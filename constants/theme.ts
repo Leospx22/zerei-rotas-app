@@ -1,0 +1,72 @@
+export const Colors = {
+  primary: {
+    50: '#E8EDF5',
+    100: '#C5D0E6',
+    200: '#8BA1CD',
+    300: '#5172B4',
+    400: '#2D4F96',
+    500: '#0A2572',
+    600: '#092066',
+    700: '#071A5A',
+    800: '#05134E',
+    900: '#030D42',
+  },
+  gold: {
+    50: '#FFF9E6',
+    100: '#FFF0BF',
+    200: '#FFE699',
+    300: '#FFD966',
+    400: '#FFCC33',
+    500: '#D4A017',
+    600: '#B8860B',
+    700: '#9C7204',
+    800: '#805E00',
+    900: '#644A00',
+  },
+  white: '#FFFFFF',
+  offWhite: '#F5F7FA',
+  lightGray: '#E1E5EB',
+  gray: '#8C9BAB',
+  darkGray: '#4A5568',
+  success: '#22C55E',
+  successBg: 'rgba(34, 197, 94, 0.07)',
+  successBorder: 'rgba(34, 197, 94, 0.2)',
+  warning: '#F59E0B',
+  warningBg: 'rgba(245, 158, 11, 0.07)',
+  warningBorder: 'rgba(245, 158, 11, 0.2)',
+  error: '#EF4444',
+  errorBg: 'rgba(239, 68, 68, 0.07)',
+  errorBorder: 'rgba(239, 68, 68, 0.2)',
+  background: '#0A1628',
+  cardBg: '#111D33',
+  cardBorder: '#1C2D4A',
+  overlay: 'rgba(5, 19, 78, 0.27)',
+};
+
+export const Spacing = {
+  xs: 4,
+  sm: 8,
+  md: 16,
+  lg: 24,
+  xl: 32,
+  xxl: 48,
+};
+
+export const FontSizes = {
+  xs: 10,
+  sm: 12,
+  md: 14,
+  lg: 16,
+  xl: 18,
+  xxl: 24,
+  xxxl: 32,
+  hero: 42,
+};
+
+export const BorderRadius = {
+  sm: 8,
+  md: 12,
+  lg: 16,
+  xl: 24,
+  full: 9999,
+};

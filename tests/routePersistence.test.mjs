@@ -11,6 +11,7 @@ import {
   saveCompletedRouteToHistory,
   saveRouteToStorage,
 } from '../lib/routePersistence.ts';
+import { buildPlanningRoute } from '../lib/packageUtils.ts';
 
 class MemoryStorage {
   values = new Map();
@@ -85,4 +86,46 @@ test('falls back to shared memory storage when localStorage is unavailable', () 
   } finally {
     if (previous) globalThis.localStorage = previous;
   }
+});
+
+test('successful spreadsheet parsing can create and persist a planning route immediately', () => {
+  const storage = new MemoryStorage();
+  const rawPackages = [
+    {
+      trackingNumber: 'PKG-1',
+      destinationAddress: 'Rua A, 10',
+      zipCode: '01000-000',
+      latitude: null,
+      longitude: null,
+      stopNumber: 1,
+    },
+    {
+      trackingNumber: 'PKG-2',
+      destinationAddress: 'Rua A, 10',
+      zipCode: '01000-000',
+      latitude: null,
+      longitude: null,
+      stopNumber: 1,
+    },
+  ];
+
+  const importedRoute = buildPlanningRoute(rawPackages);
+  saveRouteToStorage(storage, importedRoute);
+
+  const saved = loadCurrentRouteFromStorage(storage);
+  assert.equal(saved?.id, importedRoute.id);
+  assert.equal(saved?.status, 'planning');
+  assert.equal(saved?.totalPackages, 2);
+  assert.equal(saved?.stops.length, 1);
+});
+
+test('continue can reuse the already-created imported route without duplicating it', () => {
+  const storage = new MemoryStorage();
+  const importedRoute = route('planning');
+
+  saveRouteToStorage(storage, importedRoute);
+  saveRouteToStorage(storage, importedRoute);
+
+  assert.equal(loadCurrentRouteFromStorage(storage)?.id, importedRoute.id);
+  assert.equal(loadHistoryFromStorage(storage).length, 0);
 });

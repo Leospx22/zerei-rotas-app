@@ -25,8 +25,7 @@ import { useRoute } from '@/contexts/RouteContext';
 import {
   RawPackage,
   parseSpreadsheetData,
-  groupPackagesByStop,
-  generateId,
+  buildPlanningRoute,
 } from '@/lib/packageUtils';
 import { parseCSV, parseSpreadsheetText, parseSpreadsheetFile, isBinarySpreadsheet } from '@/lib/spreadsheetParser';
 
@@ -49,11 +48,12 @@ const SAMPLE_XLSX_DATA = [
 
 export default function ImportScreen() {
   const router = useRouter();
-  const { setCurrentRoute } = useRoute();
+  const { currentRoute, setCurrentRoute } = useRoute();
   const [loading, setLoading] = useState(false);
   const [rawPackages, setRawPackages] = useState<RawPackage[]>([]);
   const [detectedColumns, setDetectedColumns] = useState<string[]>([]);
   const [fileName, setFileName] = useState<string>('');
+  const [importedRouteId, setImportedRouteId] = useState<string | null>(null);
   const [pasteText, setPasteText] = useState('');
   const [error, setError] = useState<string | null>(null);
 
@@ -63,10 +63,13 @@ export default function ImportScreen() {
       setError('Nenhum pacote encontrado. Verifique as colunas da planilha.');
       return;
     }
+    const route = buildPlanningRoute(packages);
     setDetectedColumns(headers);
     setRawPackages(packages);
+    setImportedRouteId(route.id);
+    setCurrentRoute(route);
     setError(null);
-  }, []);
+  }, [setCurrentRoute]);
 
   const loadSampleData = () => {
     setLoading(true);
@@ -147,21 +150,11 @@ export default function ImportScreen() {
 
   const handleContinue = () => {
     if (rawPackages.length === 0) return;
-    const stops = groupPackagesByStop(rawPackages);
-    const totalPackages = stops.reduce((sum, s) => sum + s.packageCount, 0);
-    const route = {
-      id: generateId(),
-      name: `Rota ${new Date().toLocaleDateString('pt-BR')}`,
-      stops,
-      status: 'planning' as const,
-      estimatedDistanceKm: Math.round(stops.length * 3.5 * 10) / 10,
-      completedStops: 0,
-      totalPackages,
-      deliveredPackages: 0,
-      startTime: null,
-      durationMinutes: 0,
-    };
-    setCurrentRoute(route);
+    if (!currentRoute || currentRoute.id !== importedRouteId) {
+      const route = buildPlanningRoute(rawPackages);
+      setImportedRouteId(route.id);
+      setCurrentRoute(route);
+    }
     router.push('/import-summary');
   };
 

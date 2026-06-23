@@ -333,6 +333,24 @@ export function groupPackagesByAddress(rawPackages: RawPackage[]): GroupedStop[]
   return groupPackagesByStop(rawPackages);
 }
 
+export function buildPlanningRoute(rawPackages: RawPackage[]) {
+  const stops = groupPackagesByStop(rawPackages);
+  const totalPackages = stops.reduce((sum, stop) => sum + stop.packageCount, 0);
+
+  return {
+    id: generateId(),
+    name: `Rota ${new Date().toLocaleDateString('pt-BR')}`,
+    stops,
+    status: 'planning' as const,
+    estimatedDistanceKm: Math.round(stops.length * 3.5 * 10) / 10,
+    completedStops: 0,
+    totalPackages,
+    deliveredPackages: 0,
+    startTime: null,
+    durationMinutes: 0,
+  };
+}
+
 export function calculateImportSummary(stops: GroupedStop[]): ImportSummary {
   if (stops.length === 0) {
     return {

@@ -60,6 +60,10 @@ export default function ImportScreen() {
   const processSpreadsheet = useCallback((data: any[][], headers: string[]) => {
     const packages = parseSpreadsheetData(data, headers);
     if (packages.length === 0) {
+      console.log('[ZEREI TRACE][import] spreadsheet parsed with no packages', {
+        rawPackagesLength: packages.length,
+        setCurrentRouteCalled: false,
+      });
       setError('Nenhum pacote encontrado. Verifique as colunas da planilha.');
       return;
     }
@@ -68,6 +72,12 @@ export default function ImportScreen() {
     setRawPackages(packages);
     setImportedRouteId(route.id);
     setCurrentRoute(route);
+    console.log('[ZEREI TRACE][import] spreadsheet import succeeded', {
+      rawPackagesLength: packages.length,
+      routeId: route.id,
+      routeStatus: route.status,
+      setCurrentRouteCalled: true,
+    });
     setError(null);
   }, [setCurrentRoute]);
 

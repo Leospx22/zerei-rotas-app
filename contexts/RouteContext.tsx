@@ -88,6 +88,10 @@ export function RouteProvider({ children }: { children: ReactNode }) {
   }, [currentRoute, saveRoute]);
 
   const setCurrentRoute = useCallback((route: RouteData | null) => {
+    console.log('[ZEREI TRACE][RouteContext.setCurrentRoute]', {
+      receivedRouteId: route?.id ?? null,
+      receivedRouteStatus: route?.status ?? null,
+    });
     setCurrentRouteState(route);
     if (route) {
       saveRoute(route).catch(() => {});

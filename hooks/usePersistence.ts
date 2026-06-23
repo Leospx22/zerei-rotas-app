@@ -3,6 +3,7 @@ import { RouteData } from '@/contexts/RouteContext';
 import {
   deleteRouteFromStorage,
   getRouteStorage,
+  KEY_CURRENT,
   loadCurrentRouteFromStorage,
   loadHistoryFromStorage,
   renameRouteInStorage,
@@ -12,6 +13,13 @@ import {
 
 export type { HistoryEntry } from '@/lib/routePersistence';
 
+function describeStorage(storage: Storage | { constructor?: { name?: string } }): string {
+  if (typeof globalThis.localStorage !== 'undefined' && storage === globalThis.localStorage) {
+    return 'globalThis.localStorage';
+  }
+  return storage.constructor?.name ?? 'unknown storage';
+}
+
 export function usePersistence() {
   const [isLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -19,8 +27,25 @@ export function usePersistence() {
 
   const saveRoute = useCallback(async (route: RouteData): Promise<string | null> => {
     try {
-      return saveRouteToStorage(storage, route);
+      const jsonWritten = JSON.stringify(route);
+      console.log('[ZEREI TRACE][saveRoute] before write', {
+        storageImplementation: describeStorage(storage),
+        storageKey: KEY_CURRENT,
+        jsonWritten,
+      });
+      const savedId = saveRouteToStorage(storage, route);
+      console.log('[ZEREI TRACE][saveRoute] after write readback', {
+        storageImplementation: describeStorage(storage),
+        storageKey: KEY_CURRENT,
+        readBack: storage.getItem(KEY_CURRENT),
+      });
+      return savedId;
     } catch (err: any) {
+      console.log('[ZEREI TRACE][saveRoute] write failed', {
+        storageImplementation: describeStorage(storage),
+        storageKey: KEY_CURRENT,
+        error: err?.message ?? err,
+      });
       setError(err.message ?? 'Erro ao salvar rota');
       return null;
     }

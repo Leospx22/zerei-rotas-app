@@ -3,22 +3,13 @@ import { RouteData } from '@/contexts/RouteContext';
 import {
   deleteRouteFromStorage,
   getRouteStorage,
-  KEY_CURRENT,
   loadCurrentRouteFromStorage,
   loadHistoryFromStorage,
   renameRouteInStorage,
   saveCompletedRouteToHistory,
   saveRouteToStorage,
 } from '@/lib/routePersistence';
-
 export type { HistoryEntry } from '@/lib/routePersistence';
-
-function describeStorage(storage: Storage | { constructor?: { name?: string } }): string {
-  if (typeof globalThis.localStorage !== 'undefined' && storage === globalThis.localStorage) {
-    return 'globalThis.localStorage';
-  }
-  return storage.constructor?.name ?? 'unknown storage';
-}
 
 export function usePersistence() {
   const [isLoading] = useState(false);
@@ -27,25 +18,9 @@ export function usePersistence() {
 
   const saveRoute = useCallback(async (route: RouteData): Promise<string | null> => {
     try {
-      const jsonWritten = JSON.stringify(route);
-      console.log('[ZEREI TRACE][saveRoute] before write', {
-        storageImplementation: describeStorage(storage),
-        storageKey: KEY_CURRENT,
-        jsonWritten,
-      });
-      const savedId = saveRouteToStorage(storage, route);
-      console.log('[ZEREI TRACE][saveRoute] after write readback', {
-        storageImplementation: describeStorage(storage),
-        storageKey: KEY_CURRENT,
-        readBack: storage.getItem(KEY_CURRENT),
-      });
+      const savedId = await saveRouteToStorage(storage, route);
       return savedId;
     } catch (err: any) {
-      console.log('[ZEREI TRACE][saveRoute] write failed', {
-        storageImplementation: describeStorage(storage),
-        storageKey: KEY_CURRENT,
-        error: err?.message ?? err,
-      });
       setError(err.message ?? 'Erro ao salvar rota');
       return null;
     }
@@ -53,7 +28,7 @@ export function usePersistence() {
 
   const loadCurrentRoute = useCallback(async (): Promise<RouteData | null> => {
     try {
-      return loadCurrentRouteFromStorage(storage);
+      return await loadCurrentRouteFromStorage(storage);
     } catch (err: any) {
       setError(err.message ?? 'Erro ao carregar rota');
       return null;
@@ -62,7 +37,7 @@ export function usePersistence() {
 
   const saveToHistory = useCallback(async (route: RouteData): Promise<boolean> => {
     try {
-      saveCompletedRouteToHistory(storage, route);
+      await saveCompletedRouteToHistory(storage, route);
       return true;
     } catch (err: any) {
       setError(err.message ?? 'Erro ao salvar histórico');
@@ -74,7 +49,7 @@ export function usePersistence() {
 
   const renameRoute = useCallback(async (id: string, name: string): Promise<boolean> => {
     try {
-      return renameRouteInStorage(storage, id, name);
+      return await renameRouteInStorage(storage, id, name);
     } catch {
       return false;
     }
@@ -82,7 +57,7 @@ export function usePersistence() {
 
   const deleteRoute = useCallback(async (id: string): Promise<boolean> => {
     try {
-      return deleteRouteFromStorage(storage, id);
+      return await deleteRouteFromStorage(storage, id);
     } catch {
       return false;
     }

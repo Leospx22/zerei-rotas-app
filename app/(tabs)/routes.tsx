@@ -51,9 +51,7 @@ export default function RoutesScreen() {
 
   const loadRoutes = useCallback(async () => {
     const current = await loadCurrentRoute();
-    console.log('[ZEREI TRACE][routes] loadCurrentRoute result', current);
     const history = await getHistory();
-    console.log('[ZEREI TRACE][routes] getHistory result', history);
 
     const items: RouteItem[] = [];
 
@@ -87,7 +85,6 @@ export default function RoutesScreen() {
       });
     });
 
-    console.log('[ZEREI TRACE][routes] final routes array rendered', items);
     setRoutes(items);
   }, [loadCurrentRoute, getHistory]);
 

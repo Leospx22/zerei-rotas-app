@@ -2,7 +2,6 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
   deleteRouteFromStorage,
-  getRouteStorage,
   KEY_CURRENT,
   KEY_HISTORY,
   loadCurrentRouteFromStorage,
@@ -16,9 +15,9 @@ import { buildPlanningRoute } from '../lib/packageUtils.ts';
 class MemoryStorage {
   values = new Map();
 
-  getItem(key) { return this.values.get(key) ?? null; }
-  setItem(key, value) { this.values.set(key, value); }
-  removeItem(key) { this.values.delete(key); }
+  async getItem(key) { return this.values.get(key) ?? null; }
+  async setItem(key, value) { this.values.set(key, value); }
+  async removeItem(key) { this.values.delete(key); }
 }
 
 function route(status) {
@@ -36,59 +35,46 @@ function route(status) {
   };
 }
 
-test('import persists a planning route that Minhas Rotas can load', () => {
+test('import persists a planning route that Minhas Rotas can load', async () => {
   const storage = new MemoryStorage();
-  saveRouteToStorage(storage, route('planning'));
+  await saveRouteToStorage(storage, route('planning'));
 
-  assert.equal(loadCurrentRouteFromStorage(storage)?.status, 'planning');
-  assert.equal(loadHistoryFromStorage(storage).length, 0);
+  assert.equal((await loadCurrentRouteFromStorage(storage))?.status, 'planning');
+  assert.equal((await loadHistoryFromStorage(storage)).length, 0);
 });
 
-test('planning to active overwrites the current route without duplication', () => {
+test('planning to active overwrites the current route without duplication', async () => {
   const storage = new MemoryStorage();
-  saveRouteToStorage(storage, route('planning'));
-  saveRouteToStorage(storage, route('active'));
+  await saveRouteToStorage(storage, route('planning'));
+  await saveRouteToStorage(storage, route('active'));
 
-  assert.equal(loadCurrentRouteFromStorage(storage)?.status, 'active');
-  assert.equal(JSON.parse(storage.getItem(KEY_CURRENT)).id, 'route-1');
-  assert.equal(loadHistoryFromStorage(storage).length, 0);
+  assert.equal((await loadCurrentRouteFromStorage(storage))?.status, 'active');
+  assert.equal(JSON.parse(await storage.getItem(KEY_CURRENT)).id, 'route-1');
+  assert.equal((await loadHistoryFromStorage(storage)).length, 0);
 });
 
-test('active to completed keeps history behavior and removes the current route', () => {
+test('active to completed keeps history behavior and removes the current route', async () => {
   const storage = new MemoryStorage();
-  saveRouteToStorage(storage, route('active'));
-  saveCompletedRouteToHistory(storage, route('completed'));
+  await saveRouteToStorage(storage, route('active'));
+  await saveCompletedRouteToHistory(storage, route('completed'));
 
-  assert.equal(loadCurrentRouteFromStorage(storage), null);
-  assert.equal(storage.getItem(KEY_CURRENT), null);
-  assert.equal(loadHistoryFromStorage(storage).length, 1);
-  assert.equal(JSON.parse(storage.getItem(KEY_HISTORY))[0].id, 'route-1');
+  assert.equal(await loadCurrentRouteFromStorage(storage), null);
+  assert.equal(await storage.getItem(KEY_CURRENT), null);
+  assert.equal((await loadHistoryFromStorage(storage)).length, 1);
+  assert.equal(JSON.parse(await storage.getItem(KEY_HISTORY))[0].id, 'route-1');
 });
 
-test('planning routes can still be renamed and deleted', () => {
+test('planning routes can still be renamed and deleted', async () => {
   const storage = new MemoryStorage();
-  saveRouteToStorage(storage, route('planning'));
+  await saveRouteToStorage(storage, route('planning'));
 
-  assert.equal(renameRouteInStorage(storage, 'route-1', 'Nova rota'), true);
-  assert.equal(loadCurrentRouteFromStorage(storage)?.name, 'Nova rota');
-  assert.equal(deleteRouteFromStorage(storage, 'route-1'), true);
-  assert.equal(loadCurrentRouteFromStorage(storage), null);
+  assert.equal(await renameRouteInStorage(storage, 'route-1', 'Nova rota'), true);
+  assert.equal((await loadCurrentRouteFromStorage(storage))?.name, 'Nova rota');
+  assert.equal(await deleteRouteFromStorage(storage, 'route-1'), true);
+  assert.equal(await loadCurrentRouteFromStorage(storage), null);
 });
 
-test('falls back to shared memory storage when localStorage is unavailable', () => {
-  const previous = globalThis.localStorage;
-  try {
-    delete globalThis.localStorage;
-    const storage = getRouteStorage();
-    saveRouteToStorage(storage, route('planning'));
-
-    assert.equal(loadCurrentRouteFromStorage(getRouteStorage())?.status, 'planning');
-  } finally {
-    if (previous) globalThis.localStorage = previous;
-  }
-});
-
-test('successful spreadsheet parsing can create and persist a planning route immediately', () => {
+test('successful spreadsheet parsing can create and persist a planning route immediately', async () => {
   const storage = new MemoryStorage();
   const rawPackages = [
     {
@@ -110,22 +96,22 @@ test('successful spreadsheet parsing can create and persist a planning route imm
   ];
 
   const importedRoute = buildPlanningRoute(rawPackages);
-  saveRouteToStorage(storage, importedRoute);
+  await saveRouteToStorage(storage, importedRoute);
 
-  const saved = loadCurrentRouteFromStorage(storage);
+  const saved = await loadCurrentRouteFromStorage(storage);
   assert.equal(saved?.id, importedRoute.id);
   assert.equal(saved?.status, 'planning');
   assert.equal(saved?.totalPackages, 2);
   assert.equal(saved?.stops.length, 1);
 });
 
-test('continue can reuse the already-created imported route without duplicating it', () => {
+test('continue can reuse the already-created imported route without duplicating it', async () => {
   const storage = new MemoryStorage();
   const importedRoute = route('planning');
 
-  saveRouteToStorage(storage, importedRoute);
-  saveRouteToStorage(storage, importedRoute);
+  await saveRouteToStorage(storage, importedRoute);
+  await saveRouteToStorage(storage, importedRoute);
 
-  assert.equal(loadCurrentRouteFromStorage(storage)?.id, importedRoute.id);
-  assert.equal(loadHistoryFromStorage(storage).length, 0);
+  assert.equal((await loadCurrentRouteFromStorage(storage))?.id, importedRoute.id);
+  assert.equal((await loadHistoryFromStorage(storage)).length, 0);
 });

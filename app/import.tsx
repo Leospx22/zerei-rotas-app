@@ -27,7 +27,7 @@ import {
   parseSpreadsheetData,
   buildPlanningRoute,
 } from '@/lib/packageUtils';
-import { parseCSV, parseSpreadsheetText, parseSpreadsheetFile, isBinarySpreadsheet } from '@/lib/spreadsheetParser';
+import { parseSpreadsheetText, parseSpreadsheetFile, isBinarySpreadsheet } from '@/lib/spreadsheetParser';
 
 const SAMPLE_XLSX_DATA = [
   ['Rastreio', 'Endereço', 'CEP', 'Latitude', 'Longitude', 'Parada'],
@@ -46,6 +46,35 @@ const SAMPLE_XLSX_DATA = [
   ['ML987658', 'Av. Brasil, 500 - Jardim América, SP', '01430-000', '-23.5550', '-46.6800', '8'],
 ];
 
+function getFileExtension(fileName: string): string {
+  return fileName.split('.').pop()?.toLowerCase() ?? '';
+}
+
+function isNativeBinarySpreadsheet(fileName: string, mimeType?: string): boolean {
+  const extension = getFileExtension(fileName);
+  if (extension === 'xlsx' || extension === 'xls') return true;
+  if (extension === 'csv') return false;
+  const normalizedMime = (mimeType ?? '').toLowerCase();
+  return normalizedMime.includes('spreadsheet')
+    || normalizedMime.includes('excel')
+    || normalizedMime === 'application/vnd.ms-excel';
+}
+
+function normalizeSheetRows(data: unknown[][]): { headers: string[]; rows: string[][] } {
+  const normalized = data
+    .map(row => row.map(cell => String(cell ?? '').trim()))
+    .filter(row => row.some(cell => cell.length > 0));
+
+  if (normalized.length === 0) {
+    throw new Error('A planilha está vazia.');
+  }
+
+  return {
+    headers: normalized[0],
+    rows: normalized.slice(1),
+  };
+}
+
 export default function ImportScreen() {
   const router = useRouter();
   const { currentRoute, setCurrentRoute } = useRoute();
@@ -60,10 +89,6 @@ export default function ImportScreen() {
   const processSpreadsheet = useCallback((data: any[][], headers: string[]) => {
     const packages = parseSpreadsheetData(data, headers);
     if (packages.length === 0) {
-      console.log('[ZEREI TRACE][import] spreadsheet parsed with no packages', {
-        rawPackagesLength: packages.length,
-        setCurrentRouteCalled: false,
-      });
       setError('Nenhum pacote encontrado. Verifique as colunas da planilha.');
       return;
     }
@@ -72,12 +97,6 @@ export default function ImportScreen() {
     setRawPackages(packages);
     setImportedRouteId(route.id);
     setCurrentRoute(route);
-    console.log('[ZEREI TRACE][import] spreadsheet import succeeded', {
-      rawPackagesLength: packages.length,
-      routeId: route.id,
-      routeStatus: route.status,
-      setCurrentRouteCalled: true,
-    });
     setError(null);
   }, [setCurrentRoute]);
 
@@ -128,7 +147,6 @@ export default function ImportScreen() {
           try {
             let headers: string[];
             let rows: string[][];
-
             if (isBinarySpreadsheet(file.name)) {
               const result = await parseSpreadsheetFile(file);
               headers = result.headers;
@@ -139,7 +157,6 @@ export default function ImportScreen() {
               headers = result.headers;
               rows = result.rows;
             }
-
             if (headers.length === 0 || rows.length === 0) {
               setError('Arquivo vazio ou sem dados suficientes.');
               setLoading(false);
@@ -155,6 +172,79 @@ export default function ImportScreen() {
       } catch {
         setError('Não foi possível abrir o seletor de arquivos.');
       }
+      return;
+    }
+
+    // Native (Android / iOS)
+    try {
+      const DocumentPicker = await import('expo-document-picker');
+      const FileSystem = await import('expo-file-system/legacy');
+
+      const result = await DocumentPicker.getDocumentAsync({
+        type: [
+          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+          'application/vnd.ms-excel',
+          'text/csv',
+          'text/comma-separated-values',
+          '*/*',
+        ],
+        copyToCacheDirectory: true,
+      });
+
+      if (result.canceled || !result.assets?.[0]) return;
+
+      const asset = result.assets[0];
+      const uriFileName = decodeURIComponent(asset.uri.split('/').pop() ?? '');
+      const name = asset.name || uriFileName || 'arquivo';
+      const mimeType = asset.mimeType;
+      setFileName(name);
+      setLoading(true);
+      setError(null);
+
+      try {
+        let headers: string[];
+        let rows: string[][];
+
+        if (isNativeBinarySpreadsheet(name, mimeType)) {
+          const base64 = await FileSystem.readAsStringAsync(asset.uri, {
+            encoding: 'base64',
+          });
+          const XLSX = await import('xlsx');
+          const workbook = XLSX.read(base64, { type: 'base64' });
+          const sheetName = workbook.SheetNames[0];
+          if (!sheetName) {
+            throw new Error('A planilha não possui abas para importar.');
+          }
+          const sheet = workbook.Sheets[sheetName];
+          const jsonData: unknown[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
+          const normalized = normalizeSheetRows(jsonData);
+          headers = normalized.headers;
+          rows = normalized.rows;
+        } else {
+          const text = await FileSystem.readAsStringAsync(asset.uri);
+          if (!text.trim()) {
+            throw new Error('O arquivo CSV está vazio.');
+          }
+          const parsed = parseSpreadsheetText(text.replace(/^\uFEFF/, ''));
+          headers = parsed.headers;
+          rows = parsed.rows;
+        }
+
+        if (headers.length === 0 || rows.length === 0) {
+          setError('Arquivo vazio ou sem dados suficientes.');
+          setLoading(false);
+          return;
+        }
+
+        processSpreadsheet(rows, headers);
+      } catch (err: any) {
+        setError('Erro ao ler o arquivo: ' + (err.message ?? 'verifique o formato da planilha.'));
+      }
+
+      setLoading(false);
+    } catch (err: any) {
+      setError('Não foi possível abrir o seletor de arquivos.');
+      setLoading(false);
     }
   };
 

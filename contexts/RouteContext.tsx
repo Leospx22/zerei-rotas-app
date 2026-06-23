@@ -87,11 +87,14 @@ export function RouteProvider({ children }: { children: ReactNode }) {
     return () => clearTimeout(timer);
   }, [currentRoute, saveRoute]);
 
+  // Save to history when route auto-completes via checkCompletion
+  useEffect(() => {
+    if (currentRoute?.status === 'completed') {
+      saveToHistory(currentRoute).catch(() => {});
+    }
+  }, [currentRoute?.status]);
+
   const setCurrentRoute = useCallback((route: RouteData | null) => {
-    console.log('[ZEREI TRACE][RouteContext.setCurrentRoute]', {
-      receivedRouteId: route?.id ?? null,
-      receivedRouteStatus: route?.status ?? null,
-    });
     setCurrentRouteState(route);
     if (route) {
       saveRoute(route).catch(() => {});

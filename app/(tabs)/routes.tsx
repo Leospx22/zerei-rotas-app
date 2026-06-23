@@ -42,7 +42,7 @@ interface RouteItem {
 export default function RoutesScreen() {
   const router = useRouter();
   const { loadCurrentRoute, getHistory, renameRoute, deleteRoute } = usePersistence();
-  const { setCurrentRoute } = useRoute();
+  const { setCurrentRoute, updateRouteName } = useRoute();
 
   const [routes, setRoutes] = useState<RouteItem[]>([]);
   const [editTarget, setEditTarget] = useState<RouteItem | null>(null);
@@ -103,6 +103,9 @@ export default function RoutesScreen() {
     if (!editTarget || !editName.trim()) return;
     const trimmed = editName.trim();
     await renameRoute(editTarget.id, trimmed);
+    if (editTarget.isCurrentRoute) {
+      updateRouteName(editTarget.id, trimmed);
+    }
     setRoutes(prev => prev.map(r => r.id === editTarget.id ? { ...r, name: trimmed } : r));
     setEditTarget(null);
   };

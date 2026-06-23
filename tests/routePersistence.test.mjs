@@ -74,6 +74,23 @@ test('planning routes can still be renamed and deleted', async () => {
   assert.equal(await loadCurrentRouteFromStorage(storage), null);
 });
 
+test('renamed current route survives reload and completion history', async () => {
+  const storage = new MemoryStorage();
+  await saveRouteToStorage(storage, route('active'));
+
+  assert.equal(await renameRouteInStorage(storage, 'route-1', 'Rota Renomeada'), true);
+
+  const reloaded = await loadCurrentRouteFromStorage(storage);
+  assert.ok(reloaded);
+  assert.equal(reloaded?.name, 'Rota Renomeada');
+
+  await saveCompletedRouteToHistory(storage, { ...reloaded, status: 'completed', durationMinutes: 10 });
+
+  const history = await loadHistoryFromStorage(storage);
+  assert.equal(history.length, 1);
+  assert.equal(history[0].name, 'Rota Renomeada');
+});
+
 test('successful spreadsheet parsing can create and persist a planning route immediately', async () => {
   const storage = new MemoryStorage();
   const rawPackages = [

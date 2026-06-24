@@ -34,7 +34,6 @@ interface RouteContextType {
   // packageId → occurrence reason (UI-only state, no business logic)
   occurrences: Record<string, string>;
   setCurrentRoute: (route: RouteData | null) => void;
-  renameCurrentRoute: (name: string) => Promise<boolean>;
   updateStopStatus: (stopId: string, status: GroupedStop['status']) => void;
   updatePackageStatus: (stopId: string, packageId: string, status: PackageItem['status']) => void;
   // Sets occurrence reason and delegates status change to existing updatePackageStatus
@@ -101,19 +100,6 @@ export function RouteProvider({ children }: { children: ReactNode }) {
       saveRoute(route).catch(() => {});
     }
   }, [saveRoute]);
-
-  const renameCurrentRoute = useCallback(async (name: string): Promise<boolean> => {
-    const trimmed = name.trim();
-    if (!trimmed) return false;
-
-    const route = currentRoute ?? await loadCurrentRoute();
-    if (!route) return false;
-
-    const updatedRoute = { ...route, name: trimmed };
-    setCurrentRouteState(updatedRoute);
-    const savedId = await saveRoute(updatedRoute);
-    return savedId !== null;
-  }, [currentRoute, loadCurrentRoute, saveRoute]);
 
   const updateStopStatus = useCallback((stopId: string, status: GroupedStop['status']) => {
     setCurrentRouteState(prev => {
@@ -220,7 +206,6 @@ export function RouteProvider({ children }: { children: ReactNode }) {
       persistenceError,
       occurrences,
       setCurrentRoute,
-      renameCurrentRoute,
       updateStopStatus,
       updatePackageStatus,
       updatePackageOccurrence,

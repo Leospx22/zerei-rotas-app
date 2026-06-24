@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -41,8 +41,8 @@ interface RouteItem {
 
 export default function RoutesScreen() {
   const router = useRouter();
-  const { loadCurrentRoute, getHistory, renameRoute, deleteRoute } = usePersistence();
-  const { setCurrentRoute } = useRoute();
+  const { getHistory, renameRoute, deleteRoute } = usePersistence();
+  const { currentRoute, setCurrentRoute, renameCurrentRoute } = useRoute();
 
   const [routes, setRoutes] = useState<RouteItem[]>([]);
   const [editTarget, setEditTarget] = useState<RouteItem | null>(null);
@@ -51,23 +51,21 @@ export default function RoutesScreen() {
   const [deleteTarget, setDeleteTarget] = useState<RouteItem | null>(null);
 
   const loadRoutes = useCallback(async () => {
-    const current = await loadCurrentRoute();
     const history = await getHistory();
-
     const items: RouteItem[] = [];
 
-    if (current) {
+    if (currentRoute && currentRoute.status !== 'completed') {
       items.push({
-        id: current.id,
-        name: current.name,
-        date: current.startTime
-          ? new Date(current.startTime).toLocaleDateString('pt-BR')
+        id: currentRoute.id,
+        name: currentRoute.name,
+        date: currentRoute.startTime
+          ? new Date(currentRoute.startTime).toLocaleDateString('pt-BR')
           : new Date().toLocaleDateString('pt-BR'),
-        status: current.status as 'planning' | 'active',
-        totalPackages: current.totalPackages,
-        totalStops: current.stops.length,
-        deliveredPackages: current.deliveredPackages,
-        completedStops: current.completedStops,
+        status: currentRoute.status as 'planning' | 'active',
+        totalPackages: currentRoute.totalPackages,
+        totalStops: currentRoute.stops.length,
+        deliveredPackages: currentRoute.deliveredPackages,
+        completedStops: currentRoute.completedStops,
         isCurrentRoute: true,
       });
     }
@@ -87,13 +85,17 @@ export default function RoutesScreen() {
     });
 
     setRoutes(items);
-  }, [loadCurrentRoute, getHistory]);
+  }, [currentRoute, getHistory]);
 
   useFocusEffect(
     useCallback(() => {
       loadRoutes();
     }, [loadRoutes])
   );
+
+  useEffect(() => {
+    loadRoutes();
+  }, [currentRoute]);
 
   const openEdit = (route: RouteItem) => {
     setEditTarget(route);
@@ -105,14 +107,10 @@ export default function RoutesScreen() {
     const latestName = editNameRef.current || editName;
     if (!editTarget || !latestName.trim()) return;
     const trimmed = latestName.trim();
-    const renamed = await renameRoute(editTarget.id, trimmed);
+    const renamed = editTarget.isCurrentRoute
+      ? await renameCurrentRoute(trimmed)
+      : await renameRoute(editTarget.id, trimmed);
     if (!renamed) return;
-    if (editTarget.isCurrentRoute) {
-      const current = await loadCurrentRoute();
-      if (current && current.id === editTarget.id) {
-        setCurrentRoute(current);
-      }
-    }
     setRoutes(prev => prev.map(r => r.id === editTarget.id ? { ...r, name: trimmed } : r));
     setEditTarget(null);
   };

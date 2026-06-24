@@ -22,6 +22,13 @@ export interface RouteStorage {
 export const KEY_CURRENT = 'zerei_current_route';
 export const KEY_HISTORY = 'zerei_route_history';
 
+function traceRouteStorage(event: string, details: Record<string, unknown>): void {
+  console.log(`[ZEREI RENAME TRACE][routePersistence.${event}]`, {
+    ...details,
+    stack: new Error().stack,
+  });
+}
+
 export function getRouteStorage(): RouteStorage {
   return AsyncStorage;
 }
@@ -36,16 +43,38 @@ async function readJSON<T>(storage: RouteStorage, key: string, fallback: T): Pro
 }
 
 async function writeJSON(storage: RouteStorage, key: string, value: unknown): Promise<void> {
-  await storage.setItem(key, JSON.stringify(value));
+  const json = JSON.stringify(value);
+  traceRouteStorage('writeJSON.before', {
+    key,
+    jsonWritten: json,
+  });
+  await storage.setItem(key, json);
+  const readBack = await storage.getItem(key);
+  traceRouteStorage('writeJSON.afterReadBack', {
+    key,
+    readBack,
+  });
 }
 
 export async function saveRouteToStorage(storage: RouteStorage, route: RouteData): Promise<string> {
+  traceRouteStorage('saveRouteToStorage.called', {
+    key: KEY_CURRENT,
+    routeId: route.id,
+    routeName: route.name,
+    routeStatus: route.status,
+  });
   await writeJSON(storage, KEY_CURRENT, route);
   return route.id;
 }
 
 export async function loadCurrentRouteFromStorage(storage: RouteStorage): Promise<RouteData | null> {
   const route = await readJSON<RouteData | null>(storage, KEY_CURRENT, null);
+  traceRouteStorage('loadCurrentRouteFromStorage.result', {
+    key: KEY_CURRENT,
+    routeId: route?.id ?? null,
+    routeName: route?.name ?? null,
+    routeStatus: route?.status ?? null,
+  });
   return route && route.status !== 'completed' ? route : null;
 }
 
@@ -74,8 +103,22 @@ export async function saveCompletedRouteToHistory(storage: RouteStorage, route: 
 
 export async function renameRouteInStorage(storage: RouteStorage, id: string, name: string): Promise<boolean> {
   const current = await readJSON<RouteData | null>(storage, KEY_CURRENT, null);
+  traceRouteStorage('renameRouteInStorage.before', {
+    key: KEY_CURRENT,
+    routeId: id,
+    titleBeforeRename: current?.id === id ? current.name : null,
+    newTitlePassedToRenameRoute: name,
+    currentRouteId: current?.id ?? null,
+    currentRouteName: current?.name ?? null,
+  });
   if (current && current.id === id) {
     await writeJSON(storage, KEY_CURRENT, { ...current, name });
+    traceRouteStorage('renameRouteInStorage.afterCurrentRename', {
+      key: KEY_CURRENT,
+      routeId: id,
+      newTitlePassedToRenameRoute: name,
+      readBack: await storage.getItem(KEY_CURRENT),
+    });
     return true;
   }
   const history = await loadHistoryFromStorage(storage);

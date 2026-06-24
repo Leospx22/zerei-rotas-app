@@ -34,7 +34,6 @@ interface RouteContextType {
   // packageId → occurrence reason (UI-only state, no business logic)
   occurrences: Record<string, string>;
   setCurrentRoute: (route: RouteData | null) => void;
-  updateRouteName: (routeId: string, name: string) => void;
   updateStopStatus: (stopId: string, status: GroupedStop['status']) => void;
   updatePackageStatus: (stopId: string, packageId: string, status: PackageItem['status']) => void;
   // Sets occurrence reason and delegates status change to existing updatePackageStatus
@@ -71,6 +70,10 @@ export function RouteProvider({ children }: { children: ReactNode }) {
     let mounted = true;
     const loadRoute = async () => {
       const route = await loadCurrentRoute();
+      console.log('[ZEREI RENAME TRACE][RouteContext.mount.loadCurrentRoute]', {
+        loadedRouteId: route?.id ?? null,
+        loadedRouteName: route?.name ?? null,
+      });
       if (mounted && route) {
         setCurrentRouteState(route);
       }
@@ -83,10 +86,23 @@ export function RouteProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!currentRoute) return;
     const timer = setTimeout(() => {
+      console.log('[ZEREI RENAME TRACE][RouteContext.autoSave]', {
+        routeId: currentRoute.id,
+        routeName: currentRoute.name,
+        routeStatus: currentRoute.status,
+      });
       saveRoute(currentRoute).catch(() => {});
     }, 1000);
     return () => clearTimeout(timer);
   }, [currentRoute, saveRoute]);
+
+  useEffect(() => {
+    console.log('[ZEREI RENAME TRACE][RouteContext.currentRoute.changed]', {
+      routeId: currentRoute?.id ?? null,
+      routeName: currentRoute?.name ?? null,
+      routeStatus: currentRoute?.status ?? null,
+    });
+  }, [currentRoute]);
 
   // Save to history when route auto-completes via checkCompletion
   useEffect(() => {
@@ -96,19 +112,20 @@ export function RouteProvider({ children }: { children: ReactNode }) {
   }, [currentRoute?.status]);
 
   const setCurrentRoute = useCallback((route: RouteData | null) => {
+    console.log('[ZEREI RENAME TRACE][RouteContext.setCurrentRoute.called]', {
+      routeId: route?.id ?? null,
+      routeName: route?.name ?? null,
+      routeStatus: route?.status ?? null,
+    });
     setCurrentRouteState(route);
     if (route) {
+      console.log('[ZEREI RENAME TRACE][RouteContext.setCurrentRoute.saveRoute]', {
+        routeId: route.id,
+        routeName: route.name,
+        routeStatus: route.status,
+      });
       saveRoute(route).catch(() => {});
     }
-  }, [saveRoute]);
-
-  const updateRouteName = useCallback((routeId: string, name: string) => {
-    setCurrentRouteState(prev => {
-      if (!prev || prev.id !== routeId) return prev;
-      const updated = { ...prev, name };
-      saveRoute(updated).catch(() => {});
-      return updated;
-    });
   }, [saveRoute]);
 
   const updateStopStatus = useCallback((stopId: string, status: GroupedStop['status']) => {
@@ -216,7 +233,6 @@ export function RouteProvider({ children }: { children: ReactNode }) {
       persistenceError,
       occurrences,
       setCurrentRoute,
-      updateRouteName,
       updateStopStatus,
       updatePackageStatus,
       updatePackageOccurrence,

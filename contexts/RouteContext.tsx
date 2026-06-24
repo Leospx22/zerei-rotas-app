@@ -70,10 +70,6 @@ export function RouteProvider({ children }: { children: ReactNode }) {
     let mounted = true;
     const loadRoute = async () => {
       const route = await loadCurrentRoute();
-      console.log('[ZEREI RENAME TRACE][RouteContext.mount.loadCurrentRoute]', {
-        loadedRouteId: route?.id ?? null,
-        loadedRouteName: route?.name ?? null,
-      });
       if (mounted && route) {
         setCurrentRouteState(route);
       }
@@ -86,23 +82,10 @@ export function RouteProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!currentRoute) return;
     const timer = setTimeout(() => {
-      console.log('[ZEREI RENAME TRACE][RouteContext.autoSave]', {
-        routeId: currentRoute.id,
-        routeName: currentRoute.name,
-        routeStatus: currentRoute.status,
-      });
       saveRoute(currentRoute).catch(() => {});
     }, 1000);
     return () => clearTimeout(timer);
   }, [currentRoute, saveRoute]);
-
-  useEffect(() => {
-    console.log('[ZEREI RENAME TRACE][RouteContext.currentRoute.changed]', {
-      routeId: currentRoute?.id ?? null,
-      routeName: currentRoute?.name ?? null,
-      routeStatus: currentRoute?.status ?? null,
-    });
-  }, [currentRoute]);
 
   // Save to history when route auto-completes via checkCompletion
   useEffect(() => {
@@ -112,18 +95,8 @@ export function RouteProvider({ children }: { children: ReactNode }) {
   }, [currentRoute?.status]);
 
   const setCurrentRoute = useCallback((route: RouteData | null) => {
-    console.log('[ZEREI RENAME TRACE][RouteContext.setCurrentRoute.called]', {
-      routeId: route?.id ?? null,
-      routeName: route?.name ?? null,
-      routeStatus: route?.status ?? null,
-    });
     setCurrentRouteState(route);
     if (route) {
-      console.log('[ZEREI RENAME TRACE][RouteContext.setCurrentRoute.saveRoute]', {
-        routeId: route.id,
-        routeName: route.name,
-        routeStatus: route.status,
-      });
       saveRoute(route).catch(() => {});
     }
   }, [saveRoute]);

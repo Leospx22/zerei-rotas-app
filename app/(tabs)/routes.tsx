@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect, useRef } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -42,28 +42,17 @@ interface RouteItem {
 export default function RoutesScreen() {
   const router = useRouter();
   const { loadCurrentRoute, getHistory, renameRoute, deleteRoute } = usePersistence();
-  const { currentRoute, setCurrentRoute } = useRoute();
-  const currentRouteRef = useRef(currentRoute);
+  const { setCurrentRoute } = useRoute();
 
   const [routes, setRoutes] = useState<RouteItem[]>([]);
   const [editTarget, setEditTarget] = useState<RouteItem | null>(null);
   const [editName, setEditName] = useState('');
+  const editNameRef = useRef('');
   const [deleteTarget, setDeleteTarget] = useState<RouteItem | null>(null);
-
-  useEffect(() => {
-    currentRouteRef.current = currentRoute;
-  }, [currentRoute]);
 
   const loadRoutes = useCallback(async () => {
     const current = await loadCurrentRoute();
     const history = await getHistory();
-    console.log('[ZEREI RENAME TRACE][routes.loadRoutes]', {
-      loadedCurrentId: current?.id ?? null,
-      loadedCurrentName: current?.name ?? null,
-      contextCurrentId: currentRouteRef.current?.id ?? null,
-      contextCurrentName: currentRouteRef.current?.name ?? null,
-      historyNames: history.map(entry => ({ id: entry.id, name: entry.name })),
-    });
 
     const items: RouteItem[] = [];
 
@@ -109,39 +98,19 @@ export default function RoutesScreen() {
   const openEdit = (route: RouteItem) => {
     setEditTarget(route);
     setEditName(route.name);
+    editNameRef.current = route.name;
   };
 
   const handleSaveName = async () => {
-    if (!editTarget || !editName.trim()) return;
-    const trimmed = editName.trim();
-    console.log('[ZEREI RENAME TRACE][routes.handleSaveName.before]', {
-      routeId: editTarget.id,
-      titleBeforeRename: editTarget.name,
-      newTitlePassedToRenameRoute: trimmed,
-      isCurrentRoute: editTarget.isCurrentRoute,
-      contextCurrentId: currentRoute?.id ?? null,
-      contextCurrentName: currentRoute?.name ?? null,
-    });
+    const latestName = editNameRef.current || editName;
+    if (!editTarget || !latestName.trim()) return;
+    const trimmed = latestName.trim();
     const renamed = await renameRoute(editTarget.id, trimmed);
-    console.log('[ZEREI RENAME TRACE][routes.handleSaveName.afterRenameRoute]', {
-      routeId: editTarget.id,
-      renamed,
-      newTitlePassedToRenameRoute: trimmed,
-    });
     if (!renamed) return;
     if (editTarget.isCurrentRoute) {
       const current = await loadCurrentRoute();
-      console.log('[ZEREI RENAME TRACE][routes.handleSaveName.reloadAfterRename]', {
-        routeId: editTarget.id,
-        loadedCurrentId: current?.id ?? null,
-        loadedCurrentName: current?.name ?? null,
-      });
       if (current && current.id === editTarget.id) {
         setCurrentRoute(current);
-        console.log('[ZEREI RENAME TRACE][routes.handleSaveName.setCurrentRouteCalled]', {
-          routeId: current.id,
-          name: current.name,
-        });
       }
     }
     setRoutes(prev => prev.map(r => r.id === editTarget.id ? { ...r, name: trimmed } : r));
@@ -283,7 +252,10 @@ export default function RoutesScreen() {
           <TextInput
             style={styles.input}
             value={editName}
-            onChangeText={setEditName}
+            onChangeText={(text) => {
+              editNameRef.current = text;
+              setEditName(text);
+            }}
             placeholder="Nome da rota"
             placeholderTextColor={Colors.gray}
             autoFocus

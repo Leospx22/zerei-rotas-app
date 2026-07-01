@@ -9,8 +9,11 @@ import {
   ActivityIndicator,
   Platform,
 } from 'react-native';
+import * as DocumentPicker from 'expo-document-picker';
+import * as FileSystem from 'expo-file-system/legacy';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
+import * as XLSX from 'xlsx';
 import {
   ArrowLeft,
   FileSpreadsheet,
@@ -28,6 +31,8 @@ import {
   buildPlanningRoute,
 } from '@/lib/packageUtils';
 import { parseSpreadsheetText, parseSpreadsheetFile, isBinarySpreadsheet } from '@/lib/spreadsheetParser';
+
+const MAX_NATIVE_FILE_SIZE_BYTES = 10 * 1024 * 1024;
 
 const SAMPLE_XLSX_DATA = [
   ['Rastreio', 'Endereço', 'CEP', 'Latitude', 'Longitude', 'Parada'],
@@ -75,6 +80,17 @@ function normalizeSheetRows(data: unknown[][]): { headers: string[]; rows: strin
   };
 }
 
+function getErrorMessage(err: unknown): string {
+  return err instanceof Error && err.message ? err.message : 'verifique o formato da planilha.';
+}
+
+function getPickedAsset(result: any) {
+  if (!result || result.canceled) return null;
+  if (result.assets?.[0]) return result.assets[0];
+  if (result.type === 'success' && result.uri) return result;
+  return null;
+}
+
 export default function ImportScreen() {
   const router = useRouter();
   const { currentRoute, setCurrentRoute } = useRoute();
@@ -87,17 +103,21 @@ export default function ImportScreen() {
   const [error, setError] = useState<string | null>(null);
 
   const processSpreadsheet = useCallback((data: any[][], headers: string[]) => {
-    const packages = parseSpreadsheetData(data, headers);
-    if (packages.length === 0) {
-      setError('Nenhum pacote encontrado. Verifique as colunas da planilha.');
-      return;
+    try {
+      const packages = parseSpreadsheetData(data, headers);
+      if (packages.length === 0) {
+        setError('Nenhum pacote encontrado. Verifique as colunas da planilha.');
+        return;
+      }
+      const route = buildPlanningRoute(packages);
+      setDetectedColumns(headers);
+      setRawPackages(packages);
+      setImportedRouteId(route.id);
+      setCurrentRoute(route);
+      setError(null);
+    } catch (err) {
+      setError('Erro ao processar a planilha: ' + getErrorMessage(err));
     }
-    const route = buildPlanningRoute(packages);
-    setDetectedColumns(headers);
-    setRawPackages(packages);
-    setImportedRouteId(route.id);
-    setCurrentRoute(route);
-    setError(null);
   }, [setCurrentRoute]);
 
   const loadSampleData = () => {
@@ -177,9 +197,6 @@ export default function ImportScreen() {
 
     // Native (Android / iOS)
     try {
-      const DocumentPicker = await import('expo-document-picker');
-      const FileSystem = await import('expo-file-system/legacy');
-
       const result = await DocumentPicker.getDocumentAsync({
         type: [
           'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
@@ -191,9 +208,9 @@ export default function ImportScreen() {
         copyToCacheDirectory: true,
       });
 
-      if (result.canceled || !result.assets?.[0]) return;
+      const asset = getPickedAsset(result);
+      if (!asset) return;
 
-      const asset = result.assets[0];
       const uriFileName = decodeURIComponent(asset.uri.split('/').pop() ?? '');
       const name = asset.name || uriFileName || 'arquivo';
       const mimeType = asset.mimeType;
@@ -205,11 +222,17 @@ export default function ImportScreen() {
         let headers: string[];
         let rows: string[][];
 
+        if (!asset.uri) {
+          throw new Error('O arquivo selecionado não possui um caminho válido.');
+        }
+        if (typeof asset.size === 'number' && asset.size > MAX_NATIVE_FILE_SIZE_BYTES) {
+          throw new Error('Arquivo muito grande. Selecione uma planilha de até 10 MB.');
+        }
+
         if (isNativeBinarySpreadsheet(name, mimeType)) {
           const base64 = await FileSystem.readAsStringAsync(asset.uri, {
             encoding: 'base64',
           });
-          const XLSX = await import('xlsx');
           const workbook = XLSX.read(base64, { type: 'base64' });
           const sheetName = workbook.SheetNames[0];
           if (!sheetName) {
@@ -232,18 +255,17 @@ export default function ImportScreen() {
 
         if (headers.length === 0 || rows.length === 0) {
           setError('Arquivo vazio ou sem dados suficientes.');
-          setLoading(false);
           return;
         }
 
         processSpreadsheet(rows, headers);
       } catch (err: any) {
-        setError('Erro ao ler o arquivo: ' + (err.message ?? 'verifique o formato da planilha.'));
+        setError('Erro ao ler o arquivo: ' + getErrorMessage(err));
+      } finally {
+        setLoading(false);
       }
-
-      setLoading(false);
     } catch (err: any) {
-      setError('Não foi possível abrir o seletor de arquivos.');
+      setError('Não foi possível abrir o seletor de arquivos: ' + getErrorMessage(err));
       setLoading(false);
     }
   };
@@ -255,7 +277,7 @@ export default function ImportScreen() {
       setImportedRouteId(route.id);
       setCurrentRoute(route);
     }
-    router.push('/import-summary');
+    router.replace('/(tabs)/routes/import-summary');
   };
 
   return (

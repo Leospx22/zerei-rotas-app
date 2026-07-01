@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import {
   ArrowLeft,
@@ -19,14 +19,16 @@ import { useRoute } from '@/contexts/RouteContext';
 
 export default function DeliveryPreparationScreen() {
   const router = useRouter();
+  const { from } = useLocalSearchParams<{ from?: string }>();
   const { currentRoute, setCurrentRoute } = useRoute();
   const [expandedStop, setExpandedStop] = useState<string | null>(null);
+  const cameFromImportSummary = from === 'import-summary';
 
   if (!currentRoute) {
     return (
       <View style={styles.emptyContainer}>
         <Text style={styles.emptyText}>Nenhuma rota importada</Text>
-        <TouchableOpacity onPress={() => router.push('/import')}>
+        <TouchableOpacity onPress={() => router.replace('/(tabs)/routes/import')}>
           <Text style={styles.emptyLink}>Importar planilha</Text>
         </TouchableOpacity>
       </View>
@@ -39,7 +41,10 @@ export default function DeliveryPreparationScreen() {
 
   const startRoute = () => {
     setCurrentRoute({ ...currentRoute, status: 'active', startTime: Date.now() });
-    router.push('/route-execution');
+    router.replace({
+      pathname: '/(tabs)/routes/route-execution',
+      params: { from: 'delivery-preparation' },
+    });
   };
 
   const totalPackages = currentRoute.totalPackages;
@@ -48,7 +53,16 @@ export default function DeliveryPreparationScreen() {
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+        <TouchableOpacity
+          onPress={() => {
+            if (cameFromImportSummary) {
+              router.replace('/(tabs)/routes/import-summary');
+            } else {
+              router.back();
+            }
+          }}
+          style={styles.backButton}
+        >
           <ArrowLeft size={24} color={Colors.white} />
         </TouchableOpacity>
         <View style={styles.headerTitleRow}>

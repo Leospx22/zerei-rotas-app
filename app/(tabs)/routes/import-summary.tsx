@@ -23,7 +23,7 @@ export default function ImportSummaryScreen() {
     return (
       <View style={styles.emptyContainer}>
         <Text style={styles.emptyText}>Nenhuma rota importada</Text>
-        <TouchableOpacity onPress={() => router.push('/import')}>
+        <TouchableOpacity onPress={() => router.replace('/(tabs)/routes/import')}>
           <Text style={styles.emptyLink}>Importar planilha</Text>
         </TouchableOpacity>
       </View>
@@ -36,7 +36,7 @@ export default function ImportSummaryScreen() {
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+        <TouchableOpacity onPress={() => router.replace('/(tabs)/routes/import')} style={styles.backButton}>
           <ArrowLeft size={24} color={Colors.white} />
         </TouchableOpacity>
         <View style={styles.headerTitleRow}>
@@ -159,7 +159,12 @@ export default function ImportSummaryScreen() {
 
       <TouchableOpacity
         style={styles.nextButton}
-        onPress={() => router.push('/delivery-preparation')}
+        onPress={() =>
+          router.replace({
+            pathname: '/(tabs)/routes/delivery-preparation',
+            params: { from: 'import-summary' },
+          })
+        }
       >
         <LinearGradient
           colors={[Colors.gold[500], Colors.gold[700]]}

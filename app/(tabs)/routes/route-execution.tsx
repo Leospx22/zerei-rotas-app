@@ -8,7 +8,7 @@ import {
   Modal,
   Pressable,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import {
   ArrowLeft,
@@ -73,6 +73,7 @@ function OccurrenceSheet({ visible, onSelect, onClose }: OccurrenceSheetProps) {
 
 export default function RouteExecutionScreen() {
   const router = useRouter();
+  const { from } = useLocalSearchParams<{ from?: string }>();
   const {
     currentRoute,
     updateStopStatus,
@@ -82,10 +83,11 @@ export default function RouteExecutionScreen() {
   } = useRoute();
   const [expandedStop, setExpandedStop] = useState<string | null>(null);
   const [occurrenceTarget, setOccurrenceTarget] = useState<{ stopId: string; pkgId: string } | null>(null);
+  const cameFromDeliveryPreparation = from === 'delivery-preparation';
 
   React.useEffect(() => {
     if (currentRoute?.status === 'completed') {
-      router.replace('/route-completed');
+      router.replace('/(tabs)/routes/route-completed');
     }
   }, [currentRoute?.status]);
 
@@ -99,7 +101,7 @@ export default function RouteExecutionScreen() {
     return (
       <View style={styles.emptyContainer}>
         <Text style={styles.emptyText}>Nenhuma rota ativa</Text>
-        <TouchableOpacity onPress={() => router.push('/(tabs)')}>
+        <TouchableOpacity onPress={() => router.replace('/(tabs)/routes')}>
           <Text style={styles.emptyLink}>Voltar ao painel</Text>
         </TouchableOpacity>
       </View>
@@ -120,7 +122,16 @@ export default function RouteExecutionScreen() {
     <>
       <ScrollView style={styles.container} contentContainerStyle={styles.content}>
         <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+          <TouchableOpacity
+            onPress={() => {
+              if (cameFromDeliveryPreparation) {
+                router.replace('/(tabs)/routes/delivery-preparation');
+              } else {
+                router.back();
+              }
+            }}
+            style={styles.backButton}
+          >
             <ArrowLeft size={24} color={Colors.white} />
           </TouchableOpacity>
           <View style={styles.headerTitleRow}>

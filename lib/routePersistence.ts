@@ -55,16 +55,17 @@ export async function loadHistoryFromStorage(storage: RouteStorage): Promise<His
 
 export async function saveCompletedRouteToHistory(storage: RouteStorage, route: RouteData): Promise<void> {
   const history = await loadHistoryFromStorage(storage);
+  const existing = history.find(entry => entry.id === route.id);
   const entry: HistoryEntry = {
     id: route.id,
-    name: route.name,
+    name: existing?.name ?? route.name,
     totalPackages: route.totalPackages,
     totalStops: route.stops.length,
     deliveredPackages: route.deliveredPackages,
     completedStops: route.completedStops,
     distance: route.estimatedDistanceKm,
     durationMinutes: route.durationMinutes,
-    completedAt: new Date().toISOString(),
+    completedAt: existing?.completedAt ?? new Date().toISOString(),
   };
   const deduped = history.filter(h => h.id !== entry.id);
   deduped.unshift(entry);
@@ -72,7 +73,23 @@ export async function saveCompletedRouteToHistory(storage: RouteStorage, route: 
   await storage.removeItem(KEY_CURRENT);
 }
 
-export async function renameRouteInStorage(storage: RouteStorage, id: string, name: string): Promise<boolean> {
+export async function renameRouteInStorage(
+  storage: RouteStorage,
+  id: string,
+  name: string,
+  completedAt?: string
+): Promise<boolean> {
+  if (completedAt !== undefined) {
+    const history = await loadHistoryFromStorage(storage);
+    const idx = history.findIndex(entry =>
+      entry.id === id && entry.completedAt === completedAt
+    );
+    if (idx === -1) return false;
+    history[idx] = { ...history[idx], name };
+    await writeJSON(storage, KEY_HISTORY, history);
+    return true;
+  }
+
   const current = await readJSON<RouteData | null>(storage, KEY_CURRENT, null);
   if (current && current.id === id) {
     await writeJSON(storage, KEY_CURRENT, { ...current, name });

@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -37,12 +37,13 @@ interface RouteItem {
   deliveredPackages: number;
   completedStops: number;
   isCurrentRoute: boolean;
+  completedAt?: string;
 }
 
 export default function RoutesScreen() {
   const router = useRouter();
-  const { loadCurrentRoute, getHistory, renameRoute, deleteRoute } = usePersistence();
-  const { setCurrentRoute } = useRoute();
+  const { renameRoute, deleteRoute } = usePersistence();
+  const { currentRoute, routeHistory, setCurrentRoute, renameCurrentRoute, reloadHistory } = useRoute();
 
   const [routes, setRoutes] = useState<RouteItem[]>([]);
   const [editTarget, setEditTarget] = useState<RouteItem | null>(null);
@@ -51,28 +52,26 @@ export default function RoutesScreen() {
   const [deleteTarget, setDeleteTarget] = useState<RouteItem | null>(null);
 
   const loadRoutes = useCallback(async () => {
-    const current = await loadCurrentRoute();
-    const history = await getHistory();
-
+    await reloadHistory();
     const items: RouteItem[] = [];
 
-    if (current) {
+    if (currentRoute && currentRoute.status !== 'completed') {
       items.push({
-        id: current.id,
-        name: current.name,
-        date: current.startTime
-          ? new Date(current.startTime).toLocaleDateString('pt-BR')
+        id: currentRoute.id,
+        name: currentRoute.name,
+        date: currentRoute.startTime
+          ? new Date(currentRoute.startTime).toLocaleDateString('pt-BR')
           : new Date().toLocaleDateString('pt-BR'),
-        status: current.status as 'planning' | 'active',
-        totalPackages: current.totalPackages,
-        totalStops: current.stops.length,
-        deliveredPackages: current.deliveredPackages,
-        completedStops: current.completedStops,
+        status: currentRoute.status as 'planning' | 'active',
+        totalPackages: currentRoute.totalPackages,
+        totalStops: currentRoute.stops.length,
+        deliveredPackages: currentRoute.deliveredPackages,
+        completedStops: currentRoute.completedStops,
         isCurrentRoute: true,
       });
     }
 
-    history.forEach(entry => {
+    routeHistory.forEach(entry => {
       items.push({
         id: entry.id,
         name: entry.name,
@@ -83,17 +82,22 @@ export default function RoutesScreen() {
         deliveredPackages: entry.deliveredPackages,
         completedStops: entry.completedStops,
         isCurrentRoute: false,
+        completedAt: entry.completedAt,
       });
     });
 
     setRoutes(items);
-  }, [loadCurrentRoute, getHistory]);
+  }, [currentRoute, routeHistory, reloadHistory]);
 
   useFocusEffect(
     useCallback(() => {
       loadRoutes();
     }, [loadRoutes])
   );
+
+  useEffect(() => {
+    loadRoutes();
+  }, [currentRoute]);
 
   const openEdit = (route: RouteItem) => {
     setEditTarget(route);
@@ -105,15 +109,18 @@ export default function RoutesScreen() {
     const latestName = editNameRef.current || editName;
     if (!editTarget || !latestName.trim()) return;
     const trimmed = latestName.trim();
-    const renamed = await renameRoute(editTarget.id, trimmed);
+    const renamed = editTarget.isCurrentRoute
+      ? await renameCurrentRoute(trimmed)
+      : await renameRoute(editTarget.id, trimmed, editTarget.completedAt);
     if (!renamed) return;
-    if (editTarget.isCurrentRoute) {
-      const current = await loadCurrentRoute();
-      if (current && current.id === editTarget.id) {
-        setCurrentRoute(current);
-      }
+    if (!editTarget.isCurrentRoute) {
+      await reloadHistory();
     }
-    setRoutes(prev => prev.map(r => r.id === editTarget.id ? { ...r, name: trimmed } : r));
+    setRoutes(prev => prev.map(r =>
+      r.id === editTarget.id && r.completedAt === editTarget.completedAt
+        ? { ...r, name: trimmed }
+        : r
+    ));
     setEditTarget(null);
   };
 
@@ -122,6 +129,8 @@ export default function RoutesScreen() {
     await deleteRoute(deleteTarget.id);
     if (deleteTarget.isCurrentRoute) {
       setCurrentRoute(null);
+    } else {
+      await reloadHistory();
     }
     setRoutes(prev => prev.filter(r => r.id !== deleteTarget.id));
     setDeleteTarget(null);
@@ -155,7 +164,7 @@ export default function RoutesScreen() {
 
         <TouchableOpacity
           style={styles.importButton}
-          onPress={() => router.push('/import')}
+          onPress={() => router.push('/(tabs)/routes/import')}
         >
           <LinearGradient
             colors={[Colors.gold[500], Colors.gold[700]]}
@@ -176,7 +185,7 @@ export default function RoutesScreen() {
           </View>
         ) : (
           routes.map(route => (
-            <View key={route.id} style={styles.routeCard}>
+            <View key={route.completedAt ? `${route.id}-${route.completedAt}` : route.id} style={styles.routeCard}>
               <View style={styles.cardHeader}>
                 <View style={styles.cardTitleRow}>
                   {statusIcon(route.status)}
@@ -223,8 +232,8 @@ export default function RoutesScreen() {
                   onPress={() =>
                     router.push(
                       route.status === 'active'
-                        ? '/route-execution'
-                        : '/delivery-preparation'
+                        ? '/(tabs)/routes/route-execution'
+                        : '/(tabs)/routes/delivery-preparation'
                     )
                   }
                 >

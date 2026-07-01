@@ -47,9 +47,9 @@ export function usePersistence() {
 
   const getHistory = useCallback(async () => loadHistoryFromStorage(storage), [storage]);
 
-  const renameRoute = useCallback(async (id: string, name: string): Promise<boolean> => {
+  const renameRoute = useCallback(async (id: string, name: string, completedAt?: string): Promise<boolean> => {
     try {
-      return await renameRouteInStorage(storage, id, name);
+      return await renameRouteInStorage(storage, id, name, completedAt);
     } catch {
       return false;
     }

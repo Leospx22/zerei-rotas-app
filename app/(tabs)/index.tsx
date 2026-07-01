@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -24,8 +24,18 @@ import {
 } from 'lucide-react-native';
 import { Colors, Spacing, FontSizes, BorderRadius } from '@/constants/theme';
 import { useRoute } from '@/contexts/RouteContext';
-import { usePersistence, HistoryEntry } from '@/hooks/usePersistence';
 import { useDashboard } from '@/hooks/useDashboard';
+
+interface RecentRouteItem {
+  id: string;
+  key: string;
+  name: string;
+  status: 'planning' | 'active' | 'completed';
+  totalPackages: number;
+  totalStops: number;
+  distance: number;
+  date: string;
+}
 
 function getGreeting() {
   const h = new Date().getHours();
@@ -111,7 +121,12 @@ function CelebrationScreen({ route }: { route: any }) {
         </LinearGradient>
       </Animated.View>
 
-      <TouchableOpacity style={cel.newRouteBtn} onPress={() => router.push('/import')}>
+      <TouchableOpacity
+        style={cel.newRouteBtn}
+        onPress={() => {
+          router.push('/(tabs)/routes/import');
+        }}
+      >
         <LinearGradient colors={[Colors.gold[500], Colors.gold[700]]} style={cel.newRouteBtnGrad}>
           <Star size={18} color={Colors.primary[900]} />
           <Text style={cel.newRouteBtnText}>Nova Rota</Text>
@@ -158,8 +173,7 @@ const cel = StyleSheet.create({
 
 export default function DashboardScreen() {
   const router = useRouter();
-  const { currentRoute } = useRoute();
-  const { getHistory } = usePersistence();
+  const { currentRoute, routeHistory: recentRoutes } = useRoute();
   const {
     hasRoute,
     total,
@@ -177,11 +191,32 @@ export default function DashboardScreen() {
     largestStop,
   } = useDashboard();
 
-  const [recentRoutes, setRecentRoutes] = useState<HistoryEntry[]>([]);
-
-  useEffect(() => {
-    getHistory().then(setRecentRoutes).catch(() => {});
-  }, [getHistory]);
+  const recentRouteItems: RecentRouteItem[] = [
+    ...(currentRoute && currentRoute.status !== 'completed'
+      ? [{
+          id: currentRoute.id,
+          key: currentRoute.id,
+          name: currentRoute.name,
+          status: currentRoute.status,
+          totalPackages: currentRoute.totalPackages,
+          totalStops: currentRoute.stops.length,
+          distance: currentRoute.estimatedDistanceKm,
+          date: currentRoute.startTime
+            ? new Date(currentRoute.startTime).toLocaleDateString('pt-BR')
+            : new Date().toLocaleDateString('pt-BR'),
+        }]
+      : []),
+    ...recentRoutes.map(entry => ({
+      id: entry.id,
+      key: `${entry.id}-${entry.completedAt}`,
+      name: entry.name,
+      status: 'completed' as const,
+      totalPackages: entry.totalPackages,
+      totalStops: entry.totalStops,
+      distance: entry.distance,
+      date: new Date(entry.completedAt).toLocaleDateString('pt-BR'),
+    })),
+  ];
 
   const progressAnim = useRef(new Animated.Value(0)).current;
   useEffect(() => {
@@ -277,7 +312,13 @@ export default function DashboardScreen() {
       </LinearGradient>
 
       {/* Import button */}
-      <TouchableOpacity style={styles.importButton} onPress={() => router.push('/import')} activeOpacity={0.85}>
+      <TouchableOpacity
+        style={styles.importButton}
+        onPress={() => {
+          router.push('/(tabs)/routes/import');
+        }}
+        activeOpacity={0.85}
+      >
         <LinearGradient colors={[Colors.gold[500], Colors.gold[700]]} style={styles.importGradient}>
           <FileSpreadsheet size={22} color={Colors.primary[900]} />
           <Text style={styles.importText}>Importar Planilha</Text>
@@ -288,7 +329,7 @@ export default function DashboardScreen() {
       {hasRoute && currentRoute!.status === 'active' && (
         <TouchableOpacity
           style={styles.activeRouteCard}
-          onPress={() => router.push('/route-execution')}
+          onPress={() => router.push('/(tabs)/routes/route-execution')}
           activeOpacity={0.85}
         >
           <LinearGradient colors={['#0D7A3E', '#0A5C2F']} style={styles.activeRouteBanner}>
@@ -417,24 +458,33 @@ export default function DashboardScreen() {
 
       {/* RECENT ROUTES */}
       <Text style={styles.sectionTitle}>Rotas Recentes</Text>
-      {recentRoutes.length === 0 ? (
+      {recentRouteItems.length === 0 ? (
         <View style={styles.emptyHistoryRow}>
           <Text style={styles.emptyHistoryText}>Nenhuma rota concluída ainda.</Text>
         </View>
       ) : (
-        recentRoutes.slice(0, 5).map(entry => {
-          const date = new Date(entry.completedAt).toLocaleDateString('pt-BR');
+        recentRouteItems.slice(0, 5).map(entry => {
+          const statusColor = entry.status === 'completed'
+            ? Colors.success
+            : entry.status === 'active'
+              ? Colors.warning
+              : Colors.gray;
+          const statusLabel = entry.status === 'completed'
+            ? 'Concluída'
+            : entry.status === 'active'
+              ? 'Em andamento'
+              : 'Planejada';
           return (
-            <View key={entry.id} style={styles.routeCard}>
-              <View style={[styles.routeStatusBar, { backgroundColor: Colors.success }]} />
+            <View key={entry.key} style={styles.routeCard}>
+              <View style={[styles.routeStatusBar, { backgroundColor: statusColor }]} />
               <View style={styles.routeCardBody}>
                 <View style={styles.routeCardTopRow}>
                   <Text style={styles.routeCardName}>{entry.name}</Text>
                   <View style={[
                     styles.routeStatusBadge,
-                    { backgroundColor: Colors.success + '22', borderColor: Colors.success + '55' },
+                    { backgroundColor: statusColor + '22', borderColor: statusColor + '55' },
                   ]}>
-                    <Text style={[styles.routeStatusBadgeText, { color: Colors.success }]}>Concluída</Text>
+                    <Text style={[styles.routeStatusBadgeText, { color: statusColor }]}>{statusLabel}</Text>
                   </View>
                 </View>
                 <View style={styles.routeCardMetaRow}>
@@ -452,7 +502,7 @@ export default function DashboardScreen() {
                   </View>
                   <View style={styles.routeMetaItem}>
                     <Clock size={12} color={Colors.gray} />
-                    <Text style={styles.routeMetaText}>{date}</Text>
+                    <Text style={styles.routeMetaText}>{entry.date}</Text>
                   </View>
                 </View>
               </View>

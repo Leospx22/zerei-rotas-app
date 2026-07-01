@@ -13,6 +13,7 @@ import {
   calculateImportSummary,
 } from '@/lib/packageUtils';
 import { usePersistence } from '@/hooks/usePersistence';
+import type { HistoryEntry } from '@/lib/routePersistence';
 
 export interface RouteData {
   id: string;
@@ -31,9 +32,12 @@ interface RouteContextType {
   currentRoute: RouteData | null;
   isLoading: boolean;
   persistenceError: string | null;
+  routeHistory: HistoryEntry[];
   // packageId → occurrence reason (UI-only state, no business logic)
   occurrences: Record<string, string>;
   setCurrentRoute: (route: RouteData | null) => void;
+  reloadHistory: () => Promise<void>;
+  renameCurrentRoute: (name: string) => Promise<boolean>;
   updateStopStatus: (stopId: string, status: GroupedStop['status']) => void;
   updatePackageStatus: (stopId: string, packageId: string, status: PackageItem['status']) => void;
   // Sets occurrence reason and delegates status change to existing updatePackageStatus
@@ -61,9 +65,17 @@ function checkCompletion(route: RouteData): RouteData {
 
 export function RouteProvider({ children }: { children: ReactNode }) {
   const [currentRoute, setCurrentRouteState] = useState<RouteData | null>(null);
+  const [routeHistory, setRouteHistory] = useState<HistoryEntry[]>([]);
   // UI-only map: packageId → occurrence reason string
   const [occurrences, setOccurrences] = useState<Record<string, string>>({});
-  const { isLoading, error: persistenceError, saveRoute, loadCurrentRoute, saveToHistory } = usePersistence();
+  const { isLoading, error: persistenceError, saveRoute, loadCurrentRoute, saveToHistory, getHistory } = usePersistence();
+
+  const reloadHistory = useCallback(async () => {
+    const history = await getHistory();
+    setRouteHistory(prev =>
+      JSON.stringify(prev) === JSON.stringify(history) ? prev : history
+    );
+  }, [getHistory]);
 
   // Load persisted route on mount
   useEffect(() => {
@@ -75,12 +87,13 @@ export function RouteProvider({ children }: { children: ReactNode }) {
       }
     };
     loadRoute().catch(() => {});
+    reloadHistory().catch(() => {});
     return () => { mounted = false; };
-  }, [loadCurrentRoute]);
+  }, [loadCurrentRoute, reloadHistory]);
 
   // Auto-save on state changes (debounced)
   useEffect(() => {
-    if (!currentRoute) return;
+    if (!currentRoute || currentRoute.status === 'completed') return;
     const timer = setTimeout(() => {
       saveRoute(currentRoute).catch(() => {});
     }, 1000);
@@ -90,9 +103,11 @@ export function RouteProvider({ children }: { children: ReactNode }) {
   // Save to history when route auto-completes via checkCompletion
   useEffect(() => {
     if (currentRoute?.status === 'completed') {
-      saveToHistory(currentRoute).catch(() => {});
+      saveToHistory(currentRoute)
+        .then(() => reloadHistory())
+        .catch(() => {});
     }
-  }, [currentRoute?.status]);
+  }, [currentRoute?.status, currentRoute, saveToHistory, reloadHistory]);
 
   const setCurrentRoute = useCallback((route: RouteData | null) => {
     setCurrentRouteState(route);
@@ -100,6 +115,19 @@ export function RouteProvider({ children }: { children: ReactNode }) {
       saveRoute(route).catch(() => {});
     }
   }, [saveRoute]);
+
+  const renameCurrentRoute = useCallback(async (name: string): Promise<boolean> => {
+    const trimmed = name.trim();
+    if (!trimmed) return false;
+
+    const route = currentRoute ?? await loadCurrentRoute();
+    if (!route) return false;
+
+    const updatedRoute = { ...route, name: trimmed };
+    setCurrentRouteState(updatedRoute);
+    const savedId = await saveRoute(updatedRoute);
+    return savedId !== null;
+  }, [currentRoute, loadCurrentRoute, saveRoute]);
 
   const updateStopStatus = useCallback((stopId: string, status: GroupedStop['status']) => {
     setCurrentRouteState(prev => {
@@ -197,15 +225,19 @@ export function RouteProvider({ children }: { children: ReactNode }) {
     await saveRoute(completedRoute);
     await saveToHistory(completedRoute);
     setCurrentRouteState(completedRoute);
-  }, [currentRoute, saveRoute, saveToHistory]);
+    await reloadHistory();
+  }, [currentRoute, saveRoute, saveToHistory, reloadHistory]);
 
   return (
     <RouteContext.Provider value={{
       currentRoute,
       isLoading,
       persistenceError,
+      routeHistory,
       occurrences,
       setCurrentRoute,
+      reloadHistory,
+      renameCurrentRoute,
       updateStopStatus,
       updatePackageStatus,
       updatePackageOccurrence,

@@ -19,7 +19,7 @@ export default function RouteCompletedScreen() {
 
   const handleFinish = () => {
     setCurrentRoute(null);
-    router.replace('/(tabs)');
+    router.replace('/(tabs)/routes');
   };
 
   return (

@@ -45,12 +45,6 @@ export default function RootLayout() {
           <Stack screenOptions={{ headerShown: false }}>
             <Stack.Screen name="login" />
             <Stack.Screen name="(tabs)" />
-            <Stack.Screen name="import" />
-            <Stack.Screen name="import-summary" />
-            <Stack.Screen name="delivery-preparation" />
-            <Stack.Screen name="route-organizer" />
-            <Stack.Screen name="route-execution" />
-            <Stack.Screen name="route-completed" />
             <Stack.Screen name="+not-found" />
           </Stack>
           <StatusBar style="light" />

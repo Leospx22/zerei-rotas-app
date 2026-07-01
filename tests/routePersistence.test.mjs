@@ -35,6 +35,20 @@ function route(status) {
   };
 }
 
+function historyEntry(id, name, completedAt) {
+  return {
+    id,
+    name,
+    totalPackages: 3,
+    totalStops: 2,
+    deliveredPackages: 3,
+    completedStops: 2,
+    distance: 7,
+    durationMinutes: 15,
+    completedAt,
+  };
+}
+
 test('import persists a planning route that Minhas Rotas can load', async () => {
   const storage = new MemoryStorage();
   await saveRouteToStorage(storage, route('planning'));
@@ -131,4 +145,85 @@ test('continue can reuse the already-created imported route without duplicating 
 
   assert.equal((await loadCurrentRouteFromStorage(storage))?.id, importedRoute.id);
   assert.equal((await loadHistoryFromStorage(storage)).length, 0);
+});
+
+test('renames multiple completed history routes independently', async () => {
+  const storage = new MemoryStorage();
+  await storage.setItem(KEY_HISTORY, JSON.stringify([
+    historyEntry('route-1', 'Rota 1', '2026-06-24T10:00:00.000Z'),
+    historyEntry('route-2', 'Rota 2', '2026-06-24T11:00:00.000Z'),
+    historyEntry('route-3', 'Rota 3', '2026-06-24T12:00:00.000Z'),
+  ]));
+
+  assert.equal(await renameRouteInStorage(storage, 'route-1', 'Primeira'), true);
+  assert.equal(await renameRouteInStorage(storage, 'route-2', 'Segunda'), true);
+  assert.equal(await renameRouteInStorage(storage, 'route-3', 'Terceira'), true);
+
+  const history = await loadHistoryFromStorage(storage);
+  assert.deepEqual(history.map(entry => entry.name), ['Primeira', 'Segunda', 'Terceira']);
+});
+
+test('renames exact completed history entry when duplicate route ids exist', async () => {
+  const storage = new MemoryStorage();
+  await storage.setItem(KEY_HISTORY, JSON.stringify([
+    historyEntry('route-1', 'Rota antiga', '2026-06-24T10:00:00.000Z'),
+    historyEntry('route-1', 'Rota mais recente', '2026-06-24T11:00:00.000Z'),
+  ]));
+
+  assert.equal(
+    await renameRouteInStorage(
+      storage,
+      'route-1',
+      'Rota mais recente renomeada',
+      '2026-06-24T11:00:00.000Z'
+    ),
+    true
+  );
+
+  const history = await loadHistoryFromStorage(storage);
+  assert.equal(history[0].name, 'Rota antiga');
+  assert.equal(history[1].name, 'Rota mais recente renomeada');
+});
+
+test('completed route identity takes precedence over a current route with the same id', async () => {
+  const storage = new MemoryStorage();
+  await saveRouteToStorage(storage, route('planning'));
+  await storage.setItem(KEY_HISTORY, JSON.stringify([
+    historyEntry('route-1', 'Rota concluida', '2026-06-24T10:00:00.000Z'),
+  ]));
+
+  assert.equal(
+    await renameRouteInStorage(
+      storage,
+      'route-1',
+      'Historico renomeado',
+      '2026-06-24T10:00:00.000Z'
+    ),
+    true
+  );
+
+  assert.equal((await loadCurrentRouteFromStorage(storage))?.name, 'Rota importada');
+  assert.equal((await loadHistoryFromStorage(storage))[0].name, 'Historico renomeado');
+});
+
+test('later stale completion save does not revert newest history rename', async () => {
+  const storage = new MemoryStorage();
+  const completedRoute = route('completed');
+
+  await saveCompletedRouteToHistory(storage, completedRoute);
+  const [savedEntry] = await loadHistoryFromStorage(storage);
+  await renameRouteInStorage(
+    storage,
+    completedRoute.id,
+    'Rota final renomeada',
+    savedEntry.completedAt
+  );
+
+  await saveCompletedRouteToHistory(storage, completedRoute);
+
+  const history = await loadHistoryFromStorage(storage);
+  assert.equal(history.length, 1);
+  assert.equal(history[0].name, 'Rota final renomeada');
+  assert.equal(history[0].completedAt, savedEntry.completedAt);
+  assert.equal(await storage.getItem(KEY_CURRENT), null);
 });

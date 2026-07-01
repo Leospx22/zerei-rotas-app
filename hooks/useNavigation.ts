@@ -6,11 +6,11 @@ export function useNavigation() {
 
   const goBack = useCallback(() => router.back(), [router]);
   const goToDashboard = useCallback(() => router.push('/(tabs)'), [router]);
-  const goToImport = useCallback(() => router.push('/import'), [router]);
-  const goToImportSummary = useCallback(() => router.push('/import-summary'), [router]);
-  const goToDeliveryPreparation = useCallback(() => router.push('/delivery-preparation'), [router]);
-  const goToRouteExecution = useCallback(() => router.push('/route-execution'), [router]);
-  const goToRouteCompleted = useCallback(() => router.replace('/route-completed'), [router]);
+  const goToImport = useCallback(() => router.push('/(tabs)/routes/import'), [router]);
+  const goToImportSummary = useCallback(() => router.push('/(tabs)/routes/import-summary'), [router]);
+  const goToDeliveryPreparation = useCallback(() => router.push('/(tabs)/routes/delivery-preparation'), [router]);
+  const goToRouteExecution = useCallback(() => router.push('/(tabs)/routes/route-execution'), [router]);
+  const goToRouteCompleted = useCallback(() => router.replace('/(tabs)/routes/route-completed'), [router]);
 
   return {
     goBack,

@@ -1,5 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback } from 'react';
 import { View, Text, StyleSheet, ScrollView } from 'react-native';
+import { useFocusEffect } from 'expo-router';
 import {
   CheckCircle2,
   MapPin,
@@ -9,15 +10,16 @@ import {
   Package,
 } from 'lucide-react-native';
 import { Colors, Spacing, FontSizes, BorderRadius } from '@/constants/theme';
-import { usePersistence, HistoryEntry } from '@/hooks/usePersistence';
+import { useRoute } from '@/contexts/RouteContext';
 
 export default function HistoryScreen() {
-  const { getHistory } = usePersistence();
-  const [history, setHistory] = useState<HistoryEntry[]>([]);
+  const { routeHistory: history, reloadHistory } = useRoute();
 
-  useEffect(() => {
-    getHistory().then(setHistory).catch(() => {});
-  }, [getHistory]);
+  useFocusEffect(
+    useCallback(() => {
+      reloadHistory();
+    }, [reloadHistory])
+  );
 
   const totalPackages = history.reduce((s, h) => s + h.deliveredPackages, 0);
   const totalDistance = history.reduce((s, h) => s + h.distance, 0);
@@ -66,7 +68,7 @@ export default function HistoryScreen() {
             : `${entry.durationMinutes} min`;
 
           return (
-            <View key={entry.id} style={styles.historyCard}>
+            <View key={`${entry.id}-${entry.completedAt}`} style={styles.historyCard}>
               <View style={styles.historyHeader}>
                 <View style={styles.historyTitleRow}>
                   <TrendingUp size={16} color={Colors.gold[400]} />

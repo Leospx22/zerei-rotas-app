@@ -24,7 +24,7 @@ export default function RouteOrganizerScreen() {
     return (
       <View style={styles.emptyContainer}>
         <Text style={styles.emptyText}>Nenhuma rota criada</Text>
-        <TouchableOpacity onPress={() => router.push('/import')}>
+        <TouchableOpacity onPress={() => router.push('/(tabs)/routes/import')}>
           <Text style={styles.emptyLink}>Importar planilha</Text>
         </TouchableOpacity>
       </View>
@@ -40,7 +40,7 @@ export default function RouteOrganizerScreen() {
       status: 'active',
       startTime: Date.now(),
     });
-    router.push('/route-execution');
+    router.push('/(tabs)/routes/route-execution');
   };
 
   return (

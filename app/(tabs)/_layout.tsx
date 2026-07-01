@@ -1,21 +1,32 @@
 import { Tabs } from 'expo-router';
-import { StyleSheet } from 'react-native';
+import { getFocusedRouteNameFromRoute } from '@react-navigation/native';
 import { Home, Map, BarChart3, User } from 'lucide-react-native';
 import { Colors } from '@/constants/theme';
+
+const TAB_BAR_STYLE = {
+  backgroundColor: Colors.cardBg,
+  borderTopColor: Colors.cardBorder,
+  borderTopWidth: 1,
+  height: 100,
+  paddingBottom: 24,
+  paddingTop: 8,
+};
+
+const ROUTE_LIFECYCLE_SCREENS = new Set([
+  'import',
+  'import-summary',
+  'delivery-preparation',
+  'route-organizer',
+  'route-execution',
+  'route-completed',
+]);
 
 export default function TabLayout() {
   return (
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarStyle: {
-          backgroundColor: Colors.cardBg,
-          borderTopColor: Colors.cardBorder,
-          borderTopWidth: 1,
-          height: 64,
-          paddingBottom: 8,
-          paddingTop: 8,
-        },
+        tabBarStyle: TAB_BAR_STYLE,
         tabBarActiveTintColor: Colors.gold[500],
         tabBarInactiveTintColor: Colors.gray,
         tabBarLabelStyle: {
@@ -33,9 +44,17 @@ export default function TabLayout() {
       />
       <Tabs.Screen
         name="routes"
-        options={{
-          title: 'Rotas',
-          tabBarIcon: ({ size, color }) => <Map size={size} color={color} />,
+        options={({ route }) => {
+          const focusedRoute = getFocusedRouteNameFromRoute(route) ?? 'index';
+          const hideTabBar = ROUTE_LIFECYCLE_SCREENS.has(focusedRoute);
+
+          return {
+            title: 'Rotas',
+            tabBarStyle: hideTabBar
+              ? { ...TAB_BAR_STYLE, display: 'none' }
+              : TAB_BAR_STYLE,
+            tabBarIcon: ({ size, color }) => <Map size={size} color={color} />,
+          };
         }}
       />
       <Tabs.Screen

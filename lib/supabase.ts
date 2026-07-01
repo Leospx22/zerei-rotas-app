@@ -1,4 +1,5 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 type Database = {
   public: {
@@ -36,7 +37,14 @@ let supabaseInstance: SupabaseClient<Database> | null = null;
 
 try {
   if (supabaseUrl && supabaseAnonKey && supabaseAnonKey.length > 20) {
-    supabaseInstance = createClient<Database>(supabaseUrl, supabaseAnonKey);
+    supabaseInstance = createClient<Database>(supabaseUrl, supabaseAnonKey, {
+      auth: {
+        storage: AsyncStorage,
+        autoRefreshToken: true,
+        persistSession: true,
+        detectSessionInUrl: false,
+      },
+    });
   }
 } catch {
   supabaseInstance = null;

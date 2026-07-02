@@ -28,6 +28,7 @@ export interface ExecutionCardProps {
   onToggleSelectAll: () => void;
   placeInfoByAddressKey?: Readonly<Record<string, PlaceInfo | null | undefined>>;
   onEditPlaceInfo?: (group: Pick<ExecutionPackageGroup, 'key' | 'address'>) => void;
+  onNavigateAddress?: (address: string) => void;
   showNavigate?: boolean;
 }
 
@@ -50,6 +51,7 @@ export function ExecutionCard({
   onToggleSelectAll,
   placeInfoByAddressKey = {},
   onEditPlaceInfo,
+  onNavigateAddress,
   showNavigate = true,
 }: ExecutionCardProps) {
   if (!currentStop) return null;
@@ -159,24 +161,6 @@ export function ExecutionCard({
                         <Text style={styles.packageGroupAddress} numberOfLines={2}>
                           {group.address}
                         </Text>
-                        {onEditPlaceInfo ? (
-                          <TouchableOpacity
-                            style={styles.groupInfoAction}
-                            onPress={() => onEditPlaceInfo(group)}
-                            activeOpacity={0.78}
-                            accessibilityRole="button"
-                            accessibilityLabel={
-                              groupPlaceInfo
-                                ? `Editar informações de ${group.address}`
-                                : `Adicionar informações de ${group.address}`
-                            }
-                          >
-                            <Pencil size={14} color={Colors.gold[400]} />
-                            <Text style={styles.groupInfoActionText}>
-                              {groupPlaceInfo ? 'Editar info' : '+ Info'}
-                            </Text>
-                          </TouchableOpacity>
-                        ) : null}
                       </View>
                       <View style={styles.packageGroupMetaRow}>
                         <Text style={styles.packageGroupCount}>
@@ -188,6 +172,38 @@ export function ExecutionCard({
                             <CheckCircle2 size={12} color={Colors.success} />
                             <Text style={styles.savedInfoIndicatorText}>Info salva</Text>
                           </View>
+                        ) : null}
+                      </View>
+                      <View style={styles.packageGroupActions}>
+                        {onNavigateAddress ? (
+                          <TouchableOpacity
+                            style={styles.groupHeaderAction}
+                            onPress={() => onNavigateAddress(group.address)}
+                            activeOpacity={0.78}
+                            accessibilityRole="button"
+                            accessibilityLabel={`Navegar para ${group.address}`}
+                          >
+                            <Navigation size={15} color={Colors.gold[400]} />
+                            <Text style={styles.groupHeaderActionText}>Navegar</Text>
+                          </TouchableOpacity>
+                        ) : null}
+                        {onEditPlaceInfo ? (
+                          <TouchableOpacity
+                            style={styles.groupHeaderAction}
+                            onPress={() => onEditPlaceInfo(group)}
+                            activeOpacity={0.78}
+                            accessibilityRole="button"
+                            accessibilityLabel={
+                              groupPlaceInfo
+                                ? `Editar informações de ${group.address}`
+                                : `Adicionar informações de ${group.address}`
+                            }
+                          >
+                            <Pencil size={14} color={Colors.gold[400]} />
+                            <Text style={styles.groupHeaderActionText}>
+                              {groupPlaceInfo ? 'Editar info' : '+ Info'}
+                            </Text>
+                          </TouchableOpacity>
                         ) : null}
                       </View>
                     </View>
@@ -474,7 +490,12 @@ const styles = StyleSheet.create({
     fontSize: FontSizes.xs,
     fontWeight: '700',
   },
-  groupInfoAction: {
+  packageGroupActions: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: Spacing.sm,
+  },
+  groupHeaderAction: {
     minHeight: 40,
     flexShrink: 0,
     flexDirection: 'row',
@@ -487,7 +508,7 @@ const styles = StyleSheet.create({
     borderColor: Colors.gold[700],
     backgroundColor: Colors.background,
   },
-  groupInfoActionText: {
+  groupHeaderActionText: {
     color: Colors.gold[400],
     fontSize: FontSizes.sm,
     fontWeight: '800',

@@ -34,6 +34,7 @@ All notable product and architecture changes are recorded here. Versions follow 
 - Local Place Intelligence model, dedicated AsyncStorage collection, and read-only execution hints.
 - Place Information editor with quick suggestions and explicit save, update, and delete actions.
 - Address-group Place Information actions and compact cards in route execution.
+- Per-address-group Google Maps navigation using normalized street-and-number queries.
 - Post-import route review with stop/package inspection, route rename, and existing reorder controls.
 
 ### Changed

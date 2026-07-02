@@ -8,6 +8,7 @@ import {
   Modal,
   Pressable,
   Alert,
+  Linking,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -36,6 +37,7 @@ import {
   buildExecutionPackageGroups,
   type ExecutionPackageGroup,
 } from '@/lib/executionPresentation';
+import { buildGoogleMapsSearchUrl } from '@/lib/mapNavigation';
 import {
   deletePlaceInfo,
   loadPlaceInfo,
@@ -271,6 +273,17 @@ export default function RouteExecutionScreen() {
     setExpandedStop(currentStop.id);
   }, [currentStop]);
 
+  const handleNavigateAddress = useCallback(async (address: string) => {
+    try {
+      const url = buildGoogleMapsSearchUrl(address);
+      const supported = await Linking.canOpenURL(url);
+      if (!supported) throw new Error('Unsupported map URL');
+      await Linking.openURL(url);
+    } catch {
+      Alert.alert('Não foi possível abrir o mapa.');
+    }
+  }, []);
+
   const handleSavePlaceInfo = useCallback(async (draft: PlaceInfoDraft) => {
     if (!editingPlaceGroup) return;
     const targetGroup = editingPlaceGroup;
@@ -397,6 +410,7 @@ export default function RouteExecutionScreen() {
             onToggleSelectAll={handleToggleSelectAll}
             placeInfoByAddressKey={placeInfoByAddressKey}
             onEditPlaceInfo={setEditingPlaceGroup}
+            onNavigateAddress={handleNavigateAddress}
             showNavigate={false}
           />
         </View>

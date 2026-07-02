@@ -44,6 +44,7 @@ hooks/usePersistence.ts        React-facing persistence adapter
 hooks/useImport.ts             Import-related hook retained by the project
 hooks/useNavigation.ts         Navigation-related hook retained by the project
 lib/packageUtils.ts            Package parsing, grouping, and route construction
+lib/mapNavigation.ts           External map URL construction from normalized addresses
 lib/placeIntelligence.ts       Local address intelligence model and persistence
 lib/routePersistence.ts        AsyncStorage schema and storage operations
 lib/spreadsheetParser.ts       CSV, TSV, XLS, and XLSX parsing

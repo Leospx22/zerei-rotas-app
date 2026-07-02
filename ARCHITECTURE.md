@@ -48,6 +48,7 @@ lib/mapNavigation.ts           External map URL construction from normalized add
 lib/placeIntelligence.ts       Local address intelligence model and persistence
 lib/routePersistence.ts        AsyncStorage schema and storage operations
 lib/routeOrdering.ts           Pure manual stop movement and order reindexing
+lib/routePresentation.ts       Pure route-card status and Portuguese label derivation
 lib/spreadsheetParser.ts       CSV, TSV, XLS, and XLSX parsing
 lib/supabase.ts                Supabase client and session storage configuration
 supabase/migrations/           Supabase database migrations
@@ -216,6 +217,8 @@ History invariants:
 - A completed entry is uniquely targeted for rename by `id + completedAt`.
 - `routeHistory` in RouteContext is the read source for Painel, Minhas Rotas, and Historico.
 - `reloadHistory()` is the synchronization boundary after a history mutation.
+
+Minhas Rotas derives card status without changing persisted data: a current route with zero delivered packages is `Planejada`, a current route with deliveries is `Em rota`, and a history entry is `Concluída`. Planned cards can enter Review or activate execution; in-route cards continue execution.
 
 ## Persistence Layer
 

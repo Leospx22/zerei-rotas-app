@@ -39,6 +39,7 @@ All notable product and architecture changes are recorded here. Versions follow 
 - Post-import route review with stop/package inspection, route rename, and existing reorder controls.
 - Route overview with address totals, manual stop ordering, package previews, and map actions.
 - Painel shortcut to Route Review and dependency-free direct-position stop movement.
+- Execution route-name context and status-driven Minhas Rotas cards with planned/in-route actions.
 
 ### Changed
 

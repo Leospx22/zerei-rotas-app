@@ -419,6 +419,13 @@ export default function RouteExecutionScreen() {
           <View style={{ width: 40 }} />
         </View>
 
+        <View style={styles.routeNameContext}>
+          <Text style={styles.routeNameContextLabel}>Rota:</Text>
+          <Text style={styles.routeNameContextValue} numberOfLines={1}>
+            {currentRoute.name?.trim() || 'Rota atual'}
+          </Text>
+        </View>
+
         {completionFeedback ? (
           <AppCard variant="success" padding="medium" style={styles.completionFeedback}>
             <CheckCircle2 size={24} color={Colors.success} />
@@ -778,6 +785,16 @@ const styles = StyleSheet.create({
   backButton: { width: 40, height: 40, justifyContent: 'center' },
   headerTitleRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
   headerTitle: { fontSize: FontSizes.xl, fontWeight: '700', color: Colors.white },
+  routeNameContext: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.xs,
+    marginTop: -Spacing.sm,
+    marginBottom: Spacing.md,
+    paddingHorizontal: Spacing.xs,
+  },
+  routeNameContextLabel: { fontSize: FontSizes.sm, color: Colors.gray, fontWeight: '600' },
+  routeNameContextValue: { flex: 1, fontSize: FontSizes.md, color: Colors.offWhite, fontWeight: '700' },
   progressCard: { borderRadius: BorderRadius.lg, overflow: 'hidden', marginBottom: Spacing.lg },
   progressGradient: { padding: Spacing.lg, gap: Spacing.sm },
   progressHeader: {

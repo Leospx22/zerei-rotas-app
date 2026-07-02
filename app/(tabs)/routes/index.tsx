@@ -16,24 +16,29 @@ import {
   Crown,
   Package,
   FileSpreadsheet,
-  CheckCircle2,
-  Clock,
-  Circle,
   Pencil,
   Trash2,
   Play,
+  Truck,
 } from 'lucide-react-native';
 import { Colors, Spacing, FontSizes, BorderRadius } from '@/constants/theme';
+import { StatusBadge } from '@/components/ui';
 import { usePersistence } from '@/hooks/usePersistence';
 import { useRoute } from '@/contexts/RouteContext';
+import {
+  deriveRouteDisplayStatus,
+  routeDisplayStatusLabel,
+  type RouteDisplayStatus,
+} from '@/lib/routePresentation';
 
 interface RouteItem {
   id: string;
   name: string;
   date: string;
-  status: 'planning' | 'active' | 'completed';
+  status: RouteDisplayStatus;
   totalPackages: number;
   totalStops: number;
+  distance: number;
   deliveredPackages: number;
   completedStops: number;
   isCurrentRoute: boolean;
@@ -62,9 +67,10 @@ export default function RoutesScreen() {
         date: currentRoute.startTime
           ? new Date(currentRoute.startTime).toLocaleDateString('pt-BR')
           : new Date().toLocaleDateString('pt-BR'),
-        status: currentRoute.status as 'planning' | 'active',
+        status: deriveRouteDisplayStatus(true, currentRoute.deliveredPackages),
         totalPackages: currentRoute.totalPackages,
         totalStops: currentRoute.stops.length,
+        distance: currentRoute.estimatedDistanceKm,
         deliveredPackages: currentRoute.deliveredPackages,
         completedStops: currentRoute.completedStops,
         isCurrentRoute: true,
@@ -79,6 +85,7 @@ export default function RoutesScreen() {
         status: 'completed',
         totalPackages: entry.totalPackages,
         totalStops: entry.totalStops,
+        distance: entry.distance,
         deliveredPackages: entry.deliveredPackages,
         completedStops: entry.completedStops,
         isCurrentRoute: false,
@@ -136,22 +143,14 @@ export default function RoutesScreen() {
     setDeleteTarget(null);
   };
 
-  const statusIcon = (status: string) => {
-    if (status === 'completed') return <CheckCircle2 size={16} color={Colors.success} />;
-    if (status === 'active') return <Clock size={16} color={Colors.warning} />;
-    return <Circle size={16} color={Colors.gray} />;
-  };
-
-  const statusLabel = (status: string) => {
-    if (status === 'completed') return 'Concluída';
-    if (status === 'active') return 'Em andamento';
-    return 'Planejada';
-  };
-
-  const statusColor = (status: string) => {
-    if (status === 'completed') return Colors.success;
-    if (status === 'active') return Colors.warning;
-    return Colors.gray;
+  const startPlannedRoute = (route: RouteItem) => {
+    if (!currentRoute || currentRoute.id !== route.id) return;
+    setCurrentRoute({
+      ...currentRoute,
+      status: 'active',
+      startTime: currentRoute.startTime ?? Date.now(),
+    });
+    router.push('/(tabs)/routes/route-execution');
   };
 
   return (
@@ -187,27 +186,34 @@ export default function RoutesScreen() {
           routes.map(route => (
             <View key={route.completedAt ? `${route.id}-${route.completedAt}` : route.id} style={styles.routeCard}>
               <View style={styles.cardHeader}>
-                <View style={styles.cardTitleRow}>
-                  {statusIcon(route.status)}
-                  <Text style={styles.cardName} numberOfLines={1}>
-                    {route.name}
-                  </Text>
-                </View>
-                <View style={styles.cardIcons}>
-                  <TouchableOpacity
-                    style={styles.iconBtn}
-                    onPress={() => openEdit(route)}
-                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                  >
-                    <Pencil size={15} color={Colors.gold[400]} />
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={styles.iconBtn}
-                    onPress={() => setDeleteTarget(route)}
-                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                  >
-                    <Trash2 size={15} color={Colors.error} />
-                  </TouchableOpacity>
+                <Text style={styles.cardName} numberOfLines={2}>
+                  {route.name}
+                </Text>
+                <View style={styles.cardHeaderRight}>
+                  <StatusBadge
+                    status={route.status}
+                    label={routeDisplayStatusLabel(route.status)}
+                  />
+                  <View style={styles.cardIcons}>
+                    <TouchableOpacity
+                      style={styles.iconBtn}
+                      onPress={() => openEdit(route)}
+                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Editar ${route.name}`}
+                    >
+                      <Pencil size={15} color={Colors.gold[400]} />
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={styles.iconBtn}
+                      onPress={() => setDeleteTarget(route)}
+                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Excluir ${route.name}`}
+                    >
+                      <Trash2 size={15} color={Colors.error} />
+                    </TouchableOpacity>
+                  </View>
                 </View>
               </View>
 
@@ -220,29 +226,52 @@ export default function RoutesScreen() {
                   <MapPin size={13} color={Colors.gray} />
                   <Text style={styles.metaText}>{route.totalStops} paradas</Text>
                 </View>
+                {route.distance > 0 ? (
+                  <View style={styles.metaItem}>
+                    <Truck size={13} color={Colors.gray} />
+                    <Text style={styles.metaText}>{route.distance} km</Text>
+                  </View>
+                ) : null}
                 <Text style={styles.metaText}>{route.date}</Text>
-                <Text style={[styles.metaStatus, { color: statusColor(route.status) }]}>
-                  {statusLabel(route.status)}
-                </Text>
               </View>
 
-              {(route.status === 'active' || route.status === 'planning') && (
+              {route.status === 'planning' ? (
+                <View style={styles.routeActions}>
+                  <TouchableOpacity
+                    style={[styles.routeActionButton, styles.reviewActionButton]}
+                    onPress={() => router.push('/(tabs)/routes/delivery-preparation')}
+                    activeOpacity={0.78}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Revisar rota ${route.name}`}
+                  >
+                    <MapPin size={15} color={Colors.gold[400]} />
+                    <Text style={styles.reviewActionText}>Revisar Rota</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.routeActionButton, styles.primaryRouteAction]}
+                    onPress={() => startPlannedRoute(route)}
+                    activeOpacity={0.78}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Começar entrega ${route.name}`}
+                  >
+                    <Play size={15} color={Colors.primary[900]} />
+                    <Text style={styles.primaryRouteActionText}>Começar entrega</Text>
+                  </TouchableOpacity>
+                </View>
+              ) : null}
+
+              {route.status === 'active' ? (
                 <TouchableOpacity
-                  style={styles.continueBtn}
-                  onPress={() =>
-                    router.push(
-                      route.status === 'active'
-                        ? '/(tabs)/routes/route-execution'
-                        : '/(tabs)/routes/delivery-preparation'
-                    )
-                  }
+                  style={[styles.routeActionButton, styles.primaryRouteAction, styles.continueAction]}
+                  onPress={() => router.push('/(tabs)/routes/route-execution')}
+                  activeOpacity={0.78}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Continuar rota ${route.name}`}
                 >
-                  <Play size={14} color={Colors.primary[900]} />
-                  <Text style={styles.continueBtnText}>
-                    {route.status === 'active' ? 'Continuar' : 'Preparar'}
-                  </Text>
+                  <Play size={15} color={Colors.primary[900]} />
+                  <Text style={styles.primaryRouteActionText}>Continuar</Text>
                 </TouchableOpacity>
-              )}
+              ) : null}
             </View>
           ))
         )}
@@ -385,21 +414,19 @@ const styles = StyleSheet.create({
 
   cardHeader: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     justifyContent: 'space-between',
-  },
-  cardTitleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.sm,
-    flex: 1,
-    marginRight: Spacing.sm,
   },
   cardName: {
     fontSize: FontSizes.lg,
     fontWeight: '700',
     color: Colors.white,
     flex: 1,
+    marginRight: Spacing.sm,
+  },
+  cardHeaderRight: {
+    alignItems: 'flex-end',
+    gap: Spacing.sm,
   },
   cardIcons: {
     flexDirection: 'row',
@@ -430,26 +457,41 @@ const styles = StyleSheet.create({
     fontSize: FontSizes.sm,
     color: Colors.gray,
   },
-  metaStatus: {
-    fontSize: FontSizes.sm,
-    fontWeight: '600',
+  routeActions: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: Spacing.sm,
   },
-
-  continueBtn: {
+  routeActionButton: {
+    minHeight: 44,
+    flexGrow: 1,
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     gap: Spacing.xs,
-    backgroundColor: Colors.primary[500],
     borderRadius: BorderRadius.sm,
     paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.sm,
-    alignSelf: 'flex-end',
+    borderWidth: 1,
   },
-  continueBtnText: {
+  reviewActionButton: {
+    borderColor: Colors.gold[700],
+    backgroundColor: Colors.overlay,
+  },
+  reviewActionText: {
     fontSize: FontSizes.sm,
-    fontWeight: '700',
+    fontWeight: '800',
     color: Colors.gold[400],
   },
+  primaryRouteAction: {
+    borderColor: Colors.gold[700],
+    backgroundColor: Colors.gold[500],
+  },
+  primaryRouteActionText: {
+    fontSize: FontSizes.sm,
+    fontWeight: '900',
+    color: Colors.primary[900],
+  },
+  continueAction: { alignSelf: 'flex-end' },
 
   // Modals
   backdrop: {

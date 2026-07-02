@@ -53,6 +53,8 @@ All notable product and architecture changes are recorded here. Versions follow 
 
 ### Changed
 
+- Polished Ocorrências with compact summary counts, clearer card hierarchy, calmer resolved states, and consolidated actions.
+
 - Moved the complete route lifecycle from the root Stack into the nested Rotas Stack.
 - Replaced wizard screen accumulation with lifecycle-aware `replace()` transitions.
 - Hid the bottom tab bar during route lifecycle screens while keeping it visible on main tab screens.

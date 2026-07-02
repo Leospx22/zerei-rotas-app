@@ -55,9 +55,10 @@ interface OccurrenceCardProps {
 function OccurrenceCard({ record, onResolve, onEdit }: OccurrenceCardProps) {
   const registeredAt = formatDateTime(record.registeredAt);
   const resolvedAt = formatDateTime(record.occurrenceResolvedAt);
+  const isResolved = Boolean(record.occurrenceResolution);
 
   return (
-    <View style={styles.card}>
+    <View style={[styles.card, isResolved ? styles.resolvedCard : styles.pendingCard]}>
       <View style={styles.packageHeader}>
         <Package size={18} color={Colors.gold[400]} />
         <View style={styles.packageHeaderText}>
@@ -77,22 +78,19 @@ function OccurrenceCard({ record, onResolve, onEdit }: OccurrenceCardProps) {
         </View>
       </View>
 
-      <View style={styles.reasonBox}>
+      <View style={[styles.reasonBox, isResolved && styles.resolvedReasonBox]}>
         <Text style={styles.label}>Motivo</Text>
-        <Text style={styles.reason}>{occurrenceReasonLabel(record.reason)}</Text>
+        <Text style={[styles.reason, isResolved && styles.resolvedReason]}>
+          {occurrenceReasonLabel(record.reason)}
+        </Text>
       </View>
 
-      <View style={styles.metaGrid}>
-        <View style={styles.metaItem}>
-          <Text style={styles.label}>Rota</Text>
-          <Text style={styles.value}>{record.routeName ?? 'Rota não informada'}</Text>
-        </View>
-        <View style={styles.metaItem}>
-          <Text style={styles.label}>Parada</Text>
-          <Text style={styles.value}>
-            {record.stopNumber !== undefined ? `#${record.stopNumber}` : 'Não informada'}
-          </Text>
-        </View>
+      <View style={styles.metadataRow}>
+        <Text style={styles.label}>Rota / Parada</Text>
+        <Text style={styles.value}>
+          {record.routeName ?? 'Rota não informada'} •{' '}
+          {record.stopNumber !== undefined ? `Parada #${record.stopNumber}` : 'Parada não informada'}
+        </Text>
       </View>
 
       {registeredAt ? (
@@ -140,19 +138,31 @@ function OccurrenceCard({ record, onResolve, onEdit }: OccurrenceCardProps) {
           >
             <Text style={styles.returnedButtonText}>Devolvido ao Hub</Text>
           </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.actionButton, styles.editActionButton]}
+            onPress={() => onEdit(record)}
+            activeOpacity={0.78}
+            accessibilityRole="button"
+            accessibilityLabel={`Editar ocorrência de ${record.packageCode ?? record.packageId}`}
+          >
+            <Pencil size={15} color={Colors.gold[400]} />
+            <Text style={styles.editButtonText}>Editar</Text>
+          </TouchableOpacity>
         </View>
       ) : null}
 
-      <TouchableOpacity
-        style={styles.editButton}
-        onPress={() => onEdit(record)}
-        activeOpacity={0.78}
-        accessibilityRole="button"
-        accessibilityLabel={`Editar ocorrência de ${record.packageCode ?? record.packageId}`}
-      >
-        <Pencil size={15} color={Colors.gold[400]} />
-        <Text style={styles.editButtonText}>Editar</Text>
-      </TouchableOpacity>
+      {isResolved ? (
+        <TouchableOpacity
+          style={styles.editButton}
+          onPress={() => onEdit(record)}
+          activeOpacity={0.78}
+          accessibilityRole="button"
+          accessibilityLabel={`Editar ocorrência de ${record.packageCode ?? record.packageId}`}
+        >
+          <Pencil size={15} color={Colors.gold[400]} />
+          <Text style={styles.editButtonText}>Editar</Text>
+        </TouchableOpacity>
+      ) : null}
     </View>
   );
 }
@@ -314,6 +324,20 @@ export default function OccurrencesScreen() {
           <Text style={styles.title}>Ocorrências</Text>
         </View>
         <View style={styles.headerSpacer} />
+      </View>
+
+      <View style={styles.summaryCard}>
+        <View style={styles.summaryItem}>
+          <Text style={[styles.summaryCount, styles.pendingCount]}>{sections.pending.length}</Text>
+          <Text style={styles.summaryLabel}>Pendentes</Text>
+        </View>
+        <View style={styles.summaryDivider} />
+        <View style={styles.summaryItem}>
+          <Text style={[styles.summaryCount, styles.resolvedCount]}>
+            {sections.resolvedRecently.length}
+          </Text>
+          <Text style={styles.summaryLabel}>Resolvidas recentemente</Text>
+        </View>
       </View>
 
       {visibleOccurrenceCount === 0 ? (
@@ -505,6 +529,27 @@ const styles = StyleSheet.create({
   titleRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
   title: { color: Colors.white, fontSize: FontSizes.xxl, fontWeight: '800' },
   headerSpacer: { width: 44 },
+  summaryCard: {
+    flexDirection: 'row',
+    alignItems: 'stretch',
+    paddingVertical: Spacing.md,
+    borderRadius: BorderRadius.md,
+    borderWidth: 1,
+    borderColor: Colors.cardBorder,
+    backgroundColor: Colors.cardBg,
+  },
+  summaryItem: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: Spacing.xs,
+    paddingHorizontal: Spacing.sm,
+  },
+  summaryDivider: { width: 1, backgroundColor: Colors.cardBorder },
+  summaryCount: { fontSize: FontSizes.xxl, fontWeight: '900' },
+  pendingCount: { color: Colors.error },
+  resolvedCount: { color: Colors.success },
+  summaryLabel: { color: Colors.gray, fontSize: FontSizes.sm, fontWeight: '700', textAlign: 'center' },
   sectionTitle: { color: Colors.white, fontSize: FontSizes.lg, fontWeight: '800' },
   emptyState: {
     alignItems: 'center',
@@ -527,6 +572,8 @@ const styles = StyleSheet.create({
     borderColor: Colors.cardBorder,
     backgroundColor: Colors.cardBg,
   },
+  pendingCard: { borderLeftWidth: 3, borderLeftColor: Colors.error },
+  resolvedCard: { borderLeftWidth: 3, borderLeftColor: Colors.success },
   packageHeader: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
   packageHeaderText: { flex: 1 },
   packageCode: { color: Colors.white, fontSize: FontSizes.lg, fontWeight: '800' },
@@ -549,15 +596,18 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.errorBg,
   },
   reason: { color: Colors.error, fontSize: FontSizes.md, fontWeight: '800' },
-  metaGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.md },
-  metaItem: { flex: 1, minWidth: 120, gap: 2 },
+  resolvedReasonBox: { borderColor: Colors.cardBorder, backgroundColor: Colors.background },
+  resolvedReason: { color: Colors.white },
+  metadataRow: { gap: 2 },
   actions: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm },
   actionButton: {
     minHeight: 46,
     flexGrow: 1,
-    flexBasis: 140,
+    flexBasis: 110,
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    gap: Spacing.xs,
     paddingHorizontal: Spacing.md,
     borderRadius: BorderRadius.sm,
     borderWidth: 1,
@@ -566,6 +616,7 @@ const styles = StyleSheet.create({
   deliveredButtonText: { color: Colors.success, fontSize: FontSizes.md, fontWeight: '800' },
   returnedButton: { borderColor: Colors.warningBorder, backgroundColor: Colors.warningBg },
   returnedButtonText: { color: Colors.warning, fontSize: FontSizes.md, fontWeight: '800' },
+  editActionButton: { borderColor: Colors.gold[700], backgroundColor: Colors.overlay },
   resolutionBox: {
     gap: Spacing.sm,
     padding: Spacing.sm,

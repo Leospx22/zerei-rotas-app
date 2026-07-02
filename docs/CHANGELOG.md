@@ -25,6 +25,12 @@ All notable product and architecture changes are recorded here. Versions follow 
 - Persistence regression tests for import, status transitions, duplicate prevention, rename, history identity, and stale completion writes.
 - `ARCHITECTURE.md` as the technical source of truth.
 - `ROADMAP.md` with MVP, Premium Driver, and AI Driver Assistant milestones.
+- Additive Zerei Rotas design tokens, reusable UI primitives, and usage documentation.
+- Hybrid premium execution card above the existing stop and package controls.
+- Local smart package collection checklist with pickup confirmation gating.
+- One-tap stop completion with automatic next-stop advance and brief success feedback.
+- Select-all package collection and address-group summaries for multi-address stops.
+- Presentation-only address normalization for common street abbreviations and complements.
 
 ### Changed
 

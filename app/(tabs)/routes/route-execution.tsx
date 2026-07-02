@@ -7,6 +7,7 @@ import {
   ScrollView,
   Modal,
   Pressable,
+  Alert,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -23,7 +24,10 @@ import {
   SkipForward,
 } from 'lucide-react-native';
 import { Colors, Spacing, FontSizes, BorderRadius } from '@/constants/theme';
+import { ExecutionCard } from '@/components/ExecutionCard';
+import { AppCard, AppText } from '@/components/ui';
 import { useRoute } from '@/contexts/RouteContext';
+import { deriveExecutionState, type ExecutionStep } from '@/lib/executionState';
 
 const OCCURRENCE_OPTIONS = [
   'Cliente ausente',
@@ -33,6 +37,8 @@ const OCCURRENCE_OPTIONS = [
   'Reagendado',
   'Outro',
 ];
+
+const NOOP = () => {};
 
 interface OccurrenceSheetProps {
   visible: boolean;
@@ -83,7 +89,41 @@ export default function RouteExecutionScreen() {
   } = useRoute();
   const [expandedStop, setExpandedStop] = useState<string | null>(null);
   const [occurrenceTarget, setOccurrenceTarget] = useState<{ stopId: string; pkgId: string } | null>(null);
+  const derivedExecutionState = React.useMemo(
+    () => deriveExecutionState(currentRoute),
+    [currentRoute]
+  );
+  const [executionStep, setExecutionStep] = useState<ExecutionStep>(
+    derivedExecutionState.executionStep
+  );
+  const [separatedPackageIds, setSeparatedPackageIds] = useState<Set<string>>(
+    () => new Set()
+  );
+  const [completionFeedback, setCompletionFeedback] = useState<{
+    id: number;
+    hasNextStop: boolean;
+  } | null>(null);
+  const {
+    currentStop,
+    nextStop,
+    totalPackagesAtCurrentStop,
+    pendingPackagesAtCurrentStop,
+    deliveredPackagesCount,
+    totalPackagesCount,
+    remainingStopsCount,
+  } = derivedExecutionState;
   const cameFromDeliveryPreparation = from === 'delivery-preparation';
+
+  React.useEffect(() => {
+    setExecutionStep(derivedExecutionState.executionStep);
+    setSeparatedPackageIds(new Set());
+  }, [currentStop?.id]);
+
+  React.useEffect(() => {
+    if (!completionFeedback) return;
+    const timer = setTimeout(() => setCompletionFeedback(null), 1600);
+    return () => clearTimeout(timer);
+  }, [completionFeedback]);
 
   React.useEffect(() => {
     if (currentRoute?.status === 'completed') {
@@ -96,6 +136,84 @@ export default function RouteExecutionScreen() {
     updatePackageOccurrence(occurrenceTarget.stopId, occurrenceTarget.pkgId, reason);
     setOccurrenceTarget(null);
   }, [occurrenceTarget, updatePackageOccurrence]);
+
+  const handleConfirmPickup = useCallback(() => {
+    if (
+      !currentStop ||
+      separatedPackageIds.size !== currentStop.packages.length
+    ) {
+      return;
+    }
+    setExecutionStep('entrega');
+  }, [currentStop, separatedPackageIds]);
+
+  const handleTogglePackageSeparated = useCallback((packageId: string) => {
+    setSeparatedPackageIds(previous => {
+      const next = new Set(previous);
+      if (next.has(packageId)) {
+        next.delete(packageId);
+      } else {
+        next.add(packageId);
+      }
+      return next;
+    });
+  }, []);
+
+  const handleToggleSelectAll = useCallback(() => {
+    if (!currentStop) return;
+    setSeparatedPackageIds(previous => {
+      const allSelected = currentStop.packages.every(pkg => previous.has(pkg.id));
+      return allSelected
+        ? new Set()
+        : new Set(currentStop.packages.map(pkg => pkg.id));
+    });
+  }, [currentStop]);
+
+  const handleConfirmDelivery = useCallback(() => {
+    if (!currentStop) return;
+
+    const pendingPackages = currentStop.packages.filter(pkg => pkg.status === 'pending');
+    const occurrencePackages = currentStop.packages.filter(pkg => pkg.status === 'skipped');
+    const hasMixedPendingPackages =
+      pendingPackages.length > 0 &&
+      pendingPackages.length < currentStop.packages.length;
+
+    const completeStop = () => {
+      if (occurrencePackages.length > 0) {
+        pendingPackages.forEach(pkg => {
+          updatePackageStatus(currentStop.id, pkg.id, 'delivered');
+        });
+      } else {
+        updateStopStatus(currentStop.id, 'completed');
+      }
+
+      setExecutionStep('separacao');
+      setSeparatedPackageIds(new Set());
+      setCompletionFeedback({
+        id: Date.now(),
+        hasNextStop: nextStop !== null,
+      });
+    };
+
+    if (hasMixedPendingPackages) {
+      Alert.alert(
+        'Pacotes pendentes',
+        `Ainda há ${pendingPackages.length} pacote${pendingPackages.length === 1 ? '' : 's'} pendente${pendingPackages.length === 1 ? '' : 's'} nesta parada. Deseja concluir mesmo assim?`,
+        [
+          { text: 'Cancelar', style: 'cancel' },
+          { text: 'Concluir parada', onPress: completeStop },
+        ]
+      );
+      return;
+    }
+
+    completeStop();
+  }, [currentStop, nextStop, updatePackageStatus, updateStopStatus]);
+
+  const handleCardOccurrence = useCallback(() => {
+    if (!currentStop) return;
+    setExpandedStop(currentStop.id);
+  }, [currentStop]);
 
   if (!currentRoute) {
     return (
@@ -139,6 +257,39 @@ export default function RouteExecutionScreen() {
             <Text style={styles.headerTitle}>Executar Rota</Text>
           </View>
           <View style={{ width: 40 }} />
+        </View>
+
+        {completionFeedback ? (
+          <AppCard variant="success" padding="medium" style={styles.completionFeedback}>
+            <CheckCircle2 size={24} color={Colors.success} />
+            <View style={styles.completionFeedbackText}>
+              <AppText variant="bodyStrong" color={Colors.success}>
+                Parada concluída
+              </AppText>
+              {completionFeedback.hasNextStop ? (
+                <AppText variant="label" color={Colors.gray}>
+                  Próxima parada pronta
+                </AppText>
+              ) : null}
+            </View>
+          </AppCard>
+        ) : null}
+
+        <View style={styles.executionCardWrap}>
+          <ExecutionCard
+            currentStop={currentStop}
+            totalPackagesAtCurrentStop={totalPackagesAtCurrentStop}
+            pendingPackagesAtCurrentStop={pendingPackagesAtCurrentStop}
+            executionStep={executionStep}
+            onConfirmPickup={handleConfirmPickup}
+            onConfirmDelivery={handleConfirmDelivery}
+            onNavigate={NOOP}
+            onOccurrence={handleCardOccurrence}
+            separatedPackageIds={separatedPackageIds}
+            onTogglePackageSeparated={handleTogglePackageSeparated}
+            onToggleSelectAll={handleToggleSelectAll}
+            showNavigate={false}
+          />
         </View>
 
         <View style={styles.progressCard}>
@@ -426,6 +577,14 @@ const ACTION_COL_WIDTH = 56;
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
   content: { padding: Spacing.lg, paddingBottom: Spacing.xxl },
+  completionFeedback: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+    marginBottom: Spacing.md,
+  },
+  completionFeedbackText: { flex: 1, gap: 2 },
+  executionCardWrap: { marginBottom: Spacing.lg },
   emptyContainer: {
     flex: 1, backgroundColor: Colors.background,
     alignItems: 'center', justifyContent: 'center', gap: Spacing.md,

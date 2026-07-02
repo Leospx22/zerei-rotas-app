@@ -104,6 +104,8 @@ export default function RouteExecutionScreen() {
     updatePackageOccurrence,
     occurrences,
   } = useRoute();
+  const executionScrollRef = React.useRef<ScrollView>(null);
+  const stopOffsetsRef = React.useRef<Record<string, number>>({});
   const [expandedStop, setExpandedStop] = useState<string | null>(null);
   const [occurrenceTarget, setOccurrenceTarget] = useState<{ stopId: string; pkgId: string } | null>(null);
   const derivedExecutionState = React.useMemo(
@@ -272,6 +274,14 @@ export default function RouteExecutionScreen() {
   const handleCardOccurrence = useCallback(() => {
     if (!currentStop) return;
     setExpandedStop(currentStop.id);
+    requestAnimationFrame(() => {
+      const stopOffset = stopOffsetsRef.current[currentStop.id];
+      if (stopOffset === undefined) return;
+      executionScrollRef.current?.scrollTo({
+        y: Math.max(0, stopOffset - Spacing.md),
+        animated: true,
+      });
+    });
   }, [currentStop]);
 
   const handleNavigateAddress = useCallback(async (address: string) => {
@@ -384,7 +394,11 @@ export default function RouteExecutionScreen() {
 
   return (
     <>
-      <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+      <ScrollView
+        ref={executionScrollRef}
+        style={styles.container}
+        contentContainerStyle={styles.content}
+      >
         <View style={styles.header}>
           <TouchableOpacity
             onPress={() => {
@@ -492,6 +506,9 @@ export default function RouteExecutionScreen() {
             <View
               key={stop.id}
               style={styles.stopCard}
+              onLayout={event => {
+                stopOffsetsRef.current[stop.id] = event.nativeEvent.layout.y;
+              }}
             >
               {/* Only the header dims when the stop is done — the expand button and
                   package list stay at full opacity so TouchableOpacity press events

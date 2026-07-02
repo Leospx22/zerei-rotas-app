@@ -72,6 +72,7 @@ All notable product and architecture changes are recorded here. Versions follow 
 - The newest completed route being overwritten by stale `currentRoute` data.
 - Route names becoming inconsistent across Painel, Minhas Rotas, and Historico.
 - History reloads using separate screen-owned data sources.
+- Occurrence controls expanding outside the viewport after the address-group delivery layout grew taller.
 
 ### Removed
 

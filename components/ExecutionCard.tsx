@@ -275,11 +275,11 @@ export function ExecutionCard({
                         onPress={() => onConfirmAddressGroup(group)}
                         activeOpacity={0.8}
                         accessibilityRole="button"
-                        accessibilityLabel={`Entreguei este endereço: ${group.address}`}
+                        accessibilityLabel={`Entregue neste endereço: ${group.address}`}
                       >
                         <CheckCircle2 size={20} color={Colors.primary[900]} />
                         <Text style={styles.groupCompleteButtonText}>
-                          Entreguei este endereço
+                          Entregue neste endereço
                         </Text>
                       </TouchableOpacity>
                     )
@@ -290,23 +290,25 @@ export function ExecutionCard({
         </View>
       </View>
 
-      <TouchableOpacity
-        style={[styles.primaryButton, primaryDisabled && styles.primaryButtonDisabled]}
-        onPress={isPickup ? onConfirmPickup : onConfirmDelivery}
-        disabled={primaryDisabled}
-        activeOpacity={0.82}
-        accessibilityRole="button"
-        accessibilityLabel={primaryLabel}
-        accessibilityState={{ disabled: primaryDisabled }}
-      >
-        <LinearGradient
-          colors={[Colors.gold[500], Colors.gold[700]]}
-          style={styles.primaryButtonGradient}
+      {isPickup ? (
+        <TouchableOpacity
+          style={[styles.primaryButton, primaryDisabled && styles.primaryButtonDisabled]}
+          onPress={onConfirmPickup}
+          disabled={primaryDisabled}
+          activeOpacity={0.82}
+          accessibilityRole="button"
+          accessibilityLabel={primaryLabel}
+          accessibilityState={{ disabled: primaryDisabled }}
         >
-          <Package size={23} color={Colors.primary[900]} />
-          <Text style={styles.primaryButtonText}>{primaryLabel}</Text>
-        </LinearGradient>
-      </TouchableOpacity>
+          <LinearGradient
+            colors={[Colors.gold[500], Colors.gold[700]]}
+            style={styles.primaryButtonGradient}
+          >
+            <Package size={23} color={Colors.primary[900]} />
+            <Text style={styles.primaryButtonText}>{primaryLabel}</Text>
+          </LinearGradient>
+        </TouchableOpacity>
+      ) : null}
 
       <View style={styles.secondaryActions}>
         {showNavigate ? (

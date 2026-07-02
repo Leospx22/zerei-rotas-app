@@ -1,7 +1,7 @@
 import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { AlertCircle, Check, MapPin, Navigation, Package, Pencil } from 'lucide-react-native';
+import { AlertCircle, Check, CheckCircle2, MapPin, Navigation, Package, Pencil } from 'lucide-react-native';
 import { BorderRadius, Colors, FontSizes, Spacing } from '@/constants/theme';
 import { PlaceInfoCard } from '@/components/PlaceInfoCard';
 import type { ExecutionStep } from '@/lib/executionState';
@@ -178,10 +178,18 @@ export function ExecutionCard({
                           </TouchableOpacity>
                         ) : null}
                       </View>
-                      <Text style={styles.packageGroupCount}>
-                        {group.packages.length}{' '}
-                        {group.packages.length === 1 ? 'pacote' : 'pacotes'}
-                      </Text>
+                      <View style={styles.packageGroupMetaRow}>
+                        <Text style={styles.packageGroupCount}>
+                          {group.packages.length}{' '}
+                          {group.packages.length === 1 ? 'pacote' : 'pacotes'}
+                        </Text>
+                        {groupPlaceInfo ? (
+                          <View style={styles.savedInfoIndicator}>
+                            <CheckCircle2 size={12} color={Colors.success} />
+                            <Text style={styles.savedInfoIndicatorText}>Info salva</Text>
+                          </View>
+                        ) : null}
+                      </View>
                     </View>
                   </View>
 
@@ -430,22 +438,45 @@ const styles = StyleSheet.create({
   },
   packageGroupTitleRow: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     gap: Spacing.sm,
   },
   packageGroupAddress: {
     flex: 1,
+    flexShrink: 1,
     color: Colors.white,
     fontSize: FontSizes.md,
     fontWeight: '700',
+  },
+  packageGroupMetaRow: {
+    minHeight: 22,
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: Spacing.sm,
   },
   packageGroupCount: {
     color: Colors.gold[400],
     fontSize: FontSizes.sm,
     fontWeight: '800',
   },
+  savedInfoIndicator: {
+    minHeight: 22,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.xs,
+    paddingHorizontal: Spacing.sm,
+    borderRadius: BorderRadius.full,
+    backgroundColor: Colors.successBg,
+  },
+  savedInfoIndicatorText: {
+    color: Colors.success,
+    fontSize: FontSizes.xs,
+    fontWeight: '700',
+  },
   groupInfoAction: {
     minHeight: 40,
+    flexShrink: 0,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',

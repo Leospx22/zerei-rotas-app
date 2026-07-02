@@ -1,5 +1,5 @@
 import React from 'react';
-import { StyleSheet, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import { Building2, CarFront, KeyRound, Lightbulb, Package } from 'lucide-react-native';
 import { AppCard, AppText } from '@/components/ui';
 import { Colors, Spacing } from '@/constants/theme';
@@ -24,27 +24,52 @@ export function PlaceInfoCard({ place }: PlaceInfoCardProps) {
         <AppText variant="bodyStrong">{DELIVERY_TYPE_LABELS[place.deliveryType]}</AppText>
       </View>
 
-      {place.deliveryNote ? (
-        <InfoRow icon={<Package size={15} color={Colors.gold[400]} />} text={place.deliveryNote} />
+      {place.parkingNote ? (
+        <InfoRow
+          icon={<CarFront size={15} color={Colors.gray} />}
+          label="Estacionamento"
+          text={place.parkingNote}
+        />
       ) : null}
       {place.accessNote ? (
-        <InfoRow icon={<KeyRound size={15} color={Colors.gray} />} text={place.accessNote} />
+        <InfoRow
+          icon={<KeyRound size={15} color={Colors.gray} />}
+          label="Acesso / Portaria"
+          text={place.accessNote}
+        />
       ) : null}
-      {place.parkingNote ? (
-        <InfoRow icon={<CarFront size={15} color={Colors.gray} />} text={place.parkingNote} />
+      {place.deliveryNote ? (
+        <InfoRow
+          icon={<Package size={15} color={Colors.gold[400]} />}
+          label="Local de entrega"
+          text={place.deliveryNote}
+        />
       ) : null}
       {place.localTip ? (
-        <InfoRow icon={<Lightbulb size={15} color={Colors.warning} />} text={place.localTip} />
+        <InfoRow
+          icon={<Lightbulb size={15} color={Colors.warning} />}
+          label="Dica do local"
+          text={place.localTip}
+        />
       ) : null}
     </AppCard>
   );
 }
 
-function InfoRow({ icon, text }: { icon: React.ReactNode; text: string }) {
+function InfoRow({
+  icon,
+  label,
+  text,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  text: string;
+}) {
   return (
     <View style={styles.infoRow}>
       {icon}
       <AppText variant="label" color={Colors.offWhite} style={styles.infoText} numberOfLines={2}>
+        <Text style={styles.infoLabel}>{label}: </Text>
         {text}
       </AppText>
     </View>
@@ -69,5 +94,9 @@ const styles = StyleSheet.create({
   },
   infoText: {
     flex: 1,
+  },
+  infoLabel: {
+    color: Colors.gray,
+    fontWeight: '700',
   },
 });

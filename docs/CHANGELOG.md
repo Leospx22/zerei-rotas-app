@@ -52,6 +52,7 @@ All notable product and architecture changes are recorded here. Versions follow 
 - Sorted current-stop address groups numerically for faster package scanning.
 - Aligned the execution title and package summary with the first sorted address group.
 - Removed the misleading stop-wide delivery type selector in favor of per-address information.
+- Polished per-address Place Information headers, saved indicators, and compact field hierarchy.
 
 ### Fixed
 

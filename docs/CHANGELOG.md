@@ -35,6 +35,7 @@ All notable product and architecture changes are recorded here. Versions follow 
 - Place Information editor with quick suggestions and explicit save, update, and delete actions.
 - Address-group Place Information actions and compact cards in route execution.
 - Per-address-group Google Maps navigation using normalized street-and-number queries.
+- Per-address-group delivery completion with occurrence-safe package updates.
 - Post-import route review with stop/package inspection, route rename, and existing reorder controls.
 
 ### Changed

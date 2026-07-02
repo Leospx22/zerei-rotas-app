@@ -2,7 +2,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   buildExecutionPackageGroups,
+  getPendingPackageIdsForGroup,
   getPrimaryExecutionAddress,
+  isExecutionPackageGroupCompleted,
   normalizeAddress,
   summarizePackageGroups,
 } from '../lib/executionPresentation.ts';
@@ -105,6 +107,37 @@ test('uses the first sorted address group as the primary execution address', () 
   })));
 
   assert.equal(getPrimaryExecutionAddress(stop), 'Rua Coronel Trancoso, 20');
+});
+
+test('selects only pending packages from one address group for completion', () => {
+  const address20 = 'Rua Coronel Trancoso, 20';
+  const address34 = 'Rua Coronel Trancoso, 34';
+  const pending20 = packageItem('pkg-20-pending', address20);
+  const skipped20 = { ...packageItem('pkg-20-skipped', address20), status: 'skipped' };
+  const pending34 = packageItem('pkg-34-pending', address34);
+  const stop = stopWithGroups([
+    { address: address20, packages: [pending20, skipped20] },
+    { address: address34, packages: [pending34] },
+  ]);
+  const [group20, group34] = buildExecutionPackageGroups(stop);
+
+  assert.deepEqual(getPendingPackageIdsForGroup(group20), ['pkg-20-pending']);
+  assert.deepEqual(getPendingPackageIdsForGroup(group34), ['pkg-34-pending']);
+  assert.equal(getPendingPackageIdsForGroup(group20).includes('pkg-20-skipped'), false);
+  assert.equal(getPendingPackageIdsForGroup(group20).includes('pkg-34-pending'), false);
+});
+
+test('treats delivered and occurrence packages as a completed address group', () => {
+  const address = 'Rua Coronel Trancoso, 20';
+  const stop = stopWithGroups([{
+    address,
+    packages: [
+      { ...packageItem('pkg-delivered', address), status: 'delivered' },
+      { ...packageItem('pkg-skipped', address), status: 'skipped' },
+    ],
+  }]);
+
+  assert.equal(isExecutionPackageGroupCompleted(buildExecutionPackageGroups(stop)[0]), true);
 });
 
 test('keeps the original relative order for equal street numbers', () => {

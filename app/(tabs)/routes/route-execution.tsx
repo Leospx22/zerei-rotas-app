@@ -35,6 +35,7 @@ import { useRoute } from '@/contexts/RouteContext';
 import { deriveExecutionState, type ExecutionStep } from '@/lib/executionState';
 import {
   buildExecutionPackageGroups,
+  getPendingPackageIdsForGroup,
   type ExecutionPackageGroup,
 } from '@/lib/executionPresentation';
 import { buildGoogleMapsSearchUrl } from '@/lib/mapNavigation';
@@ -284,6 +285,31 @@ export default function RouteExecutionScreen() {
     }
   }, []);
 
+  const handleConfirmAddressGroup = useCallback((group: ExecutionPackageGroup) => {
+    if (!currentStop || executionStep !== 'entrega') return;
+
+    const pendingPackageIds = getPendingPackageIdsForGroup(group);
+    if (pendingPackageIds.length === 0) return;
+
+    const groupPackageIds = new Set(group.packages.map(pkg => pkg.id));
+    const hasPendingOutsideGroup = currentStop.packages.some(
+      pkg => pkg.status === 'pending' && !groupPackageIds.has(pkg.id)
+    );
+
+    pendingPackageIds.forEach(packageId => {
+      updatePackageStatus(currentStop.id, packageId, 'delivered');
+    });
+
+    if (!hasPendingOutsideGroup) {
+      setExecutionStep('separacao');
+      setSeparatedPackageIds(new Set());
+      setCompletionFeedback({
+        id: Date.now(),
+        hasNextStop: nextStop !== null,
+      });
+    }
+  }, [currentStop, executionStep, nextStop, updatePackageStatus]);
+
   const handleSavePlaceInfo = useCallback(async (draft: PlaceInfoDraft) => {
     if (!editingPlaceGroup) return;
     const targetGroup = editingPlaceGroup;
@@ -411,6 +437,7 @@ export default function RouteExecutionScreen() {
             placeInfoByAddressKey={placeInfoByAddressKey}
             onEditPlaceInfo={setEditingPlaceGroup}
             onNavigateAddress={handleNavigateAddress}
+            onConfirmAddressGroup={handleConfirmAddressGroup}
             showNavigate={false}
           />
         </View>

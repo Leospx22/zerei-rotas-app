@@ -101,6 +101,19 @@ export interface PackageGroupSummary {
   remainingGroups: number;
 }
 
+export function getPendingPackageIdsForGroup(group: ExecutionPackageGroup): string[] {
+  return group.packages
+    .filter(pkg => pkg.status === 'pending')
+    .map(pkg => pkg.id);
+}
+
+export function isExecutionPackageGroupCompleted(group: ExecutionPackageGroup): boolean {
+  return (
+    group.packages.length > 0 &&
+    group.packages.every(pkg => pkg.status === 'delivered' || pkg.status === 'skipped')
+  );
+}
+
 function numericStreetNumber(address: string): number | null {
   const number = normalizeAddress(address).number;
   const match = number.match(/^\d+/);

@@ -9,6 +9,7 @@ import type { GroupedStop, PackageItem } from '@/lib/packageUtils';
 import type { PlaceInfo } from '@/lib/placeIntelligence';
 import {
   buildExecutionPackageGroups,
+  isExecutionPackageGroupCompleted,
   normalizeAddress,
   summarizePackageGroups,
   type ExecutionPackageGroup,
@@ -29,6 +30,7 @@ export interface ExecutionCardProps {
   placeInfoByAddressKey?: Readonly<Record<string, PlaceInfo | null | undefined>>;
   onEditPlaceInfo?: (group: Pick<ExecutionPackageGroup, 'key' | 'address'>) => void;
   onNavigateAddress?: (address: string) => void;
+  onConfirmAddressGroup?: (group: ExecutionPackageGroup) => void;
   showNavigate?: boolean;
 }
 
@@ -52,6 +54,7 @@ export function ExecutionCard({
   placeInfoByAddressKey = {},
   onEditPlaceInfo,
   onNavigateAddress,
+  onConfirmAddressGroup,
   showNavigate = true,
 }: ExecutionCardProps) {
   if (!currentStop) return null;
@@ -127,8 +130,8 @@ export function ExecutionCard({
         </View>
       </LinearGradient>
 
-      {isPickup ? (
-        <View style={styles.collectionSection}>
+      <View style={styles.collectionSection}>
+        {isPickup ? (
           <View style={styles.collectionHeader}>
             <View>
               <Text style={styles.collectionTitle}>Conferidos</Text>
@@ -148,10 +151,12 @@ export function ExecutionCard({
               </Text>
             </TouchableOpacity>
           </View>
+        ) : null}
 
-          <View style={styles.packageRows}>
+        <View style={styles.packageRows}>
             {packageGroups.map(group => {
               const groupPlaceInfo = placeInfoByAddressKey[group.key] ?? null;
+              const groupCompleted = isExecutionPackageGroupCompleted(group);
               return (
                 <View key={group.key} style={styles.packageGroup}>
                   <View style={styles.packageGroupHeader}>
@@ -213,15 +218,27 @@ export function ExecutionCard({
 
                 {group.packages.map(pkg => {
                   const separated = separatedPackageIds.has(pkg.id);
+                  const packageStateLabel = isPickup
+                    ? 'Separado'
+                    : pkg.status === 'delivered'
+                      ? 'Entregue'
+                      : pkg.status === 'skipped'
+                        ? 'Ocorrência'
+                        : 'Pendente';
                   return (
                     <TouchableOpacity
                       key={pkg.id}
-                      style={[styles.packageRow, separated && styles.packageRowSeparated]}
+                      style={[
+                        styles.packageRow,
+                        separated && styles.packageRowSeparated,
+                        !isPickup && groupCompleted && styles.packageRowCompleted,
+                      ]}
                       onPress={() => onTogglePackageSeparated(pkg.id)}
+                      disabled={!isPickup}
                       activeOpacity={0.78}
-                      accessibilityRole="checkbox"
-                      accessibilityState={{ checked: separated }}
-                      accessibilityLabel={`${pkg.trackingNumber}, ${separated ? 'separado' : 'não separado'}`}
+                      accessibilityRole={isPickup ? 'checkbox' : undefined}
+                      accessibilityState={isPickup ? { checked: separated } : { disabled: true }}
+                      accessibilityLabel={`${pkg.trackingNumber}, ${packageStateLabel}`}
                     >
                       <View style={[styles.checkbox, separated && styles.checkboxSelected]}>
                         {separated ? <Check size={18} color={Colors.primary[900]} /> : null}
@@ -234,18 +251,44 @@ export function ExecutionCard({
                           {pkg.destinationAddress}
                         </Text>
                       </View>
-                      <Text style={[styles.separatedLabel, separated && styles.separatedLabelActive]}>
-                        Separado
+                      <Text
+                        style={[
+                          styles.separatedLabel,
+                          (separated || pkg.status === 'delivered') && styles.separatedLabelActive,
+                          pkg.status === 'skipped' && styles.packageOccurrenceLabel,
+                        ]}
+                      >
+                        {packageStateLabel}
                       </Text>
                     </TouchableOpacity>
                   );
                 })}
+                  {!isPickup && onConfirmAddressGroup ? (
+                    groupCompleted ? (
+                      <View style={styles.groupCompletedState}>
+                        <CheckCircle2 size={18} color={Colors.success} />
+                        <Text style={styles.groupCompletedStateText}>Endereço concluído</Text>
+                      </View>
+                    ) : (
+                      <TouchableOpacity
+                        style={styles.groupCompleteButton}
+                        onPress={() => onConfirmAddressGroup(group)}
+                        activeOpacity={0.8}
+                        accessibilityRole="button"
+                        accessibilityLabel={`Entreguei este endereço: ${group.address}`}
+                      >
+                        <CheckCircle2 size={20} color={Colors.primary[900]} />
+                        <Text style={styles.groupCompleteButtonText}>
+                          Entreguei este endereço
+                        </Text>
+                      </TouchableOpacity>
+                    )
+                  ) : null}
                 </View>
               );
             })}
-          </View>
         </View>
-      ) : null}
+      </View>
 
       <TouchableOpacity
         style={[styles.primaryButton, primaryDisabled && styles.primaryButtonDisabled]}
@@ -529,6 +572,9 @@ const styles = StyleSheet.create({
     borderColor: Colors.successBorder,
     backgroundColor: Colors.successBg,
   },
+  packageRowCompleted: {
+    opacity: 0.62,
+  },
   checkbox: {
     width: 32,
     height: 32,
@@ -562,6 +608,40 @@ const styles = StyleSheet.create({
   },
   separatedLabelActive: {
     color: Colors.success,
+  },
+  packageOccurrenceLabel: {
+    color: Colors.error,
+  },
+  groupCompleteButton: {
+    minHeight: 52,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: Spacing.sm,
+    paddingHorizontal: Spacing.md,
+    borderRadius: BorderRadius.md,
+    backgroundColor: Colors.gold[500],
+  },
+  groupCompleteButtonText: {
+    color: Colors.primary[900],
+    fontSize: FontSizes.md,
+    fontWeight: '900',
+  },
+  groupCompletedState: {
+    minHeight: 48,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: Spacing.sm,
+    borderRadius: BorderRadius.md,
+    borderWidth: 1,
+    borderColor: Colors.successBorder,
+    backgroundColor: Colors.successBg,
+  },
+  groupCompletedStateText: {
+    color: Colors.success,
+    fontSize: FontSizes.md,
+    fontWeight: '800',
   },
   primaryButton: {
     minHeight: 64,

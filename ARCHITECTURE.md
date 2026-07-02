@@ -112,7 +112,7 @@ Detailed transitions:
 3. Continue reuses that route and calls `router.replace()` for import-summary. It must not create a duplicate route.
 4. Import Summary uses `router.replace()` for delivery-preparation.
 5. Delivery Preparation changes the route to `active`, sets `startTime`, and uses `router.replace()` for route-execution.
-6. Route Execution updates stop and package status through `RouteContext`.
+6. Route Execution updates package status through `RouteContext`, including address-group completion that marks only pending packages in the selected presentation group. Skipped occurrence packages are preserved, and the existing context logic derives stop completion.
 7. When every stop is completed or skipped, `RouteContext` changes the route to `completed` and persists it to history.
 8. Route Execution observes the completed status and replaces itself with route-completed.
 9. Finishing the completion screen clears the in-memory current route and replaces the flow with Minhas Rotas.

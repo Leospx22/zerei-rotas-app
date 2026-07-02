@@ -235,7 +235,7 @@ The module owns JSON serialization, loading, saving, completion history, rename,
 
 ### `lib/placeIntelligence.ts`
 
-Place Intelligence is stored separately from routes under `ZR_PLACE_INTELLIGENCE`. Entries are keyed with the presentation-only `normalizeAddress()` group key, so equivalent street abbreviations and complements resolve to the same place. The execution screen performs read-only lookup for the current stop; writes occur only through explicit future editing features.
+Place Intelligence is stored separately from routes under `ZR_PLACE_INTELLIGENCE`. Entries are keyed with the presentation-only `normalizeAddress()` group key, so equivalent street abbreviations and complements resolve to the same place. When the current stop changes, the execution screen loads each visible address group independently and exposes its explicit modal editor for save, update, and confirmed deletion; no automatic writes occur.
 
 ### `hooks/usePersistence.ts`
 

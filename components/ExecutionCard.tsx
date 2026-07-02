@@ -1,7 +1,7 @@
 import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { AlertCircle, Building2, Check, MapPin, Navigation, Package } from 'lucide-react-native';
+import { AlertCircle, Check, MapPin, Navigation, Package, Pencil } from 'lucide-react-native';
 import { BorderRadius, Colors, FontSizes, Spacing } from '@/constants/theme';
 import { PlaceInfoCard } from '@/components/PlaceInfoCard';
 import type { ExecutionStep } from '@/lib/executionState';
@@ -11,6 +11,7 @@ import {
   buildExecutionPackageGroups,
   normalizeAddress,
   summarizePackageGroups,
+  type ExecutionPackageGroup,
 } from '@/lib/executionPresentation';
 
 export interface ExecutionCardProps {
@@ -25,11 +26,10 @@ export interface ExecutionCardProps {
   separatedPackageIds: ReadonlySet<string>;
   onTogglePackageSeparated: (packageId: string) => void;
   onToggleSelectAll: () => void;
-  placeInfo?: PlaceInfo | null;
+  placeInfoByAddressKey?: Readonly<Record<string, PlaceInfo | null | undefined>>;
+  onEditPlaceInfo?: (group: Pick<ExecutionPackageGroup, 'key' | 'address'>) => void;
   showNavigate?: boolean;
 }
-
-const DELIVERY_TYPES = ['Portaria', 'Condomínio', 'Endereço comum'] as const;
 
 /**
  * Presentation-only card for the focused delivery stop.
@@ -48,7 +48,8 @@ export function ExecutionCard({
   separatedPackageIds,
   onTogglePackageSeparated,
   onToggleSelectAll,
-  placeInfo = null,
+  placeInfoByAddressKey = {},
+  onEditPlaceInfo,
   showNavigate = true,
 }: ExecutionCardProps) {
   if (!currentStop) return null;
@@ -93,8 +94,6 @@ export function ExecutionCard({
           <Text style={styles.stopSummary}>{stopSummary}</Text>
         </View>
       </View>
-
-      {placeInfo ? <PlaceInfoCard place={placeInfo} /> : null}
 
       <LinearGradient
         colors={[Colors.primary[500], Colors.primary[700]]}
@@ -149,18 +148,44 @@ export function ExecutionCard({
           </View>
 
           <View style={styles.packageRows}>
-            {packageGroups.map(group => (
-              <View key={group.key} style={styles.packageGroup}>
-                <View style={styles.packageGroupHeader}>
-                  <MapPin size={16} color={Colors.gold[400]} />
-                  <Text style={styles.packageGroupAddress} numberOfLines={2}>
-                    {group.address}
-                  </Text>
-                  <Text style={styles.packageGroupCount}>
-                    {group.packages.length}{' '}
-                    {group.packages.length === 1 ? 'pacote' : 'pacotes'}
-                  </Text>
-                </View>
+            {packageGroups.map(group => {
+              const groupPlaceInfo = placeInfoByAddressKey[group.key] ?? null;
+              return (
+                <View key={group.key} style={styles.packageGroup}>
+                  <View style={styles.packageGroupHeader}>
+                    <MapPin size={16} color={Colors.gold[400]} />
+                    <View style={styles.packageGroupHeaderContent}>
+                      <View style={styles.packageGroupTitleRow}>
+                        <Text style={styles.packageGroupAddress} numberOfLines={2}>
+                          {group.address}
+                        </Text>
+                        {onEditPlaceInfo ? (
+                          <TouchableOpacity
+                            style={styles.groupInfoAction}
+                            onPress={() => onEditPlaceInfo(group)}
+                            activeOpacity={0.78}
+                            accessibilityRole="button"
+                            accessibilityLabel={
+                              groupPlaceInfo
+                                ? `Editar informações de ${group.address}`
+                                : `Adicionar informações de ${group.address}`
+                            }
+                          >
+                            <Pencil size={14} color={Colors.gold[400]} />
+                            <Text style={styles.groupInfoActionText}>
+                              {groupPlaceInfo ? 'Editar info' : '+ Info'}
+                            </Text>
+                          </TouchableOpacity>
+                        ) : null}
+                      </View>
+                      <Text style={styles.packageGroupCount}>
+                        {group.packages.length}{' '}
+                        {group.packages.length === 1 ? 'pacote' : 'pacotes'}
+                      </Text>
+                    </View>
+                  </View>
+
+                  {groupPlaceInfo ? <PlaceInfoCard place={groupPlaceInfo} /> : null}
 
                 {group.packages.map(pkg => {
                   const separated = separatedPackageIds.has(pkg.id);
@@ -191,35 +216,12 @@ export function ExecutionCard({
                     </TouchableOpacity>
                   );
                 })}
-              </View>
-            ))}
+                </View>
+              );
+            })}
           </View>
         </View>
       ) : null}
-
-      <View style={styles.deliveryTypeSection}>
-        <View style={styles.deliveryTypeTitleRow}>
-          <Building2 size={17} color={Colors.gold[400]} />
-          <Text style={styles.deliveryTypeTitle}>Tipo de entrega</Text>
-        </View>
-        <View style={styles.deliveryTypes}>
-          {DELIVERY_TYPES.map((type, index) => (
-            <View
-              key={type}
-              style={[styles.deliveryTypeBadge, index === 0 && styles.deliveryTypeBadgePrimary]}
-            >
-              <Text
-                style={[
-                  styles.deliveryTypeBadgeText,
-                  index === 0 && styles.deliveryTypeBadgeTextPrimary,
-                ]}
-              >
-                {type}
-              </Text>
-            </View>
-          ))}
-        </View>
-      </View>
 
       <TouchableOpacity
         style={[styles.primaryButton, primaryDisabled && styles.primaryButtonDisabled]}
@@ -416,11 +418,20 @@ const styles = StyleSheet.create({
   packageGroupHeader: {
     minHeight: 44,
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     gap: Spacing.sm,
-    paddingHorizontal: Spacing.sm,
+    padding: Spacing.sm,
     borderRadius: BorderRadius.sm,
     backgroundColor: Colors.overlay,
+  },
+  packageGroupHeaderContent: {
+    flex: 1,
+    gap: Spacing.xs,
+  },
+  packageGroupTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
   },
   packageGroupAddress: {
     flex: 1,
@@ -429,6 +440,23 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   packageGroupCount: {
+    color: Colors.gold[400],
+    fontSize: FontSizes.sm,
+    fontWeight: '800',
+  },
+  groupInfoAction: {
+    minHeight: 40,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: Spacing.xs,
+    paddingHorizontal: Spacing.sm,
+    borderRadius: BorderRadius.sm,
+    borderWidth: 1,
+    borderColor: Colors.gold[700],
+    backgroundColor: Colors.background,
+  },
+  groupInfoActionText: {
     color: Colors.gold[400],
     fontSize: FontSizes.sm,
     fontWeight: '800',
@@ -482,45 +510,6 @@ const styles = StyleSheet.create({
   },
   separatedLabelActive: {
     color: Colors.success,
-  },
-  deliveryTypeSection: {
-    gap: Spacing.sm,
-  },
-  deliveryTypeTitleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.sm,
-  },
-  deliveryTypeTitle: {
-    color: Colors.white,
-    fontSize: FontSizes.md,
-    fontWeight: '700',
-  },
-  deliveryTypes: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: Spacing.sm,
-  },
-  deliveryTypeBadge: {
-    minHeight: 36,
-    justifyContent: 'center',
-    paddingHorizontal: Spacing.md,
-    borderRadius: BorderRadius.full,
-    borderWidth: 1,
-    borderColor: Colors.cardBorder,
-    backgroundColor: Colors.background,
-  },
-  deliveryTypeBadgePrimary: {
-    borderColor: Colors.gold[700],
-    backgroundColor: Colors.overlay,
-  },
-  deliveryTypeBadgeText: {
-    color: Colors.gray,
-    fontSize: FontSizes.sm,
-    fontWeight: '600',
-  },
-  deliveryTypeBadgeTextPrimary: {
-    color: Colors.gold[400],
   },
   primaryButton: {
     minHeight: 64,

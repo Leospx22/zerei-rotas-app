@@ -32,6 +32,8 @@ All notable product and architecture changes are recorded here. Versions follow 
 - Select-all package collection and address-group summaries for multi-address stops.
 - Presentation-only address normalization for common street abbreviations and complements.
 - Local Place Intelligence model, dedicated AsyncStorage collection, and read-only execution hints.
+- Place Information editor with quick suggestions and explicit save, update, and delete actions.
+- Address-group Place Information actions and compact cards in route execution.
 - Post-import route review with stop/package inspection, route rename, and existing reorder controls.
 
 ### Changed
@@ -49,6 +51,7 @@ All notable product and architecture changes are recorded here. Versions follow 
 - Clarified execution hierarchy with a street-and-number title and an immediate address/package summary.
 - Sorted current-stop address groups numerically for faster package scanning.
 - Aligned the execution title and package summary with the first sorted address group.
+- Removed the misleading stop-wide delivery type selector in favor of per-address information.
 
 ### Fixed
 

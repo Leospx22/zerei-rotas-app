@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   buildExecutionPackageGroups,
+  getPrimaryExecutionAddress,
   normalizeAddress,
   summarizePackageGroups,
 } from '../lib/executionPresentation.ts';
@@ -90,6 +91,20 @@ test('sorts visual address groups by street number and places unnumbered groups 
       'Rua Sem Numero',
     ]
   );
+});
+
+test('uses the first sorted address group as the primary execution address', () => {
+  const addresses = [
+    'Rua Coronel Trancoso, 42',
+    'Rua Coronel Trancoso, 20',
+    'Rua Coronel Trancoso, 34',
+  ];
+  const stop = stopWithGroups(addresses.map((address, index) => ({
+    address,
+    packages: [packageItem(`pkg-primary-${index}`, address)],
+  })));
+
+  assert.equal(getPrimaryExecutionAddress(stop), 'Rua Coronel Trancoso, 20');
 });
 
 test('keeps the original relative order for equal street numbers', () => {

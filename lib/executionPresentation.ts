@@ -146,6 +146,14 @@ export function buildExecutionPackageGroups(
     .map(({ group }) => group);
 }
 
+export function getPrimaryExecutionAddress(stop: GroupedStop | null): string {
+  if (!stop) return '';
+  return (
+    buildExecutionPackageGroups(stop)[0]?.address ??
+    normalizeAddress(stop.normalizedAddress).displayAddress
+  );
+}
+
 export function summarizePackageGroups(
   groups: ExecutionPackageGroup[],
   limit = 3,

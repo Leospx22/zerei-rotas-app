@@ -25,10 +25,23 @@ import {
 } from 'lucide-react-native';
 import { Colors, Spacing, FontSizes, BorderRadius } from '@/constants/theme';
 import { ExecutionCard } from '@/components/ExecutionCard';
+import {
+  PlaceInfoEditorModal,
+  type PlaceInfoDraft,
+} from '@/components/PlaceInfoEditorModal';
 import { AppCard, AppText } from '@/components/ui';
 import { useRoute } from '@/contexts/RouteContext';
 import { deriveExecutionState, type ExecutionStep } from '@/lib/executionState';
-import { loadPlaceInfo, type PlaceInfo } from '@/lib/placeIntelligence';
+import {
+  buildExecutionPackageGroups,
+  type ExecutionPackageGroup,
+} from '@/lib/executionPresentation';
+import {
+  deletePlaceInfo,
+  loadPlaceInfo,
+  savePlaceInfo,
+  type PlaceInfo,
+} from '@/lib/placeIntelligence';
 
 const OCCURRENCE_OPTIONS = [
   'Cliente ausente',
@@ -104,7 +117,13 @@ export default function RouteExecutionScreen() {
     id: number;
     hasNextStop: boolean;
   } | null>(null);
-  const [placeInfo, setPlaceInfo] = useState<PlaceInfo | null>(null);
+  const [placeInfoByAddressKey, setPlaceInfoByAddressKey] = useState<
+    Record<string, PlaceInfo | null>
+  >({});
+  const [editingPlaceGroup, setEditingPlaceGroup] = useState<
+    Pick<ExecutionPackageGroup, 'key' | 'address'> | null
+  >(null);
+  const [placeInfoSaving, setPlaceInfoSaving] = useState(false);
   const {
     currentStop,
     nextStop,
@@ -114,35 +133,47 @@ export default function RouteExecutionScreen() {
     totalPackagesCount,
     remainingStopsCount,
   } = derivedExecutionState;
+  const placeAddressGroups = React.useMemo(
+    () => buildExecutionPackageGroups(currentStop).map(({ key, address }) => ({ key, address })),
+    [currentStop?.id]
+  );
   const cameFromDeliveryPreparation = from === 'delivery-preparation';
 
   React.useEffect(() => {
     setExecutionStep(derivedExecutionState.executionStep);
     setSeparatedPackageIds(new Set());
+    setEditingPlaceGroup(null);
   }, [currentStop?.id]);
 
   React.useEffect(() => {
     let active = true;
-    if (!currentStop) {
-      setPlaceInfo(null);
+    if (placeAddressGroups.length === 0) {
+      setPlaceInfoByAddressKey({});
       return () => {
         active = false;
       };
     }
 
-    setPlaceInfo(null);
-    loadPlaceInfo(currentStop.normalizedAddress)
-      .then(info => {
-        if (active) setPlaceInfo(info);
+    setPlaceInfoByAddressKey({});
+    Promise.all(
+      placeAddressGroups.map(async group => {
+        const info = await loadPlaceInfo(group.address).catch(() => null);
+        return [group.key, info] as const;
       })
-      .catch(() => {
-        if (active) setPlaceInfo(null);
-      });
+    ).then(entries => {
+      if (active) {
+        setPlaceInfoByAddressKey(Object.fromEntries(entries));
+      }
+    }).catch(() => {
+      if (active) {
+        setPlaceInfoByAddressKey({});
+      }
+    });
 
     return () => {
       active = false;
     };
-  }, [currentStop?.id, currentStop?.normalizedAddress]);
+  }, [placeAddressGroups]);
 
   React.useEffect(() => {
     if (!completionFeedback) return;
@@ -240,6 +271,57 @@ export default function RouteExecutionScreen() {
     setExpandedStop(currentStop.id);
   }, [currentStop]);
 
+  const handleSavePlaceInfo = useCallback(async (draft: PlaceInfoDraft) => {
+    if (!editingPlaceGroup) return;
+    const targetGroup = editingPlaceGroup;
+    setPlaceInfoSaving(true);
+    try {
+      await savePlaceInfo({
+        normalizedAddress: targetGroup.address,
+        deliveryType: draft.deliveryType,
+        parkingNote: draft.parkingNote.trim() || undefined,
+        accessNote: draft.accessNote.trim() || undefined,
+        deliveryNote: draft.deliveryNote.trim() || undefined,
+        localTip: draft.localTip.trim() || undefined,
+        updatedAt: new Date().toISOString(),
+      });
+      const savedPlace = await loadPlaceInfo(targetGroup.address);
+      setPlaceInfoByAddressKey(previous => ({
+        ...previous,
+        [targetGroup.key]: savedPlace,
+      }));
+      setEditingPlaceGroup(null);
+    } catch {
+      Alert.alert(
+        'Não foi possível salvar',
+        'Tente novamente. As informações da rota não foram alteradas.'
+      );
+    } finally {
+      setPlaceInfoSaving(false);
+    }
+  }, [editingPlaceGroup]);
+
+  const handleDeletePlaceInfo = useCallback(async () => {
+    if (!editingPlaceGroup) return;
+    const targetGroup = editingPlaceGroup;
+    setPlaceInfoSaving(true);
+    try {
+      await deletePlaceInfo(targetGroup.address);
+      setPlaceInfoByAddressKey(previous => ({
+        ...previous,
+        [targetGroup.key]: null,
+      }));
+      setEditingPlaceGroup(null);
+    } catch {
+      Alert.alert(
+        'Não foi possível apagar',
+        'Tente novamente. As informações deste local continuam salvas.'
+      );
+    } finally {
+      setPlaceInfoSaving(false);
+    }
+  }, [editingPlaceGroup]);
+
   if (!currentRoute) {
     return (
       <View style={styles.emptyContainer}>
@@ -313,7 +395,8 @@ export default function RouteExecutionScreen() {
             separatedPackageIds={separatedPackageIds}
             onTogglePackageSeparated={handleTogglePackageSeparated}
             onToggleSelectAll={handleToggleSelectAll}
-            placeInfo={placeInfo}
+            placeInfoByAddressKey={placeInfoByAddressKey}
+            onEditPlaceInfo={setEditingPlaceGroup}
             showNavigate={false}
           />
         </View>
@@ -593,6 +676,19 @@ export default function RouteExecutionScreen() {
         visible={occurrenceTarget !== null}
         onSelect={handleOccurrenceSelect}
         onClose={() => setOccurrenceTarget(null)}
+      />
+      <PlaceInfoEditorModal
+        visible={editingPlaceGroup !== null}
+        address={editingPlaceGroup?.address ?? ''}
+        initialPlaceInfo={
+          editingPlaceGroup
+            ? placeInfoByAddressKey[editingPlaceGroup.key] ?? null
+            : null
+        }
+        saving={placeInfoSaving}
+        onClose={() => setEditingPlaceGroup(null)}
+        onSave={handleSavePlaceInfo}
+        onDelete={handleDeletePlaceInfo}
       />
     </>
   );

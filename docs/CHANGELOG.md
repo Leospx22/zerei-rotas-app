@@ -44,6 +44,9 @@ All notable product and architecture changes are recorded here. Versions follow 
 - Address-group package selection and clearing in both execution phases, with per-group occurrence access.
 - Reliable individual package selection and direct package-to-occurrence-reason flow.
 - Address-aware group occurrence flow with direct single-package reasons and filtered multi-package selection.
+- Persistent package occurrence reasons and registration timestamps.
+- Read-only Ocorrências screen for current and completed routes.
+- Optional completed-history occurrence summaries and route-card occurrence access.
 
 ### Changed
 
@@ -63,6 +66,7 @@ All notable product and architecture changes are recorded here. Versions follow 
 - Removed the misleading stop-wide delivery type selector in favor of per-address information.
 - Polished per-address Place Information headers, saved indicators, and compact field hierarchy.
 - Removed the duplicate stop-wide delivery action after address-group delivery became primary.
+- Persisted occurrence metadata inside the existing current-route and history storage records.
 
 ### Fixed
 

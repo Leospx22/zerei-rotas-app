@@ -21,6 +21,7 @@ import {
   Play,
   Truck,
   Clock,
+  AlertCircle,
 } from 'lucide-react-native';
 import { Colors, Spacing, FontSizes, BorderRadius } from '@/constants/theme';
 import { StatusBadge } from '@/components/ui';
@@ -31,6 +32,7 @@ import {
   routeDisplayStatusLabel,
   type RouteDisplayStatus,
 } from '@/lib/routePresentation';
+import { collectRouteOccurrenceRecords } from '@/lib/occurrenceRecords';
 
 interface RouteItem {
   id: string;
@@ -43,6 +45,7 @@ interface RouteItem {
   deliveredPackages: number;
   completedStops: number;
   isCurrentRoute: boolean;
+  occurrenceCount: number;
   completedAt?: string;
 }
 
@@ -75,6 +78,7 @@ export default function RoutesScreen() {
         deliveredPackages: currentRoute.deliveredPackages,
         completedStops: currentRoute.completedStops,
         isCurrentRoute: true,
+        occurrenceCount: collectRouteOccurrenceRecords(currentRoute).length,
       });
     }
 
@@ -90,6 +94,7 @@ export default function RoutesScreen() {
         deliveredPackages: entry.deliveredPackages,
         completedStops: entry.completedStops,
         isCurrentRoute: false,
+        occurrenceCount: entry.occurrences?.length ?? 0,
         completedAt: entry.completedAt,
       });
     });
@@ -235,6 +240,27 @@ export default function RoutesScreen() {
                   <Trash2 size={17} color={Colors.error} />
                 </TouchableOpacity>
               </View>
+
+              {route.occurrenceCount > 0 ? (
+                <View style={styles.occurrenceRow}>
+                  <View style={styles.occurrenceCount}>
+                    <AlertCircle size={15} color={Colors.error} />
+                    <Text style={styles.occurrenceCountText}>
+                      {route.occurrenceCount}{' '}
+                      {route.occurrenceCount === 1 ? 'ocorrência' : 'ocorrências'}
+                    </Text>
+                  </View>
+                  <TouchableOpacity
+                    style={styles.occurrenceAction}
+                    onPress={() => router.push('/(tabs)/routes/occurrences')}
+                    activeOpacity={0.78}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Ver ocorrências de ${route.name}`}
+                  >
+                    <Text style={styles.occurrenceActionText}>Ver ocorrências</Text>
+                  </TouchableOpacity>
+                </View>
+              ) : null}
 
               {route.status === 'planning' ? (
                 <View style={styles.routeActions}>
@@ -468,6 +494,29 @@ const styles = StyleSheet.create({
     fontSize: FontSizes.sm,
     color: Colors.gray,
   },
+  occurrenceRow: {
+    minHeight: 44,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: Spacing.sm,
+    padding: Spacing.sm,
+    borderRadius: BorderRadius.sm,
+    backgroundColor: Colors.errorBg,
+  },
+  occurrenceCount: { flexDirection: 'row', alignItems: 'center', gap: Spacing.xs },
+  occurrenceCountText: { color: Colors.error, fontSize: FontSizes.sm, fontWeight: '800' },
+  occurrenceAction: {
+    minHeight: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: Spacing.md,
+    borderRadius: BorderRadius.sm,
+    borderWidth: 1,
+    borderColor: Colors.errorBorder,
+  },
+  occurrenceActionText: { color: Colors.error, fontSize: FontSizes.sm, fontWeight: '800' },
   routeActions: {
     flexDirection: 'row',
     flexWrap: 'wrap',

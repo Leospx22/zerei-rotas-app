@@ -14,6 +14,7 @@ import {
 } from '@/lib/packageUtils';
 import { usePersistence } from '@/hooks/usePersistence';
 import type { HistoryEntry } from '@/lib/routePersistence';
+import { applyPackageOccurrenceToStops } from '@/lib/occurrenceRecords';
 
 export interface RouteData {
   id: string;
@@ -33,7 +34,7 @@ interface RouteContextType {
   isLoading: boolean;
   persistenceError: string | null;
   routeHistory: HistoryEntry[];
-  // packageId → occurrence reason (UI-only state, no business logic)
+  // Compatibility lookup for occurrence reasons also persisted on PackageItem.
   occurrences: Record<string, string>;
   setCurrentRoute: (route: RouteData | null) => void;
   reloadHistory: () => Promise<void>;
@@ -66,7 +67,7 @@ function checkCompletion(route: RouteData): RouteData {
 export function RouteProvider({ children }: { children: ReactNode }) {
   const [currentRoute, setCurrentRouteState] = useState<RouteData | null>(null);
   const [routeHistory, setRouteHistory] = useState<HistoryEntry[]>([]);
-  // UI-only map: packageId → occurrence reason string
+  // Immediate UI lookup; PackageItem remains the persisted source.
   const [occurrences, setOccurrences] = useState<Record<string, string>>({});
   const { isLoading, error: persistenceError, saveRoute, loadCurrentRoute, saveToHistory, getHistory } = usePersistence();
 
@@ -168,11 +169,28 @@ export function RouteProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
-  // UI wrapper: stores the occurrence reason then delegates to existing updatePackageStatus
+  // Persist occurrence metadata in the route while retaining the UI lookup map.
   const updatePackageOccurrence = useCallback((stopId: string, packageId: string, reason: string) => {
+    const registeredAt = new Date().toISOString();
     setOccurrences(prev => ({ ...prev, [packageId]: reason }));
-    updatePackageStatus(stopId, packageId, 'skipped');
-  }, [updatePackageStatus]);
+    setCurrentRouteState(prev => {
+      if (!prev) return prev;
+      const stops = applyPackageOccurrenceToStops(
+        prev.stops,
+        stopId,
+        packageId,
+        reason,
+        registeredAt
+      );
+      const completedStops = stops.filter(stop => stop.status === 'completed').length;
+      const deliveredPackages = stops.reduce(
+        (sum, stop) =>
+          sum + stop.packages.filter(packageItem => packageItem.status === 'delivered').length,
+        0
+      );
+      return checkCompletion({ ...prev, stops, completedStops, deliveredPackages });
+    });
+  }, []);
 
   const removeDuplicates = useCallback(() => {
     setCurrentRouteState(prev => {

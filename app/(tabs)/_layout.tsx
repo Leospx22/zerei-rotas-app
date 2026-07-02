@@ -18,6 +18,7 @@ const ROUTE_LIFECYCLE_SCREENS = new Set([
   'delivery-preparation',
   'route-organizer',
   'route-execution',
+  'occurrences',
   'route-completed',
 ]);
 

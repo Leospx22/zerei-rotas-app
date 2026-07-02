@@ -22,6 +22,7 @@ import {
   ChevronUp,
   Crown,
   AlertTriangle,
+  AlertCircle,
   SkipForward,
 } from 'lucide-react-native';
 import { Colors, Spacing, FontSizes, BorderRadius } from '@/constants/theme';
@@ -45,6 +46,7 @@ import {
   getAddressGroupOccurrenceAction,
   type OccurrenceTarget,
 } from '@/lib/occurrenceFlow';
+import { collectRouteOccurrenceRecords } from '@/lib/occurrenceRecords';
 import {
   togglePackageGroupSelection,
   togglePackageSelection,
@@ -121,6 +123,10 @@ export default function RouteExecutionScreen() {
   const [occurrencePackageFilter, setOccurrencePackageFilter] = useState<Set<string> | null>(null);
   const derivedExecutionState = React.useMemo(
     () => deriveExecutionState(currentRoute),
+    [currentRoute]
+  );
+  const currentOccurrenceCount = React.useMemo(
+    () => collectRouteOccurrenceRecords(currentRoute).length,
     [currentRoute]
   );
   const [executionStep, setExecutionStep] = useState<ExecutionStep>(
@@ -499,6 +505,21 @@ export default function RouteExecutionScreen() {
           />
         </View>
 
+        {currentOccurrenceCount > 0 ? (
+          <TouchableOpacity
+            style={styles.viewOccurrencesButton}
+            onPress={() => router.push('/(tabs)/routes/occurrences')}
+            activeOpacity={0.78}
+            accessibilityRole="button"
+            accessibilityLabel="Ver ocorrências"
+          >
+            <AlertCircle size={17} color={Colors.error} />
+            <Text style={styles.viewOccurrencesText}>
+              Ver ocorrências ({currentOccurrenceCount})
+            </Text>
+          </TouchableOpacity>
+        ) : null}
+
         <View style={styles.progressCard}>
           <LinearGradient
             colors={[Colors.primary[500], Colors.primary[700]]}
@@ -667,7 +688,7 @@ export default function RouteExecutionScreen() {
                         .map(pkg => {
                           const isDelivered = pkg.status === 'delivered';
                           const isOccurrence = pkg.status === 'skipped';
-                          const occurrenceReason = occurrences[pkg.id];
+                          const occurrenceReason = pkg.occurrenceReason ?? occurrences[pkg.id];
 
                           return (
                             <View key={pkg.id} style={styles.packageRow}>
@@ -804,6 +825,20 @@ const styles = StyleSheet.create({
   },
   completionFeedbackText: { flex: 1, gap: 2 },
   executionCardWrap: { marginBottom: Spacing.lg },
+  viewOccurrencesButton: {
+    minHeight: 44,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: Spacing.sm,
+    marginTop: -Spacing.sm,
+    marginBottom: Spacing.lg,
+    borderRadius: BorderRadius.sm,
+    borderWidth: 1,
+    borderColor: Colors.errorBorder,
+    backgroundColor: Colors.errorBg,
+  },
+  viewOccurrencesText: { color: Colors.error, fontSize: FontSizes.sm, fontWeight: '800' },
   emptyContainer: {
     flex: 1, backgroundColor: Colors.background,
     alignItems: 'center', justifyContent: 'center', gap: Spacing.md,

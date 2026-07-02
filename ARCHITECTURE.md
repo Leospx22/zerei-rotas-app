@@ -33,6 +33,7 @@ app/
       delivery-preparation.tsx Route review and activation
       route-organizer.tsx      Optional route organization screen
       route-execution.tsx      Delivery execution
+      occurrences.tsx          Read-only current/history occurrence review
       route-completed.tsx      Completion summary
 
 assets/images/                 Application icons and static images
@@ -46,6 +47,7 @@ hooks/useNavigation.ts         Navigation-related hook retained by the project
 lib/packageUtils.ts            Package parsing, grouping, and route construction
 lib/mapNavigation.ts           External map URL construction from normalized addresses
 lib/occurrenceFlow.ts          Direct package occurrence target validation
+lib/occurrenceRecords.ts       Occurrence metadata updates and record collection
 lib/packageSelection.ts        Pure local separation selection helpers
 lib/placeIntelligence.ts       Local address intelligence model and persistence
 lib/routePersistence.ts        AsyncStorage schema and storage operations
@@ -72,6 +74,7 @@ Root Stack
 |   |   |-- delivery-preparation
 |   |   |-- route-organizer
 |   |   |-- route-execution
+|   |   |-- occurrences
 |   |   `-- route-completed
 |   |-- history                Historico
 |   `-- profile                Perfil
@@ -92,7 +95,7 @@ The application must not create another `NavigationContainer`. Expo Router owns 
 
 `app/(tabs)/_layout.tsx` owns the real bottom tab bar. The working Android dimensions are `height: 100`, `paddingBottom: 24`, and `paddingTop: 8`; these values account for the device navigation/gesture area and should not be reduced without device testing.
 
-The tab bar is visible on Painel, Minhas Rotas, Historico, and Perfil. It is hidden when the focused child of the routes Stack is one of the lifecycle screens: import, import-summary, delivery-preparation, route-organizer, route-execution, or route-completed.
+The tab bar is visible on Painel, Minhas Rotas, Historico, and Perfil. It is hidden when the focused child of the routes Stack is one of the lifecycle screens: import, import-summary, delivery-preparation, route-organizer, route-execution, occurrences, or route-completed.
 
 ## Route Lifecycle
 
@@ -133,10 +136,11 @@ Use `replace()` between sequential wizard screens to avoid accumulating hidden l
 
 - `currentRoute`: the live planning, active, or temporarily completed route
 - `routeHistory`: the shared completed-route summaries used by all tabs
-- `occurrences`: package occurrence reasons kept as UI state
+- `occurrences`: compatibility lookup for occurrence reasons displayed by execution UI
 - Route creation assignment through `setCurrentRoute`
 - Current-route rename through `renameCurrentRoute`
 - Stop and package status updates
+- Atomic occurrence status, reason, and registration timestamp updates
 - Completion detection and elapsed-duration calculation
 - Duplicate-stop removal and stop reordering
 - Import summary calculation
@@ -192,6 +196,15 @@ RouteData
 
 Stops are grouped exclusively by the spreadsheet Stop column. Sequence/order columns must never be interpreted as stop numbers. Packages are grouped by stop first, then by normalized address within that stop.
 
+`PackageItem` stores occurrence metadata additively:
+
+```ts
+occurrenceReason?: string;
+occurrenceRegisteredAt?: string;
+```
+
+Both fields are optional so previously persisted routes remain valid. A package occurrence continues using the existing `skipped` status convention. Current-route AsyncStorage persistence serializes these fields with the route; skipped packages without a saved reason display `Motivo não informado`.
+
 ## History Model
 
 Completed routes use the compact `HistoryEntry` model:
@@ -207,6 +220,7 @@ interface HistoryEntry {
   distance: number;
   durationMinutes: number;
   completedAt: string;
+  occurrences?: OccurrenceRecord[];
 }
 ```
 
@@ -218,6 +232,8 @@ History invariants:
 - Repeated completion writes for the same route ID preserve an existing renamed title and `completedAt`.
 - A completed entry is uniquely targeted for rename by `id + completedAt`.
 - `routeHistory` in RouteContext is the read source for Painel, Minhas Rotas, and Historico.
+- Occurrence summaries are optional and preserve package code, address, normalized address, reason, registration time, route name, and stop number after completion.
+- History records created before occurrence summaries remain valid and expose an empty occurrence collection.
 - `reloadHistory()` is the synchronization boundary after a history mutation.
 
 Minhas Rotas derives card status without changing persisted data: a current route with zero delivered packages is `Planejada`, a current route with deliveries is `Em rota`, and a history entry is `Concluída`. Planned cards can enter Review or activate execution; in-route cards continue execution.

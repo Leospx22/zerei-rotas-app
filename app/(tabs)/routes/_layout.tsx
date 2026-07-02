@@ -9,6 +9,7 @@ export default function RoutesStackLayout() {
       <Stack.Screen name="delivery-preparation" />
       <Stack.Screen name="route-organizer" />
       <Stack.Screen name="route-execution" />
+      <Stack.Screen name="occurrences" />
       <Stack.Screen name="route-completed" />
     </Stack>
   );

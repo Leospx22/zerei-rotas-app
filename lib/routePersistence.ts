@@ -1,5 +1,9 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { RouteData } from '../contexts/RouteContext';
+import {
+  collectRouteOccurrenceRecords,
+  type OccurrenceRecord,
+} from './occurrenceRecords.ts';
 
 export interface HistoryEntry {
   id: string;
@@ -11,6 +15,7 @@ export interface HistoryEntry {
   distance: number;
   durationMinutes: number;
   completedAt: string;
+  occurrences?: OccurrenceRecord[];
 }
 
 export interface RouteStorage {
@@ -56,6 +61,18 @@ export async function loadHistoryFromStorage(storage: RouteStorage): Promise<His
 export async function saveCompletedRouteToHistory(storage: RouteStorage, route: RouteData): Promise<void> {
   const history = await loadHistoryFromStorage(storage);
   const existing = history.find(entry => entry.id === route.id);
+  const existingOccurrences = new Map(
+    (existing?.occurrences ?? []).map(record => [record.packageId, record])
+  );
+  const routeOccurrences = collectRouteOccurrenceRecords(route).map(record => {
+    const previous = existingOccurrences.get(record.packageId);
+    return {
+      ...previous,
+      ...record,
+      reason: record.reason ?? previous?.reason,
+      registeredAt: record.registeredAt ?? previous?.registeredAt,
+    };
+  });
   const entry: HistoryEntry = {
     id: route.id,
     name: existing?.name ?? route.name,
@@ -66,6 +83,9 @@ export async function saveCompletedRouteToHistory(storage: RouteStorage, route: 
     distance: route.estimatedDistanceKm,
     durationMinutes: route.durationMinutes,
     completedAt: existing?.completedAt ?? new Date().toISOString(),
+    occurrences: routeOccurrences.length > 0
+      ? routeOccurrences
+      : existing?.occurrences,
   };
   const deduped = history.filter(h => h.id !== entry.id);
   deduped.unshift(entry);
@@ -85,7 +105,11 @@ export async function renameRouteInStorage(
       entry.id === id && entry.completedAt === completedAt
     );
     if (idx === -1) return false;
-    history[idx] = { ...history[idx], name };
+    history[idx] = {
+      ...history[idx],
+      name,
+      occurrences: history[idx].occurrences?.map(record => ({ ...record, routeName: name })),
+    };
     await writeJSON(storage, KEY_HISTORY, history);
     return true;
   }
@@ -98,7 +122,11 @@ export async function renameRouteInStorage(
   const history = await loadHistoryFromStorage(storage);
   const idx = history.findIndex(entry => entry.id === id);
   if (idx === -1) return false;
-  history[idx] = { ...history[idx], name };
+  history[idx] = {
+    ...history[idx],
+    name,
+    occurrences: history[idx].occurrences?.map(record => ({ ...record, routeName: name })),
+  };
   await writeJSON(storage, KEY_HISTORY, history);
   return true;
 }

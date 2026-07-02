@@ -26,6 +26,8 @@ export interface PackageItem {
   longitude: number | null;
   stopNumber: number | null;
   status: 'pending' | 'delivered' | 'skipped';
+  occurrenceReason?: string;
+  occurrenceRegisteredAt?: string;
 }
 
 // A group of packages sharing the same full address within a Stop

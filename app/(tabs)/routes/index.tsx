@@ -20,6 +20,7 @@ import {
   Trash2,
   Play,
   Truck,
+  Clock,
 } from 'lucide-react-native';
 import { Colors, Spacing, FontSizes, BorderRadius } from '@/constants/theme';
 import { StatusBadge } from '@/components/ui';
@@ -177,7 +178,7 @@ export default function RoutesScreen() {
         {routes.length === 0 ? (
           <View style={styles.emptyState}>
             <MapPin size={48} color={Colors.cardBorder} />
-            <Text style={styles.emptyTitle}>Nenhuma rota salva ainda.</Text>
+            <Text style={styles.emptyTitle}>Nenhuma rota encontrada</Text>
             <Text style={styles.emptySubtitle}>
               Importe uma planilha para começar.
             </Text>
@@ -189,32 +190,10 @@ export default function RoutesScreen() {
                 <Text style={styles.cardName} numberOfLines={2}>
                   {route.name}
                 </Text>
-                <View style={styles.cardHeaderRight}>
-                  <StatusBadge
-                    status={route.status}
-                    label={routeDisplayStatusLabel(route.status)}
-                  />
-                  <View style={styles.cardIcons}>
-                    <TouchableOpacity
-                      style={styles.iconBtn}
-                      onPress={() => openEdit(route)}
-                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                      accessibilityRole="button"
-                      accessibilityLabel={`Editar ${route.name}`}
-                    >
-                      <Pencil size={15} color={Colors.gold[400]} />
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={styles.iconBtn}
-                      onPress={() => setDeleteTarget(route)}
-                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                      accessibilityRole="button"
-                      accessibilityLabel={`Excluir ${route.name}`}
-                    >
-                      <Trash2 size={15} color={Colors.error} />
-                    </TouchableOpacity>
-                  </View>
-                </View>
+                <StatusBadge
+                  status={route.status}
+                  label={routeDisplayStatusLabel(route.status)}
+                />
               </View>
 
               <View style={styles.cardMeta}>
@@ -232,21 +211,33 @@ export default function RoutesScreen() {
                     <Text style={styles.metaText}>{route.distance} km</Text>
                   </View>
                 ) : null}
-                <Text style={styles.metaText}>{route.date}</Text>
+                <View style={styles.metaItem}>
+                  <Clock size={13} color={Colors.gray} />
+                  <Text style={styles.metaText}>{route.date}</Text>
+                </View>
+              </View>
+
+              <View style={styles.cardManagementRow}>
+                <TouchableOpacity
+                  style={styles.iconBtn}
+                  onPress={() => openEdit(route)}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Editar ${route.name}`}
+                >
+                  <Pencil size={17} color={Colors.gold[400]} />
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.iconBtn}
+                  onPress={() => setDeleteTarget(route)}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Excluir ${route.name}`}
+                >
+                  <Trash2 size={17} color={Colors.error} />
+                </TouchableOpacity>
               </View>
 
               {route.status === 'planning' ? (
                 <View style={styles.routeActions}>
-                  <TouchableOpacity
-                    style={[styles.routeActionButton, styles.reviewActionButton]}
-                    onPress={() => router.push('/(tabs)/routes/delivery-preparation')}
-                    activeOpacity={0.78}
-                    accessibilityRole="button"
-                    accessibilityLabel={`Revisar rota ${route.name}`}
-                  >
-                    <MapPin size={15} color={Colors.gold[400]} />
-                    <Text style={styles.reviewActionText}>Revisar Rota</Text>
-                  </TouchableOpacity>
                   <TouchableOpacity
                     style={[styles.routeActionButton, styles.primaryRouteAction]}
                     onPress={() => startPlannedRoute(route)}
@@ -257,20 +248,42 @@ export default function RoutesScreen() {
                     <Play size={15} color={Colors.primary[900]} />
                     <Text style={styles.primaryRouteActionText}>Começar entrega</Text>
                   </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.routeActionButton, styles.reviewActionButton]}
+                    onPress={() => router.push('/(tabs)/routes/delivery-preparation')}
+                    activeOpacity={0.78}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Revisar rota ${route.name}`}
+                  >
+                    <MapPin size={15} color={Colors.gold[400]} />
+                    <Text style={styles.reviewActionText}>Revisar Rota</Text>
+                  </TouchableOpacity>
                 </View>
               ) : null}
 
               {route.status === 'active' ? (
-                <TouchableOpacity
-                  style={[styles.routeActionButton, styles.primaryRouteAction, styles.continueAction]}
-                  onPress={() => router.push('/(tabs)/routes/route-execution')}
-                  activeOpacity={0.78}
-                  accessibilityRole="button"
-                  accessibilityLabel={`Continuar rota ${route.name}`}
-                >
-                  <Play size={15} color={Colors.primary[900]} />
-                  <Text style={styles.primaryRouteActionText}>Continuar</Text>
-                </TouchableOpacity>
+                <View style={styles.routeActions}>
+                  <TouchableOpacity
+                    style={[styles.routeActionButton, styles.primaryRouteAction]}
+                    onPress={() => router.push('/(tabs)/routes/route-execution')}
+                    activeOpacity={0.78}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Continuar rota ${route.name}`}
+                  >
+                    <Play size={15} color={Colors.primary[900]} />
+                    <Text style={styles.primaryRouteActionText}>Continuar</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.routeActionButton, styles.reviewActionButton]}
+                    onPress={() => router.push('/(tabs)/routes/delivery-preparation')}
+                    activeOpacity={0.78}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Revisar rota ${route.name}`}
+                  >
+                    <MapPin size={15} color={Colors.gold[400]} />
+                    <Text style={styles.reviewActionText}>Revisar Rota</Text>
+                  </TouchableOpacity>
+                </View>
               ) : null}
             </View>
           ))
@@ -424,18 +437,15 @@ const styles = StyleSheet.create({
     flex: 1,
     marginRight: Spacing.sm,
   },
-  cardHeaderRight: {
-    alignItems: 'flex-end',
-    gap: Spacing.sm,
-  },
-  cardIcons: {
+  cardManagementRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: Spacing.sm,
+    justifyContent: 'flex-end',
+    gap: Spacing.md,
   },
   iconBtn: {
-    width: 32,
-    height: 32,
+    width: 44,
+    height: 44,
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: BorderRadius.sm,
@@ -444,11 +454,12 @@ const styles = StyleSheet.create({
 
   cardMeta: {
     flexDirection: 'row',
-    gap: Spacing.md,
+    gap: Spacing.sm,
     alignItems: 'center',
     flexWrap: 'wrap',
   },
   metaItem: {
+    minHeight: 22,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
@@ -465,6 +476,7 @@ const styles = StyleSheet.create({
   routeActionButton: {
     minHeight: 44,
     flexGrow: 1,
+    flexBasis: 150,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -491,7 +503,6 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     color: Colors.primary[900],
   },
-  continueAction: { alignSelf: 'flex-end' },
 
   // Modals
   backdrop: {

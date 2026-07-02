@@ -40,6 +40,10 @@ All notable product and architecture changes are recorded here. Versions follow 
 - Route overview with address totals, manual stop ordering, package previews, and map actions.
 - Painel shortcut to Route Review and dependency-free direct-position stop movement.
 - Execution route-name context and status-driven Minhas Rotas cards with planned/in-route actions.
+- Mobile-focused Minhas Rotas card hierarchy, action layout, and larger management controls.
+- Address-group package selection and clearing in both execution phases, with per-group occurrence access.
+- Reliable individual package selection and direct package-to-occurrence-reason flow.
+- Address-aware group occurrence flow with direct single-package reasons and filtered multi-package selection.
 
 ### Changed
 
@@ -78,6 +82,8 @@ All notable product and architecture changes are recorded here. Versions follow 
 - History reloads using separate screen-owned data sources.
 - Occurrence controls expanding outside the viewport after the address-group delivery layout grew taller.
 - Import Summary making customized route order appear reverted after leaving Route Review.
+- Individual package selection being disabled during the delivery phase.
+- Group occurrence requiring package reselection even when pending packages were already selected.
 
 ### Removed
 

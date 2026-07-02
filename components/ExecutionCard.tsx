@@ -7,6 +7,7 @@ import { PlaceInfoCard } from '@/components/PlaceInfoCard';
 import type { ExecutionStep } from '@/lib/executionState';
 import type { GroupedStop, PackageItem } from '@/lib/packageUtils';
 import type { PlaceInfo } from '@/lib/placeIntelligence';
+import { isPackageGroupSelected } from '@/lib/packageSelection';
 import {
   buildExecutionPackageGroups,
   isExecutionPackageGroupCompleted,
@@ -23,10 +24,11 @@ export interface ExecutionCardProps {
   onConfirmPickup: () => void;
   onConfirmDelivery: () => void;
   onNavigate: () => void;
-  onOccurrence: () => void;
+  onAddressGroupOccurrence?: (group: ExecutionPackageGroup) => void;
+  onPackageOccurrence?: (packageId: string) => void;
   separatedPackageIds: ReadonlySet<string>;
   onTogglePackageSeparated: (packageId: string) => void;
-  onToggleSelectAll: () => void;
+  onToggleAddressGroupSeparated?: (packageIds: readonly string[]) => void;
   placeInfoByAddressKey?: Readonly<Record<string, PlaceInfo | null | undefined>>;
   onEditPlaceInfo?: (group: Pick<ExecutionPackageGroup, 'key' | 'address'>) => void;
   onNavigateAddress?: (address: string) => void;
@@ -47,10 +49,11 @@ export function ExecutionCard({
   onConfirmPickup,
   onConfirmDelivery,
   onNavigate,
-  onOccurrence,
+  onAddressGroupOccurrence,
+  onPackageOccurrence,
   separatedPackageIds,
   onTogglePackageSeparated,
-  onToggleSelectAll,
+  onToggleAddressGroupSeparated,
   placeInfoByAddressKey = {},
   onEditPlaceInfo,
   onNavigateAddress,
@@ -139,17 +142,6 @@ export function ExecutionCard({
                 {separatedPackagesCount} / {totalPackagesAtCurrentStop}
               </Text>
             </View>
-            <TouchableOpacity
-              style={styles.selectAllButton}
-              onPress={onToggleSelectAll}
-              activeOpacity={0.78}
-              accessibilityRole="button"
-              accessibilityLabel={pickupComplete ? 'Limpar seleção' : 'Selecionar tudo'}
-            >
-              <Text style={styles.selectAllButtonText}>
-                {pickupComplete ? 'Limpar seleção' : 'Selecionar tudo'}
-              </Text>
-            </TouchableOpacity>
           </View>
         ) : null}
 
@@ -157,6 +149,11 @@ export function ExecutionCard({
             {packageGroups.map(group => {
               const groupPlaceInfo = placeInfoByAddressKey[group.key] ?? null;
               const groupCompleted = isExecutionPackageGroupCompleted(group);
+              const groupPackageIds = group.packages.map(pkg => pkg.id);
+              const groupSelected = isPackageGroupSelected(
+                separatedPackageIds,
+                groupPackageIds
+              );
               return (
                 <View key={group.key} style={styles.packageGroup}>
                   <View style={styles.packageGroupHeader}>
@@ -210,6 +207,24 @@ export function ExecutionCard({
                             </Text>
                           </TouchableOpacity>
                         ) : null}
+                        {onToggleAddressGroupSeparated ? (
+                          <TouchableOpacity
+                            style={styles.groupHeaderAction}
+                            onPress={() => onToggleAddressGroupSeparated(groupPackageIds)}
+                            activeOpacity={0.78}
+                            accessibilityRole="button"
+                            accessibilityLabel={
+                              groupSelected
+                                ? `Limpar seleção de ${group.address}`
+                                : `Selecionar tudo em ${group.address}`
+                            }
+                          >
+                            <Check size={15} color={Colors.gold[400]} />
+                            <Text style={styles.groupHeaderActionText}>
+                              {groupSelected ? 'Limpar seleção' : 'Selecionar tudo'}
+                            </Text>
+                          </TouchableOpacity>
+                        ) : null}
                       </View>
                     </View>
                   </View>
@@ -226,41 +241,61 @@ export function ExecutionCard({
                         ? 'Ocorrência'
                         : 'Pendente';
                   return (
-                    <TouchableOpacity
+                    <View
                       key={pkg.id}
                       style={[
                         styles.packageRow,
                         separated && styles.packageRowSeparated,
                         !isPickup && groupCompleted && styles.packageRowCompleted,
                       ]}
-                      onPress={() => onTogglePackageSeparated(pkg.id)}
-                      disabled={!isPickup}
-                      activeOpacity={0.78}
-                      accessibilityRole={isPickup ? 'checkbox' : undefined}
-                      accessibilityState={isPickup ? { checked: separated } : { disabled: true }}
-                      accessibilityLabel={`${pkg.trackingNumber}, ${packageStateLabel}`}
                     >
-                      <View style={[styles.checkbox, separated && styles.checkboxSelected]}>
-                        {separated ? <Check size={18} color={Colors.primary[900]} /> : null}
-                      </View>
-                      <View style={styles.packageRowContent}>
-                        <Text style={styles.packageTracking} numberOfLines={1}>
-                          {pkg.trackingNumber}
-                        </Text>
-                        <Text style={styles.packageAddress} numberOfLines={1}>
-                          {pkg.destinationAddress}
-                        </Text>
-                      </View>
-                      <Text
-                        style={[
-                          styles.separatedLabel,
-                          (separated || pkg.status === 'delivered') && styles.separatedLabelActive,
-                          pkg.status === 'skipped' && styles.packageOccurrenceLabel,
-                        ]}
+                      <TouchableOpacity
+                        style={styles.packageSelectionArea}
+                        onPress={() => onTogglePackageSeparated(pkg.id)}
+                        activeOpacity={0.78}
+                        accessibilityRole="checkbox"
+                        accessibilityState={{ checked: separated }}
+                        accessibilityLabel={`${pkg.trackingNumber}, ${packageStateLabel}`}
                       >
-                        {packageStateLabel}
-                      </Text>
-                    </TouchableOpacity>
+                        <View style={[styles.checkbox, separated && styles.checkboxSelected]}>
+                          {separated ? <Check size={18} color={Colors.primary[900]} /> : null}
+                        </View>
+                        <View style={styles.packageRowContent}>
+                          <Text style={styles.packageTracking} numberOfLines={1}>
+                            {pkg.trackingNumber}
+                          </Text>
+                          <Text style={styles.packageAddress} numberOfLines={1}>
+                            {pkg.destinationAddress}
+                          </Text>
+                        </View>
+                        <Text
+                          style={[
+                            styles.separatedLabel,
+                            (separated || pkg.status === 'delivered') && styles.separatedLabelActive,
+                            pkg.status === 'skipped' && styles.packageOccurrenceLabel,
+                          ]}
+                        >
+                          {packageStateLabel}
+                        </Text>
+                      </TouchableOpacity>
+                      {onPackageOccurrence ? (
+                        <TouchableOpacity
+                          style={[
+                            styles.packageOccurrenceAction,
+                            pkg.status === 'delivered' && styles.packageOccurrenceActionDisabled,
+                          ]}
+                          onPress={() => onPackageOccurrence(pkg.id)}
+                          disabled={pkg.status === 'delivered'}
+                          activeOpacity={0.75}
+                          accessibilityRole="button"
+                          accessibilityLabel={`Registrar ocorrência para ${pkg.trackingNumber}`}
+                          accessibilityState={{ disabled: pkg.status === 'delivered' }}
+                        >
+                          <AlertCircle size={17} color={Colors.error} />
+                          <Text style={styles.packageOccurrenceActionText}>Ocorrência</Text>
+                        </TouchableOpacity>
+                      ) : null}
+                    </View>
                   );
                 })}
                   {!isPickup && onConfirmAddressGroup ? (
@@ -283,6 +318,20 @@ export function ExecutionCard({
                         </Text>
                       </TouchableOpacity>
                     )
+                  ) : null}
+                  {!isPickup && onAddressGroupOccurrence ? (
+                    <TouchableOpacity
+                      style={styles.groupOccurrenceButton}
+                      onPress={() => onAddressGroupOccurrence(group)}
+                      activeOpacity={0.75}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Registrar ocorrência em ${group.address}`}
+                    >
+                      <AlertCircle size={19} color={Colors.error} />
+                      <Text style={styles.groupOccurrenceButtonText}>
+                        Registrar ocorrência
+                      </Text>
+                    </TouchableOpacity>
                   ) : null}
                 </View>
               );
@@ -310,8 +359,8 @@ export function ExecutionCard({
         </TouchableOpacity>
       ) : null}
 
-      <View style={styles.secondaryActions}>
-        {showNavigate ? (
+      {showNavigate ? (
+        <View style={styles.secondaryActions}>
           <TouchableOpacity
             style={styles.secondaryButton}
             onPress={onNavigate}
@@ -322,21 +371,8 @@ export function ExecutionCard({
             <Navigation size={20} color={Colors.gold[400]} />
             <Text style={styles.secondaryButtonText}>Navegar</Text>
           </TouchableOpacity>
-        ) : null}
-
-        <TouchableOpacity
-          style={[styles.secondaryButton, styles.occurrenceButton]}
-          onPress={onOccurrence}
-          activeOpacity={0.75}
-          accessibilityRole="button"
-          accessibilityLabel="Registrar ocorrência"
-        >
-          <AlertCircle size={20} color={Colors.error} />
-          <Text style={[styles.secondaryButtonText, styles.occurrenceButtonText]}>
-            Registrar ocorrência
-          </Text>
-        </TouchableOpacity>
-      </View>
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -463,21 +499,6 @@ const styles = StyleSheet.create({
     fontSize: FontSizes.xl,
     fontWeight: '900',
   },
-  selectAllButton: {
-    minHeight: 48,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: Spacing.md,
-    borderRadius: BorderRadius.md,
-    borderWidth: 1,
-    borderColor: Colors.gold[700],
-    backgroundColor: Colors.overlay,
-  },
-  selectAllButtonText: {
-    color: Colors.gold[400],
-    fontSize: FontSizes.md,
-    fontWeight: '800',
-  },
   packageRows: {
     gap: Spacing.sm,
   },
@@ -570,6 +591,31 @@ const styles = StyleSheet.create({
     borderColor: Colors.cardBorder,
     backgroundColor: Colors.background,
   },
+  packageSelectionArea: {
+    minHeight: 48,
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+  },
+  packageOccurrenceAction: {
+    minWidth: 68,
+    minHeight: 48,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 2,
+    paddingHorizontal: Spacing.xs,
+    borderRadius: BorderRadius.sm,
+    backgroundColor: Colors.errorBg,
+  },
+  packageOccurrenceActionDisabled: {
+    opacity: 0.35,
+  },
+  packageOccurrenceActionText: {
+    color: Colors.error,
+    fontSize: FontSizes.xs,
+    fontWeight: '700',
+  },
   packageRowSeparated: {
     borderColor: Colors.successBorder,
     backgroundColor: Colors.successBg,
@@ -645,6 +691,23 @@ const styles = StyleSheet.create({
     fontSize: FontSizes.md,
     fontWeight: '800',
   },
+  groupOccurrenceButton: {
+    minHeight: 48,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: Spacing.sm,
+    paddingHorizontal: Spacing.md,
+    borderRadius: BorderRadius.md,
+    borderWidth: 1,
+    borderColor: Colors.errorBorder,
+    backgroundColor: Colors.errorBg,
+  },
+  groupOccurrenceButtonText: {
+    color: Colors.error,
+    fontSize: FontSizes.md,
+    fontWeight: '800',
+  },
   primaryButton: {
     minHeight: 64,
     borderRadius: BorderRadius.md,
@@ -684,17 +747,10 @@ const styles = StyleSheet.create({
     borderColor: Colors.cardBorder,
     backgroundColor: Colors.background,
   },
-  occurrenceButton: {
-    borderColor: Colors.errorBorder,
-    backgroundColor: Colors.errorBg,
-  },
   secondaryButtonText: {
     color: Colors.gold[400],
     fontSize: FontSizes.md,
     fontWeight: '700',
     textAlign: 'center',
-  },
-  occurrenceButtonText: {
-    color: Colors.error,
   },
 });

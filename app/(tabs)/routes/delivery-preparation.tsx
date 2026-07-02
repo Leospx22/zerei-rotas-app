@@ -134,7 +134,11 @@ export default function DeliveryPreparationScreen() {
   };
 
   const startRoute = () => {
-    setCurrentRoute({ ...currentRoute, status: 'active', startTime: Date.now() });
+    setCurrentRoute({
+      ...currentRoute,
+      status: 'active',
+      startTime: currentRoute.startTime ?? Date.now(),
+    });
     router.replace({
       pathname: '/(tabs)/routes/route-execution',
       params: { from: 'delivery-preparation' },

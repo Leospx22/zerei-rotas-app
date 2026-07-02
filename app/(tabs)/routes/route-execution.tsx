@@ -40,6 +40,16 @@ import {
 } from '@/lib/executionPresentation';
 import { buildGoogleMapsSearchUrl } from '@/lib/mapNavigation';
 import {
+  applyOccurrenceReasonToTarget,
+  createDirectOccurrenceTarget,
+  getAddressGroupOccurrenceAction,
+  type OccurrenceTarget,
+} from '@/lib/occurrenceFlow';
+import {
+  togglePackageGroupSelection,
+  togglePackageSelection,
+} from '@/lib/packageSelection';
+import {
   deletePlaceInfo,
   loadPlaceInfo,
   savePlaceInfo,
@@ -107,7 +117,8 @@ export default function RouteExecutionScreen() {
   const executionScrollRef = React.useRef<ScrollView>(null);
   const stopOffsetsRef = React.useRef<Record<string, number>>({});
   const [expandedStop, setExpandedStop] = useState<string | null>(null);
-  const [occurrenceTarget, setOccurrenceTarget] = useState<{ stopId: string; pkgId: string } | null>(null);
+  const [occurrenceTarget, setOccurrenceTarget] = useState<OccurrenceTarget | null>(null);
+  const [occurrencePackageFilter, setOccurrencePackageFilter] = useState<Set<string> | null>(null);
   const derivedExecutionState = React.useMemo(
     () => deriveExecutionState(currentRoute),
     [currentRoute]
@@ -148,6 +159,7 @@ export default function RouteExecutionScreen() {
     setExecutionStep(derivedExecutionState.executionStep);
     setSeparatedPackageIds(new Set());
     setEditingPlaceGroup(null);
+    setOccurrencePackageFilter(null);
   }, [currentStop?.id]);
 
   React.useEffect(() => {
@@ -194,7 +206,7 @@ export default function RouteExecutionScreen() {
 
   const handleOccurrenceSelect = useCallback((reason: string) => {
     if (!occurrenceTarget) return;
-    updatePackageOccurrence(occurrenceTarget.stopId, occurrenceTarget.pkgId, reason);
+    applyOccurrenceReasonToTarget(occurrenceTarget, reason, updatePackageOccurrence);
     setOccurrenceTarget(null);
   }, [occurrenceTarget, updatePackageOccurrence]);
 
@@ -209,26 +221,16 @@ export default function RouteExecutionScreen() {
   }, [currentStop, separatedPackageIds]);
 
   const handleTogglePackageSeparated = useCallback((packageId: string) => {
-    setSeparatedPackageIds(previous => {
-      const next = new Set(previous);
-      if (next.has(packageId)) {
-        next.delete(packageId);
-      } else {
-        next.add(packageId);
-      }
-      return next;
-    });
+    setSeparatedPackageIds(previous =>
+      togglePackageSelection(previous, packageId)
+    );
   }, []);
 
-  const handleToggleSelectAll = useCallback(() => {
-    if (!currentStop) return;
-    setSeparatedPackageIds(previous => {
-      const allSelected = currentStop.packages.every(pkg => previous.has(pkg.id));
-      return allSelected
-        ? new Set()
-        : new Set(currentStop.packages.map(pkg => pkg.id));
-    });
-  }, [currentStop]);
+  const handleToggleAddressGroupSeparated = useCallback((packageIds: readonly string[]) => {
+    setSeparatedPackageIds(previous =>
+      togglePackageGroupSelection(previous, packageIds)
+    );
+  }, []);
 
   const handleConfirmDelivery = useCallback(() => {
     if (!currentStop) return;
@@ -271,17 +273,50 @@ export default function RouteExecutionScreen() {
     completeStop();
   }, [currentStop, nextStop, updatePackageStatus, updateStopStatus]);
 
-  const handleCardOccurrence = useCallback(() => {
-    if (!currentStop) return;
-    setExpandedStop(currentStop.id);
+  const scrollToOccurrenceControls = useCallback((stopId: string) => {
     requestAnimationFrame(() => {
-      const stopOffset = stopOffsetsRef.current[currentStop.id];
+      const stopOffset = stopOffsetsRef.current[stopId];
       if (stopOffset === undefined) return;
       executionScrollRef.current?.scrollTo({
         y: Math.max(0, stopOffset - Spacing.md),
         animated: true,
       });
     });
+  }, []);
+
+  const handleAddressGroupOccurrence = useCallback((group: ExecutionPackageGroup) => {
+    if (!currentStop) return;
+    const action = getAddressGroupOccurrenceAction(
+      currentStop.id,
+      group.packages,
+      separatedPackageIds
+    );
+
+    if (action.kind === 'direct') {
+      setOccurrencePackageFilter(null);
+      setOccurrenceTarget(action.target);
+      return;
+    }
+
+    if (action.kind === 'select') {
+      setOccurrenceTarget(null);
+      setOccurrencePackageFilter(new Set(action.packageIds));
+      setExpandedStop(currentStop.id);
+      scrollToOccurrenceControls(currentStop.id);
+      return;
+    }
+
+    Alert.alert('Nenhum pacote pendente neste endereço.');
+  }, [currentStop, scrollToOccurrenceControls, separatedPackageIds]);
+
+  const handlePackageOccurrence = useCallback((packageId: string) => {
+    if (!currentStop) return;
+    const packageItem = currentStop.packages.find(pkg => pkg.id === packageId);
+    if (!packageItem) return;
+    const target = createDirectOccurrenceTarget(currentStop.id, packageItem);
+    if (target) {
+      setOccurrenceTarget({ stopId: target.stopId, packageIds: [target.pkgId] });
+    }
   }, [currentStop]);
 
   const handleNavigateAddress = useCallback(async (address: string) => {
@@ -451,10 +486,11 @@ export default function RouteExecutionScreen() {
             onConfirmPickup={handleConfirmPickup}
             onConfirmDelivery={handleConfirmDelivery}
             onNavigate={NOOP}
-            onOccurrence={handleCardOccurrence}
+            onAddressGroupOccurrence={handleAddressGroupOccurrence}
+            onPackageOccurrence={handlePackageOccurrence}
             separatedPackageIds={separatedPackageIds}
             onTogglePackageSeparated={handleTogglePackageSeparated}
-            onToggleSelectAll={handleToggleSelectAll}
+            onToggleAddressGroupSeparated={handleToggleAddressGroupSeparated}
             placeInfoByAddressKey={placeInfoByAddressKey}
             onEditPlaceInfo={setEditingPlaceGroup}
             onNavigateAddress={handleNavigateAddress}
@@ -508,6 +544,8 @@ export default function RouteExecutionScreen() {
           const isExpanded = expandedStop === stop.id;
           const stopDelivered = stop.packages.filter(p => p.status === 'delivered').length;
           const stopOccurrenceCount = stop.packages.filter(p => p.status === 'skipped').length;
+          const activeOccurrenceFilter =
+            stop.id === currentStop?.id ? occurrencePackageFilter : null;
 
           return (
             <View
@@ -598,7 +636,10 @@ export default function RouteExecutionScreen() {
 
               <TouchableOpacity
                 style={styles.expandButton}
-                onPress={() => setExpandedStop(isExpanded ? null : stop.id)}
+                onPress={() => {
+                  setOccurrencePackageFilter(null);
+                  setExpandedStop(isExpanded ? null : stop.id);
+                }}
               >
                 {isExpanded ? (
                   <ChevronUp size={16} color={Colors.gold[400]} />
@@ -621,18 +662,25 @@ export default function RouteExecutionScreen() {
                     <Text style={[styles.pkgColHeaderAction, { color: Colors.error }]}>Ocorrência</Text>
                   </View>
 
-                  {stop.addressGroups.map((ag, addrIdx) => (
+                  {stop.addressGroups.map((ag, addrIdx) => {
+                    const visiblePackageIds = activeOccurrenceFilter
+                      ? ag.packageIds.filter(packageId => activeOccurrenceFilter.has(packageId))
+                      : ag.packageIds;
+
+                    if (visiblePackageIds.length === 0) return null;
+
+                    return (
                     <View key={addrIdx} style={styles.addressGroup}>
                       <View style={styles.addressGroupHeader}>
                         <MapPin size={12} color={Colors.primary[200]} />
                         <Text style={styles.addressGroupText} numberOfLines={2}>
                           {ag.normalizedAddress}
                         </Text>
-                        <Text style={styles.addressGroupCount}>{ag.packageCount} pkg</Text>
+                        <Text style={styles.addressGroupCount}>{visiblePackageIds.length} pkg</Text>
                       </View>
 
                       {stop.packages
-                        .filter(p => ag.packageIds.includes(p.id))
+                        .filter(p => visiblePackageIds.includes(p.id))
                         .map(pkg => {
                           const isDelivered = pkg.status === 'delivered';
                           const isOccurrence = pkg.status === 'skipped';
@@ -708,7 +756,7 @@ export default function RouteExecutionScreen() {
                                   if (isOccurrence) {
                                     updatePackageStatus(stop.id, pkg.id, 'pending');
                                   } else {
-                                    setOccurrenceTarget({ stopId: stop.id, pkgId: pkg.id });
+                                    setOccurrenceTarget({ stopId: stop.id, packageIds: [pkg.id] });
                                   }
                                 }}
                                 hitSlop={{ top: 10, bottom: 10, left: 6, right: 6 }}
@@ -729,7 +777,8 @@ export default function RouteExecutionScreen() {
                           );
                         })}
                     </View>
-                  ))}
+                    );
+                  })}
                 </View>
               )}
             </View>

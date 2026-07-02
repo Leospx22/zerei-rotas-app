@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, TextInput } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import {
@@ -13,15 +13,26 @@ import {
   Hash,
   CheckCircle2,
   AlertTriangle,
+  Pencil,
+  ArrowUpDown,
 } from 'lucide-react-native';
 import { Colors, Spacing, FontSizes, BorderRadius } from '@/constants/theme';
+import { AppButton, AppCard, AppText } from '@/components/ui';
 import { useRoute } from '@/contexts/RouteContext';
 
 export default function DeliveryPreparationScreen() {
   const router = useRouter();
   const { from } = useLocalSearchParams<{ from?: string }>();
-  const { currentRoute, setCurrentRoute } = useRoute();
+  const {
+    currentRoute,
+    setCurrentRoute,
+    renameCurrentRoute,
+    reorderStops,
+  } = useRoute();
   const [expandedStop, setExpandedStop] = useState<string | null>(null);
+  const [isEditing, setIsEditing] = useState(false);
+  const [draftRouteName, setDraftRouteName] = useState('');
+  const [editMessage, setEditMessage] = useState<string | null>(null);
   const cameFromImportSummary = from === 'import-summary';
 
   if (!currentRoute) {
@@ -37,6 +48,24 @@ export default function DeliveryPreparationScreen() {
 
   const toggleExpand = (stopId: string) => {
     setExpandedStop(prev => (prev === stopId ? null : stopId));
+  };
+
+  const toggleEditing = () => {
+    if (!isEditing) {
+      setDraftRouteName(currentRoute.name);
+      setEditMessage(null);
+    }
+    setIsEditing(previous => !previous);
+  };
+
+  const saveRouteName = async () => {
+    const renamed = await renameCurrentRoute(draftRouteName);
+    if (renamed) setEditMessage('Nome da rota atualizado.');
+  };
+
+  const handleReorderStops = () => {
+    reorderStops();
+    setEditMessage('Ordem das paradas atualizada.');
   };
 
   const startRoute = () => {
@@ -67,7 +96,7 @@ export default function DeliveryPreparationScreen() {
         </TouchableOpacity>
         <View style={styles.headerTitleRow}>
           <Crown size={20} color={Colors.gold[400]} />
-          <Text style={styles.headerTitle}>Preparar Entregas</Text>
+          <Text style={styles.headerTitle}>Revisar Rota</Text>
         </View>
         <View style={{ width: 40 }} />
       </View>
@@ -104,9 +133,57 @@ export default function DeliveryPreparationScreen() {
       <View style={styles.instructionCard}>
         <CheckCircle2 size={16} color={Colors.gold[400]} />
         <Text style={styles.instructionText}>
-          Separe os pacotes por parada antes de sair. Toque em uma parada para ver os códigos SPX TN por endereço.
+          Confira as paradas, os endereços agrupados e os pacotes antes de começar. Toque em uma parada para ver os códigos SPX TN.
         </Text>
       </View>
+
+      <View style={styles.secondaryActions}>
+        <AppButton
+          label={isEditing ? 'Fechar edição' : 'Editar rota'}
+          variant="secondary"
+          leftIcon={<Pencil size={19} color={Colors.gold[400]} />}
+          onPress={toggleEditing}
+        />
+        <AppButton
+          label="Voltar para importação"
+          variant="ghost"
+          leftIcon={<ArrowLeft size={19} color={Colors.gray} />}
+          onPress={() => router.replace('/(tabs)/routes/import')}
+        />
+      </View>
+
+      {isEditing ? (
+        <AppCard variant="elevated" padding="medium" style={styles.editCard}>
+          <AppText variant="sectionTitle">Ajustes da rota</AppText>
+          <AppText variant="label" color={Colors.gray}>Nome da rota</AppText>
+          <TextInput
+            style={styles.routeNameInput}
+            value={draftRouteName}
+            onChangeText={setDraftRouteName}
+            placeholder="Nome da rota"
+            placeholderTextColor={Colors.gray}
+            returnKeyType="done"
+            onSubmitEditing={saveRouteName}
+          />
+          <AppButton
+            label="Salvar nome"
+            variant="secondary"
+            onPress={saveRouteName}
+            disabled={!draftRouteName.trim()}
+          />
+          <AppButton
+            label="Reordenar paradas"
+            variant="ghost"
+            leftIcon={<ArrowUpDown size={19} color={Colors.gold[400]} />}
+            onPress={handleReorderStops}
+          />
+          {editMessage ? (
+            <AppText variant="label" color={Colors.success}>
+              {editMessage}
+            </AppText>
+          ) : null}
+        </AppCard>
+      ) : null}
 
       <Text style={styles.sectionTitle}>Paradas ({totalStops})</Text>
 
@@ -222,7 +299,7 @@ export default function DeliveryPreparationScreen() {
           style={styles.startGradient}
         >
           <Play size={24} color={Colors.primary[900]} />
-          <Text style={styles.startText}>Iniciar Rota</Text>
+          <Text style={styles.startText}>Começar entrega</Text>
         </LinearGradient>
       </TouchableOpacity>
     </ScrollView>
@@ -266,6 +343,18 @@ const styles = StyleSheet.create({
     padding: Spacing.md, gap: Spacing.sm, marginBottom: Spacing.lg,
   },
   instructionText: { flex: 1, fontSize: FontSizes.sm, color: Colors.gold[300], lineHeight: 20 },
+  secondaryActions: { gap: Spacing.sm, marginBottom: Spacing.lg },
+  editCard: { gap: Spacing.sm, marginBottom: Spacing.lg },
+  routeNameInput: {
+    minHeight: 52,
+    backgroundColor: Colors.background,
+    borderWidth: 1,
+    borderColor: Colors.cardBorder,
+    borderRadius: BorderRadius.md,
+    paddingHorizontal: Spacing.md,
+    color: Colors.white,
+    fontSize: FontSizes.md,
+  },
 
   sectionTitle: { fontSize: FontSizes.lg, fontWeight: '700', color: Colors.white, marginBottom: Spacing.md },
 

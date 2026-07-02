@@ -3,10 +3,13 @@ import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { AlertCircle, Building2, Check, MapPin, Navigation, Package } from 'lucide-react-native';
 import { BorderRadius, Colors, FontSizes, Spacing } from '@/constants/theme';
+import { PlaceInfoCard } from '@/components/PlaceInfoCard';
 import type { ExecutionStep } from '@/lib/executionState';
 import type { GroupedStop, PackageItem } from '@/lib/packageUtils';
+import type { PlaceInfo } from '@/lib/placeIntelligence';
 import {
   buildExecutionPackageGroups,
+  normalizeAddress,
   summarizePackageGroups,
 } from '@/lib/executionPresentation';
 
@@ -22,6 +25,7 @@ export interface ExecutionCardProps {
   separatedPackageIds: ReadonlySet<string>;
   onTogglePackageSeparated: (packageId: string) => void;
   onToggleSelectAll: () => void;
+  placeInfo?: PlaceInfo | null;
   showNavigate?: boolean;
 }
 
@@ -44,6 +48,7 @@ export function ExecutionCard({
   separatedPackageIds,
   onTogglePackageSeparated,
   onToggleSelectAll,
+  placeInfo = null,
   showNavigate = true,
 }: ExecutionCardProps) {
   if (!currentStop) return null;
@@ -60,7 +65,11 @@ export function ExecutionCard({
     separatedPackagesCount === totalPackagesAtCurrentStop;
   const primaryDisabled = isPickup && !pickupComplete;
   const packageGroups = buildExecutionPackageGroups(currentStop);
-  const groupSummary = summarizePackageGroups(packageGroups);
+  const groupSummary = summarizePackageGroups(packageGroups, 3, true);
+  const mainAddress =
+    packageGroups[0]?.address ?? normalizeAddress(currentStop.normalizedAddress).displayAddress;
+  const addressCount = packageGroups.length;
+  const stopSummary = `${addressCount} ${addressCount === 1 ? 'endere\u00e7o' : 'endere\u00e7os'} • ${totalPackagesAtCurrentStop} ${totalPackagesAtCurrentStop === 1 ? 'pacote' : 'pacotes'}`;
   const highlightedLabel = isPickup
     ? `PEGUE ${packageCount} PACOTE${packageCount === 1 ? '' : 'S'}`
     : `ENTREGUE ${packageCount} PACOTE${packageCount === 1 ? '' : 'S'}`;
@@ -79,8 +88,13 @@ export function ExecutionCard({
 
       <View style={styles.addressRow}>
         <MapPin size={22} color={Colors.gold[400]} />
-        <Text style={styles.address}>{currentStop.normalizedAddress}</Text>
+        <View style={styles.addressContent}>
+          <Text style={styles.address}>{mainAddress}</Text>
+          <Text style={styles.stopSummary}>{stopSummary}</Text>
+        </View>
       </View>
+
+      {placeInfo ? <PlaceInfoCard place={placeInfo} /> : null}
 
       <LinearGradient
         colors={[Colors.primary[500], Colors.primary[700]]}
@@ -299,11 +313,19 @@ const styles = StyleSheet.create({
     gap: Spacing.sm,
   },
   address: {
-    flex: 1,
     color: Colors.white,
     fontSize: FontSizes.xxl,
     fontWeight: '800',
     lineHeight: 30,
+  },
+  addressContent: {
+    flex: 1,
+    gap: Spacing.xs,
+  },
+  stopSummary: {
+    color: Colors.gold[300],
+    fontSize: FontSizes.md,
+    fontWeight: '700',
   },
   packageHighlight: {
     minHeight: 112,

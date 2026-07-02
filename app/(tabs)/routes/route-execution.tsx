@@ -28,6 +28,7 @@ import { ExecutionCard } from '@/components/ExecutionCard';
 import { AppCard, AppText } from '@/components/ui';
 import { useRoute } from '@/contexts/RouteContext';
 import { deriveExecutionState, type ExecutionStep } from '@/lib/executionState';
+import { loadPlaceInfo, type PlaceInfo } from '@/lib/placeIntelligence';
 
 const OCCURRENCE_OPTIONS = [
   'Cliente ausente',
@@ -103,6 +104,7 @@ export default function RouteExecutionScreen() {
     id: number;
     hasNextStop: boolean;
   } | null>(null);
+  const [placeInfo, setPlaceInfo] = useState<PlaceInfo | null>(null);
   const {
     currentStop,
     nextStop,
@@ -118,6 +120,29 @@ export default function RouteExecutionScreen() {
     setExecutionStep(derivedExecutionState.executionStep);
     setSeparatedPackageIds(new Set());
   }, [currentStop?.id]);
+
+  React.useEffect(() => {
+    let active = true;
+    if (!currentStop) {
+      setPlaceInfo(null);
+      return () => {
+        active = false;
+      };
+    }
+
+    setPlaceInfo(null);
+    loadPlaceInfo(currentStop.normalizedAddress)
+      .then(info => {
+        if (active) setPlaceInfo(info);
+      })
+      .catch(() => {
+        if (active) setPlaceInfo(null);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [currentStop?.id, currentStop?.normalizedAddress]);
 
   React.useEffect(() => {
     if (!completionFeedback) return;
@@ -288,6 +313,7 @@ export default function RouteExecutionScreen() {
             separatedPackageIds={separatedPackageIds}
             onTogglePackageSeparated={handleTogglePackageSeparated}
             onToggleSelectAll={handleToggleSelectAll}
+            placeInfo={placeInfo}
             showNavigate={false}
           />
         </View>

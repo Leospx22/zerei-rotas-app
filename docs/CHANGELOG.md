@@ -31,6 +31,8 @@ All notable product and architecture changes are recorded here. Versions follow 
 - One-tap stop completion with automatic next-stop advance and brief success feedback.
 - Select-all package collection and address-group summaries for multi-address stops.
 - Presentation-only address normalization for common street abbreviations and complements.
+- Local Place Intelligence model, dedicated AsyncStorage collection, and read-only execution hints.
+- Post-import route review with stop/package inspection, route rename, and existing reorder controls.
 
 ### Changed
 
@@ -44,6 +46,9 @@ All notable product and architecture changes are recorded here. Versions follow 
 - Changed native filesystem access to `expo-file-system/legacy` for the supported Expo API.
 - Made repeated completion history writes preserve an existing renamed title and completion identity.
 - Prevented completed routes from being written by current-route debounced auto-save.
+- Clarified execution hierarchy with a street-and-number title and an immediate address/package summary.
+- Sorted current-stop address groups numerically for faster package scanning.
+- Aligned the execution title and package summary with the first sorted address group.
 
 ### Fixed
 

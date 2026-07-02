@@ -63,6 +63,69 @@ test('builds visual package groups from stop address groups', () => {
   assert.equal(groups[1].packages.length, 8);
 });
 
+test('sorts visual address groups by street number and places unnumbered groups last', () => {
+  const addresses = [
+    'Rua Coronel Trancoso, 42',
+    'Rua Coronel Trancoso, 77',
+    'Rua sem numero',
+    'Rua Coronel Trancoso, 20',
+    'Rua Coronel Trancoso, 34',
+    'Rua Miller, 86',
+  ];
+  const stop = stopWithGroups(addresses.map((address, index) => ({
+    address,
+    packages: [packageItem(`pkg-sorted-${index}`, address)],
+  })));
+
+  const groups = buildExecutionPackageGroups(stop);
+
+  assert.deepEqual(
+    groups.map(group => group.address),
+    [
+      'Rua Coronel Trancoso, 20',
+      'Rua Coronel Trancoso, 34',
+      'Rua Coronel Trancoso, 42',
+      'Rua Coronel Trancoso, 77',
+      'Rua Miller, 86',
+      'Rua Sem Numero',
+    ]
+  );
+});
+
+test('keeps the original relative order for equal street numbers', () => {
+  const addresses = ['Rua Alfa, 20', 'Rua Beta, 20', 'Rua Gama, 10'];
+  const stop = stopWithGroups(addresses.map((address, index) => ({
+    address,
+    packages: [packageItem(`pkg-stable-${index}`, address)],
+  })));
+
+  assert.deepEqual(
+    buildExecutionPackageGroups(stop).map(group => group.address),
+    ['Rua Gama, 10', 'Rua Alfa, 20', 'Rua Beta, 20']
+  );
+});
+
+test('summarizes sorted presentation groups in the same order when requested', () => {
+  const addresses = [
+    'Rua Coronel Trancoso, 42',
+    'Rua Coronel Trancoso, 20',
+    'Rua Coronel Trancoso, 34',
+    'Rua Coronel Trancoso, 77',
+  ];
+  const stop = stopWithGroups(addresses.map((address, index) => ({
+    address,
+    packages: [packageItem(`pkg-summary-${index}`, address)],
+  })));
+
+  const summary = summarizePackageGroups(buildExecutionPackageGroups(stop), 3, true);
+
+  assert.deepEqual(
+    summary.lines.map(line => line.match(/\d+$/)?.[0]),
+    ['20', '34', '42']
+  );
+  assert.equal(summary.remainingGroups, 1);
+});
+
 test('summarizes the three largest address groups and remaining count', () => {
   const definitions = [
     { number: 38, count: 2 },

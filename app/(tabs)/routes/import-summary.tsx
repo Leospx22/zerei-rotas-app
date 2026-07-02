@@ -170,7 +170,7 @@ export default function ImportSummaryScreen() {
           colors={[Colors.gold[500], Colors.gold[700]]}
           style={styles.nextGradient}
         >
-          <Text style={styles.nextText}>Preparar Entregas</Text>
+          <Text style={styles.nextText}>Revisar Rota</Text>
           <ChevronRight size={20} color={Colors.primary[900]} />
         </LinearGradient>
       </TouchableOpacity>

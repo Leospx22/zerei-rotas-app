@@ -101,6 +101,12 @@ export interface PackageGroupSummary {
   remainingGroups: number;
 }
 
+function numericStreetNumber(address: string): number | null {
+  const number = normalizeAddress(address).number;
+  const match = number.match(/^\d+/);
+  return match ? Number.parseInt(match[0], 10) : null;
+}
+
 export function buildExecutionPackageGroups(
   stop: GroupedStop | null
 ): ExecutionPackageGroup[] {
@@ -123,17 +129,32 @@ export function buildExecutionPackageGroups(
     });
   });
 
-  return [...groups.values()];
+  return [...groups.values()]
+    .map((group, originalIndex) => ({
+      group,
+      originalIndex,
+      streetNumber: numericStreetNumber(group.address),
+    }))
+    .sort((left, right) => {
+      if (left.streetNumber === null && right.streetNumber === null) {
+        return left.originalIndex - right.originalIndex;
+      }
+      if (left.streetNumber === null) return 1;
+      if (right.streetNumber === null) return -1;
+      return left.streetNumber - right.streetNumber || left.originalIndex - right.originalIndex;
+    })
+    .map(({ group }) => group);
 }
 
 export function summarizePackageGroups(
   groups: ExecutionPackageGroup[],
-  limit = 3
+  limit = 3,
+  preserveInputOrder = false
 ): PackageGroupSummary {
-  const sortedGroups = [...groups].sort(
-    (left, right) => right.packages.length - left.packages.length
-  );
-  const visibleGroups = sortedGroups.slice(0, limit);
+  const orderedGroups = preserveInputOrder
+    ? groups
+    : [...groups].sort((left, right) => right.packages.length - left.packages.length);
+  const visibleGroups = orderedGroups.slice(0, limit);
 
   return {
     lines: visibleGroups.map(group => {
@@ -144,6 +165,6 @@ export function summarizePackageGroups(
         ? `${count} ${packageLabel} no nº ${houseNumber}`
         : `${count} ${packageLabel} em ${group.address}`;
     }),
-    remainingGroups: Math.max(0, sortedGroups.length - visibleGroups.length),
+    remainingGroups: Math.max(0, orderedGroups.length - visibleGroups.length),
   };
 }

@@ -44,6 +44,7 @@ hooks/usePersistence.ts        React-facing persistence adapter
 hooks/useImport.ts             Import-related hook retained by the project
 hooks/useNavigation.ts         Navigation-related hook retained by the project
 lib/packageUtils.ts            Package parsing, grouping, and route construction
+lib/placeIntelligence.ts       Local address intelligence model and persistence
 lib/routePersistence.ts        AsyncStorage schema and storage operations
 lib/spreadsheetParser.ts       CSV, TSV, XLS, and XLSX parsing
 lib/supabase.ts                Supabase client and session storage configuration
@@ -228,8 +229,13 @@ Storage keys:
 | --- | --- | --- |
 | `zerei_current_route` | `RouteData` | The single planning or active route |
 | `zerei_route_history` | `HistoryEntry[]` | Completed-route summaries |
+| `ZR_PLACE_INTELLIGENCE` | Address-keyed `PlaceInfo` collection | Local delivery knowledge |
 
 The module owns JSON serialization, loading, saving, completion history, rename, and delete behavior.
+
+### `lib/placeIntelligence.ts`
+
+Place Intelligence is stored separately from routes under `ZR_PLACE_INTELLIGENCE`. Entries are keyed with the presentation-only `normalizeAddress()` group key, so equivalent street abbreviations and complements resolve to the same place. The execution screen performs read-only lookup for the current stop; writes occur only through explicit future editing features.
 
 ### `hooks/usePersistence.ts`
 

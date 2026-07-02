@@ -47,6 +47,7 @@ lib/packageUtils.ts            Package parsing, grouping, and route construction
 lib/mapNavigation.ts           External map URL construction from normalized addresses
 lib/placeIntelligence.ts       Local address intelligence model and persistence
 lib/routePersistence.ts        AsyncStorage schema and storage operations
+lib/routeOrdering.ts           Pure manual stop movement and order reindexing
 lib/spreadsheetParser.ts       CSV, TSV, XLS, and XLSX parsing
 lib/supabase.ts                Supabase client and session storage configuration
 supabase/migrations/           Supabase database migrations
@@ -110,8 +111,8 @@ Detailed transitions:
 1. Painel or Minhas Rotas opens `/(tabs)/routes/import` with `router.push()`.
 2. A successful import immediately creates and persists a `planning` route.
 3. Continue reuses that route and calls `router.replace()` for import-summary. It must not create a duplicate route.
-4. Import Summary uses `router.replace()` for delivery-preparation.
-5. Delivery Preparation changes the route to `active`, sets `startTime`, and uses `router.replace()` for route-execution.
+4. Import Summary uses `router.replace()` for delivery-preparation. When Review returns to Import Summary, the summary renders the current RouteContext array sequence and provides an immediate canonical return to Review.
+5. Delivery Preparation shows the full route sequence and can move stops one position up/down or directly to a validated 1-based position through `setCurrentRoute`, preserving package/address-group data while persisting the customized array order. Painel links to this same screen whenever a current route exists. Starting changes the route to `active`, sets `startTime`, and uses `router.replace()` for route-execution.
 6. Route Execution updates package status through `RouteContext`, including address-group completion that marks only pending packages in the selected presentation group. Skipped occurrence packages are preserved, and the existing context logic derives stop completion.
 7. When every stop is completed or skipped, `RouteContext` changes the route to `completed` and persists it to history.
 8. Route Execution observes the completed status and replaces itself with route-completed.

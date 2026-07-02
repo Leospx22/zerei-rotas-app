@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import {
   ArrowLeft,
@@ -17,6 +17,7 @@ import { useRoute } from '@/contexts/RouteContext';
 
 export default function ImportSummaryScreen() {
   const router = useRouter();
+  const { from } = useLocalSearchParams<{ from?: string }>();
   const { currentRoute, getSummary } = useRoute();
 
   if (!currentRoute) {
@@ -32,6 +33,17 @@ export default function ImportSummaryScreen() {
 
   const summary = getSummary();
   const duplicateStops = currentRoute.stops.filter(s => s.duplicateAddressWarning);
+  const returningFromReview = from === 'delivery-preparation';
+  const largestStopSequence =
+    currentRoute.stops.findIndex(stop => stop.stopNumber === summary.largestStop.stopNumber) + 1;
+  const smallestStopSequence =
+    currentRoute.stops.findIndex(stop => stop.stopNumber === summary.smallestStop.stopNumber) + 1;
+  const openRouteReview = () => {
+    router.replace({
+      pathname: '/(tabs)/routes/delivery-preparation',
+      params: { from: 'import-summary' },
+    });
+  };
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
@@ -45,6 +57,19 @@ export default function ImportSummaryScreen() {
         </View>
         <View style={{ width: 40 }} />
       </View>
+
+      {returningFromReview ? (
+        <TouchableOpacity
+          style={styles.returnToReviewButton}
+          onPress={openRouteReview}
+          activeOpacity={0.78}
+          accessibilityRole="button"
+          accessibilityLabel="Voltar para Revisar Rota"
+        >
+          <Text style={styles.returnToReviewText}>Voltar para Revisar Rota</Text>
+          <ChevronRight size={18} color={Colors.gold[400]} />
+        </TouchableOpacity>
+      ) : null}
 
       {/* ROTA DE HOJE hero card */}
       <LinearGradient
@@ -78,7 +103,7 @@ export default function ImportSummaryScreen() {
               <TrendingUp size={13} color={Colors.success} />
               <Text style={[styles.rotaExtremeLabel, { color: Colors.success }]}>Maior Parada</Text>
             </View>
-            <Text style={styles.rotaExtremeStop}>Parada {summary.largestStop.stopNumber}</Text>
+            <Text style={styles.rotaExtremeStop}>Parada #{largestStopSequence}</Text>
             <Text style={styles.rotaExtremeAddress} numberOfLines={1}>{summary.largestStop.address}</Text>
             <Text style={styles.rotaExtremeCount}>
               {summary.largestStop.count} pacote{summary.largestStop.count !== 1 ? 's' : ''}
@@ -89,7 +114,7 @@ export default function ImportSummaryScreen() {
               <ArrowDown size={13} color={Colors.warning} />
               <Text style={[styles.rotaExtremeLabel, { color: Colors.warning }]}>Menor Parada</Text>
             </View>
-            <Text style={styles.rotaExtremeStop}>Parada {summary.smallestStop.stopNumber}</Text>
+            <Text style={styles.rotaExtremeStop}>Parada #{smallestStopSequence}</Text>
             <Text style={styles.rotaExtremeAddress} numberOfLines={1}>{summary.smallestStop.address}</Text>
             <Text style={styles.rotaExtremeCount}>
               {summary.smallestStop.count} pacote{summary.smallestStop.count !== 1 ? 's' : ''}
@@ -109,13 +134,13 @@ export default function ImportSummaryScreen() {
       )}
 
       {/* All stops list */}
-      <Text style={styles.sectionTitle}>Paradas ({currentRoute.stops.length})</Text>
+      <Text style={styles.sectionTitle}>Ordem atual ({currentRoute.stops.length} paradas)</Text>
 
-      {currentRoute.stops.map(stop => (
+      {currentRoute.stops.map((stop, index) => (
         <View key={stop.id} style={styles.stopCard}>
           <View style={styles.stopNumberWrap}>
             <View style={styles.stopNumberCircle}>
-              <Text style={styles.stopNumberText}>{stop.stopNumber}</Text>
+              <Text style={styles.stopNumberText}>#{index + 1}</Text>
             </View>
             <Text style={styles.stopLabel}>Parada</Text>
             {stop.optimizedOrderIndex !== undefined && stop.optimizedOrderIndex !== null && (
@@ -159,18 +184,15 @@ export default function ImportSummaryScreen() {
 
       <TouchableOpacity
         style={styles.nextButton}
-        onPress={() =>
-          router.replace({
-            pathname: '/(tabs)/routes/delivery-preparation',
-            params: { from: 'import-summary' },
-          })
-        }
+        onPress={openRouteReview}
       >
         <LinearGradient
           colors={[Colors.gold[500], Colors.gold[700]]}
           style={styles.nextGradient}
         >
-          <Text style={styles.nextText}>Revisar Rota</Text>
+          <Text style={styles.nextText}>
+            {returningFromReview ? 'Voltar para Revisar Rota' : 'Revisar Rota'}
+          </Text>
           <ChevronRight size={20} color={Colors.primary[900]} />
         </LinearGradient>
       </TouchableOpacity>
@@ -195,6 +217,24 @@ const styles = StyleSheet.create({
   backButton: { width: 40, height: 40, justifyContent: 'center' },
   headerTitleRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
   headerTitle: { fontSize: FontSizes.xl, fontWeight: '700', color: Colors.white },
+  returnToReviewButton: {
+    minHeight: 48,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: Spacing.sm,
+    marginBottom: Spacing.md,
+    paddingHorizontal: Spacing.md,
+    borderRadius: BorderRadius.md,
+    borderWidth: 1,
+    borderColor: Colors.gold[700],
+    backgroundColor: Colors.overlay,
+  },
+  returnToReviewText: {
+    color: Colors.gold[400],
+    fontSize: FontSizes.md,
+    fontWeight: '800',
+  },
 
   rotaCard: {
     borderRadius: BorderRadius.xl, padding: Spacing.lg,

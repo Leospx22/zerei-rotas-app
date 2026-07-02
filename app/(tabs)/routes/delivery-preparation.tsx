@@ -1,5 +1,16 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, TextInput } from 'react-native';
+import {
+  Alert,
+  Linking,
+  Modal,
+  Pressable,
+  View,
+  Text,
+  TouchableOpacity,
+  StyleSheet,
+  ScrollView,
+  TextInput,
+} from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import {
@@ -14,11 +25,21 @@ import {
   CheckCircle2,
   AlertTriangle,
   Pencil,
+  ArrowUp,
+  ArrowDown,
   ArrowUpDown,
+  Navigation,
 } from 'lucide-react-native';
 import { Colors, Spacing, FontSizes, BorderRadius } from '@/constants/theme';
 import { AppButton, AppCard, AppText } from '@/components/ui';
 import { useRoute } from '@/contexts/RouteContext';
+import { getPrimaryExecutionAddress } from '@/lib/executionPresentation';
+import { buildGoogleMapsSearchUrl } from '@/lib/mapNavigation';
+import {
+  moveRouteStop,
+  moveRouteStopToIndex,
+  type StopMoveDirection,
+} from '@/lib/routeOrdering';
 
 export default function DeliveryPreparationScreen() {
   const router = useRouter();
@@ -27,12 +48,14 @@ export default function DeliveryPreparationScreen() {
     currentRoute,
     setCurrentRoute,
     renameCurrentRoute,
-    reorderStops,
   } = useRoute();
   const [expandedStop, setExpandedStop] = useState<string | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [draftRouteName, setDraftRouteName] = useState('');
   const [editMessage, setEditMessage] = useState<string | null>(null);
+  const [moveStopIndex, setMoveStopIndex] = useState<number | null>(null);
+  const [targetPosition, setTargetPosition] = useState('');
+  const [moveError, setMoveError] = useState<string | null>(null);
   const cameFromImportSummary = from === 'import-summary';
 
   if (!currentRoute) {
@@ -63,9 +86,51 @@ export default function DeliveryPreparationScreen() {
     if (renamed) setEditMessage('Nome da rota atualizado.');
   };
 
-  const handleReorderStops = () => {
-    reorderStops();
-    setEditMessage('Ordem das paradas atualizada.');
+  const handleMoveStop = (index: number, direction: StopMoveDirection) => {
+    const stops = moveRouteStop(currentRoute.stops, index, direction);
+    setCurrentRoute({ ...currentRoute, stops });
+  };
+
+  const openMoveModal = (index: number) => {
+    setMoveStopIndex(index);
+    setTargetPosition(String(index + 1));
+    setMoveError(null);
+  };
+
+  const closeMoveModal = () => {
+    setMoveStopIndex(null);
+    setTargetPosition('');
+    setMoveError(null);
+  };
+
+  const confirmMoveStop = () => {
+    if (moveStopIndex === null || !/^\d+$/.test(targetPosition.trim())) {
+      setMoveError('Informe uma posição válida.');
+      return;
+    }
+
+    const targetIndex = Number(targetPosition) - 1;
+    if (targetIndex < 0 || targetIndex >= currentRoute.stops.length) {
+      setMoveError('Informe uma posição válida.');
+      return;
+    }
+
+    if (targetIndex !== moveStopIndex) {
+      const stops = moveRouteStopToIndex(currentRoute.stops, moveStopIndex, targetIndex);
+      setCurrentRoute({ ...currentRoute, stops });
+    }
+    closeMoveModal();
+  };
+
+  const handleNavigate = async (address: string) => {
+    try {
+      const url = buildGoogleMapsSearchUrl(address);
+      const supported = await Linking.canOpenURL(url);
+      if (!supported) throw new Error('Unsupported map URL');
+      await Linking.openURL(url);
+    } catch {
+      Alert.alert('Não foi possível abrir o mapa.');
+    }
   };
 
   const startRoute = () => {
@@ -78,14 +143,22 @@ export default function DeliveryPreparationScreen() {
 
   const totalPackages = currentRoute.totalPackages;
   const totalStops = currentRoute.stops.length;
+  const totalAddresses = currentRoute.stops.reduce(
+    (total, stop) => total + stop.addressCount,
+    0
+  );
 
   return (
+    <>
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <View style={styles.header}>
         <TouchableOpacity
           onPress={() => {
             if (cameFromImportSummary) {
-              router.replace('/(tabs)/routes/import-summary');
+              router.replace({
+                pathname: '/(tabs)/routes/import-summary',
+                params: { from: 'delivery-preparation' },
+              });
             } else {
               router.back();
             }
@@ -108,6 +181,7 @@ export default function DeliveryPreparationScreen() {
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
       >
+        <Text style={styles.summaryTitle}>Resumo da rota</Text>
         <Text style={styles.summaryRouteName}>{currentRoute.name}</Text>
         <View style={styles.summaryRow}>
           <View style={styles.summaryItem}>
@@ -117,15 +191,15 @@ export default function DeliveryPreparationScreen() {
           </View>
           <View style={styles.summaryDivider} />
           <View style={styles.summaryItem}>
-            <MapPin size={18} color={Colors.gold[400]} />
+            <Hash size={18} color={Colors.gold[400]} />
             <Text style={styles.summaryValue}>{totalStops}</Text>
             <Text style={styles.summaryLabel}>Paradas</Text>
           </View>
           <View style={styles.summaryDivider} />
           <View style={styles.summaryItem}>
-            <Hash size={18} color={Colors.gold[400]} />
-            <Text style={styles.summaryValue}>{currentRoute.estimatedDistanceKm} km</Text>
-            <Text style={styles.summaryLabel}>Distância</Text>
+            <MapPin size={18} color={Colors.gold[400]} />
+            <Text style={styles.summaryValue}>{totalAddresses}</Text>
+            <Text style={styles.summaryLabel}>Endereços</Text>
           </View>
         </View>
       </LinearGradient>
@@ -171,12 +245,6 @@ export default function DeliveryPreparationScreen() {
             onPress={saveRouteName}
             disabled={!draftRouteName.trim()}
           />
-          <AppButton
-            label="Reordenar paradas"
-            variant="ghost"
-            leftIcon={<ArrowUpDown size={19} color={Colors.gold[400]} />}
-            onPress={handleReorderStops}
-          />
           {editMessage ? (
             <AppText variant="label" color={Colors.success}>
               {editMessage}
@@ -187,8 +255,11 @@ export default function DeliveryPreparationScreen() {
 
       <Text style={styles.sectionTitle}>Paradas ({totalStops})</Text>
 
-      {currentRoute.stops.map(stop => {
+      {currentRoute.stops.map((stop, index) => {
         const isExpanded = expandedStop === stop.id;
+        const mainAddress = getPrimaryExecutionAddress(stop);
+        const isFirstStop = index === 0;
+        const isLastStop = index === currentRoute.stops.length - 1;
 
         return (
           <View key={stop.id} style={styles.stopCard}>
@@ -199,7 +270,7 @@ export default function DeliveryPreparationScreen() {
             >
               <View style={styles.stopNumberWrap}>
                 <View style={styles.stopNumberCircle}>
-                  <Text style={styles.stopNumberText}>{stop.stopNumber}</Text>
+                  <Text style={styles.stopNumberText}>#{index + 1}</Text>
                 </View>
                 <Text style={styles.stopLabel}>Parada</Text>
                 {stop.optimizedOrderIndex !== undefined && stop.optimizedOrderIndex !== null && (
@@ -211,7 +282,7 @@ export default function DeliveryPreparationScreen() {
 
               <View style={styles.stopInfo}>
                 <Text style={styles.stopAddress} numberOfLines={2}>
-                  {stop.normalizedAddress}
+                  {mainAddress}
                 </Text>
                 <View style={styles.stopMetaRow}>
                   <View style={styles.metaBadge}>
@@ -220,14 +291,12 @@ export default function DeliveryPreparationScreen() {
                       {stop.packageCount} pacote{stop.packageCount !== 1 ? 's' : ''}
                     </Text>
                   </View>
-                  {stop.addressCount > 1 && (
-                    <View style={[styles.metaBadge, { backgroundColor: 'rgba(34,197,94,0.08)' }]}>
-                      <MapPin size={11} color={Colors.success} />
-                      <Text style={[styles.metaBadgeText, { color: Colors.success }]}>
-                        {stop.addressCount} endereços
-                      </Text>
-                    </View>
-                  )}
+                  <View style={[styles.metaBadge, { backgroundColor: 'rgba(34,197,94,0.08)' }]}>
+                    <MapPin size={11} color={Colors.success} />
+                    <Text style={[styles.metaBadgeText, { color: Colors.success }]}>
+                      {stop.addressCount} {stop.addressCount === 1 ? 'endereço' : 'endereços'}
+                    </Text>
+                  </View>
                   {stop.duplicateAddressWarning && (
                     <View style={[styles.metaBadge, styles.metaBadgeWarn]}>
                       <AlertTriangle size={11} color={Colors.warning} />
@@ -249,10 +318,61 @@ export default function DeliveryPreparationScreen() {
               </View>
             </TouchableOpacity>
 
+            <View style={styles.stopOrderActions}>
+              <TouchableOpacity
+                style={[styles.stopOrderButton, isFirstStop && styles.stopOrderButtonDisabled]}
+                onPress={() => handleMoveStop(index, -1)}
+                disabled={isFirstStop}
+                activeOpacity={0.75}
+                accessibilityRole="button"
+                accessibilityLabel={`Subir parada ${index + 1}`}
+                accessibilityState={{ disabled: isFirstStop }}
+              >
+                <ArrowUp size={16} color={isFirstStop ? Colors.darkGray : Colors.gold[400]} />
+                <Text style={[styles.stopOrderButtonText, isFirstStop && styles.stopOrderButtonTextDisabled]}>
+                  Subir
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.stopOrderButton, isLastStop && styles.stopOrderButtonDisabled]}
+                onPress={() => handleMoveStop(index, 1)}
+                disabled={isLastStop}
+                activeOpacity={0.75}
+                accessibilityRole="button"
+                accessibilityLabel={`Descer parada ${index + 1}`}
+                accessibilityState={{ disabled: isLastStop }}
+              >
+                <ArrowDown size={16} color={isLastStop ? Colors.darkGray : Colors.gold[400]} />
+                <Text style={[styles.stopOrderButtonText, isLastStop && styles.stopOrderButtonTextDisabled]}>
+                  Descer
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.stopOrderButton}
+                onPress={() => openMoveModal(index)}
+                activeOpacity={0.75}
+                accessibilityRole="button"
+                accessibilityLabel={`Mover parada ${index + 1} para outra posição`}
+              >
+                <ArrowUpDown size={16} color={Colors.gold[400]} />
+                <Text style={styles.stopOrderButtonText}>Mover</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.stopOrderButton, styles.navigateButton]}
+                onPress={() => handleNavigate(mainAddress)}
+                activeOpacity={0.75}
+                accessibilityRole="button"
+                accessibilityLabel={`Navegar para ${mainAddress}`}
+              >
+                <Navigation size={16} color={Colors.gold[400]} />
+                <Text style={styles.stopOrderButtonText}>Navegar</Text>
+              </TouchableOpacity>
+            </View>
+
             {isExpanded && (
               <View style={styles.expandedBody}>
                 <Text style={styles.expandedTitle}>
-                  Códigos SPX TN — Parada {stop.stopNumber}
+                  Códigos SPX TN — Parada {index + 1}
                 </Text>
 
                 {stop.addressGroups.map((ag, addrIdx) => (
@@ -289,7 +409,7 @@ export default function DeliveryPreparationScreen() {
       <View style={styles.optimizationNote}>
         <MapPin size={16} color={Colors.gray} />
         <Text style={styles.optimizationText}>
-          Paradas ordenadas conforme a coluna "Stop" da planilha importada.
+          Use Subir e Descer para ajustar a sequência antes de começar a entrega.
         </Text>
       </View>
 
@@ -303,6 +423,73 @@ export default function DeliveryPreparationScreen() {
         </LinearGradient>
       </TouchableOpacity>
     </ScrollView>
+    <Modal
+      visible={moveStopIndex !== null}
+      transparent
+      animationType="fade"
+      onRequestClose={closeMoveModal}
+    >
+      <View style={moveModalStyles.root}>
+        <Pressable
+          style={moveModalStyles.backdrop}
+          onPress={closeMoveModal}
+          accessibilityRole="button"
+          accessibilityLabel="Cancelar movimentação"
+        />
+        <View style={moveModalStyles.card}>
+          <AppText variant="sectionTitle">Mover parada</AppText>
+          <AppText variant="body" color={Colors.gray}>
+            Escolha a nova posição desta parada
+          </AppText>
+          <View style={moveModalStyles.positionSummary}>
+            <AppText variant="bodyStrong">
+              Parada atual: #{moveStopIndex === null ? '-' : moveStopIndex + 1}
+            </AppText>
+            <AppText variant="label" color={Colors.gray}>
+              Total de paradas: {totalStops}
+            </AppText>
+          </View>
+          <AppText variant="label" color={Colors.gray}>
+            Mover para posição
+          </AppText>
+          <TextInput
+            style={[moveModalStyles.input, moveError && moveModalStyles.inputError]}
+            value={targetPosition}
+            onChangeText={value => {
+              setTargetPosition(value);
+              setMoveError(null);
+            }}
+            keyboardType="number-pad"
+            inputMode="numeric"
+            maxLength={String(totalStops).length}
+            autoFocus
+            selectTextOnFocus
+            accessibilityLabel="Nova posição da parada"
+          />
+          {moveError ? (
+            <AppText variant="label" color={Colors.error}>
+              {moveError}
+            </AppText>
+          ) : null}
+          <View style={moveModalStyles.actions}>
+            <AppButton
+              label="Cancelar"
+              variant="ghost"
+              fullWidth={false}
+              style={moveModalStyles.actionButton}
+              onPress={closeMoveModal}
+            />
+            <AppButton
+              label="Mover"
+              fullWidth={false}
+              style={moveModalStyles.actionButton}
+              onPress={confirmMoveStop}
+            />
+          </View>
+        </View>
+      </View>
+    </Modal>
+    </>
   );
 }
 
@@ -329,6 +516,7 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.md, borderWidth: 1,
     borderColor: 'rgba(212,160,23,0.2)', gap: Spacing.md,
   },
+  summaryTitle: { fontSize: FontSizes.sm, fontWeight: '800', color: Colors.gold[400] },
   summaryRouteName: { fontSize: FontSizes.lg, fontWeight: '700', color: Colors.white },
   summaryRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-around' },
   summaryItem: { alignItems: 'center', gap: 4, flex: 1 },
@@ -391,6 +579,29 @@ const styles = StyleSheet.create({
 
   expandControl: { alignItems: 'center', gap: 2 },
   expandHint: { fontSize: FontSizes.xs, color: Colors.gold[400], fontWeight: '600' },
+  stopOrderActions: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: Spacing.sm,
+    paddingHorizontal: Spacing.md,
+    paddingBottom: Spacing.md,
+  },
+  stopOrderButton: {
+    minHeight: 44,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: Spacing.xs,
+    paddingHorizontal: Spacing.md,
+    borderRadius: BorderRadius.sm,
+    borderWidth: 1,
+    borderColor: Colors.cardBorder,
+    backgroundColor: Colors.background,
+  },
+  navigateButton: { flexGrow: 1 },
+  stopOrderButtonDisabled: { opacity: 0.45 },
+  stopOrderButtonText: { fontSize: FontSizes.sm, fontWeight: '800', color: Colors.gold[400] },
+  stopOrderButtonTextDisabled: { color: Colors.darkGray },
 
   expandedBody: {
     borderTopWidth: 1, borderTopColor: Colors.cardBorder,
@@ -442,4 +653,55 @@ const styles = StyleSheet.create({
     justifyContent: 'center', height: 56, gap: Spacing.sm,
   },
   startText: { fontSize: FontSizes.xl, fontWeight: '800', color: Colors.primary[900] },
+});
+
+const moveModalStyles = StyleSheet.create({
+  root: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: Spacing.lg,
+  },
+  backdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0, 0, 0, 0.72)',
+  },
+  card: {
+    width: '100%',
+    maxWidth: 420,
+    gap: Spacing.md,
+    padding: Spacing.lg,
+    borderRadius: BorderRadius.lg,
+    borderWidth: 1,
+    borderColor: Colors.cardBorder,
+    backgroundColor: Colors.cardBg,
+  },
+  positionSummary: {
+    gap: Spacing.xs,
+    padding: Spacing.md,
+    borderRadius: BorderRadius.md,
+    backgroundColor: Colors.overlay,
+  },
+  input: {
+    minHeight: 56,
+    paddingHorizontal: Spacing.md,
+    borderRadius: BorderRadius.md,
+    borderWidth: 1,
+    borderColor: Colors.cardBorder,
+    backgroundColor: Colors.background,
+    color: Colors.white,
+    fontSize: FontSizes.xl,
+    fontWeight: '800',
+    textAlign: 'center',
+  },
+  inputError: {
+    borderColor: Colors.error,
+  },
+  actions: {
+    flexDirection: 'row',
+    gap: Spacing.sm,
+  },
+  actionButton: {
+    flex: 1,
+  },
 });

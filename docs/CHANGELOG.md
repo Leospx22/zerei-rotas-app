@@ -37,6 +37,8 @@ All notable product and architecture changes are recorded here. Versions follow 
 - Per-address-group Google Maps navigation using normalized street-and-number queries.
 - Per-address-group delivery completion with occurrence-safe package updates.
 - Post-import route review with stop/package inspection, route rename, and existing reorder controls.
+- Route overview with address totals, manual stop ordering, package previews, and map actions.
+- Painel shortcut to Route Review and dependency-free direct-position stop movement.
 
 ### Changed
 
@@ -74,6 +76,7 @@ All notable product and architecture changes are recorded here. Versions follow 
 - Route names becoming inconsistent across Painel, Minhas Rotas, and Historico.
 - History reloads using separate screen-owned data sources.
 - Occurrence controls expanding outside the viewport after the address-group delivery layout grew taller.
+- Import Summary making customized route order appear reverted after leaving Route Review.
 
 ### Removed
 

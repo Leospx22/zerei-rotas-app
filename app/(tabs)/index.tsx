@@ -311,6 +311,19 @@ export default function DashboardScreen() {
         )}
       </LinearGradient>
 
+      {currentRoute && currentRoute.status !== 'completed' ? (
+        <TouchableOpacity
+          style={styles.reviewRouteButton}
+          onPress={() => router.push('/(tabs)/routes/delivery-preparation')}
+          activeOpacity={0.8}
+          accessibilityRole="button"
+          accessibilityLabel="Revisar Rota"
+        >
+          <MapPin size={19} color={Colors.gold[400]} />
+          <Text style={styles.reviewRouteButtonText}>Revisar Rota</Text>
+        </TouchableOpacity>
+      ) : null}
+
       {/* Import button */}
       <TouchableOpacity
         style={styles.importButton}
@@ -564,6 +577,24 @@ const styles = StyleSheet.create({
   rotaEmptyState: { alignItems: 'center', paddingVertical: Spacing.xl, gap: Spacing.md },
   rotaEmptyText: { fontSize: FontSizes.lg, color: Colors.gray, fontWeight: '600' },
   rotaEmptySubtext: { fontSize: FontSizes.sm, color: Colors.darkGray, textAlign: 'center', lineHeight: 20 },
+
+  reviewRouteButton: {
+    minHeight: 52,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: Spacing.sm,
+    marginBottom: Spacing.md,
+    borderRadius: BorderRadius.md,
+    borderWidth: 1,
+    borderColor: Colors.gold[700],
+    backgroundColor: Colors.overlay,
+  },
+  reviewRouteButtonText: {
+    color: Colors.gold[400],
+    fontSize: FontSizes.lg,
+    fontWeight: '800',
+  },
 
   importButton: { borderRadius: BorderRadius.md, overflow: 'hidden', marginBottom: Spacing.md },
   importGradient: {

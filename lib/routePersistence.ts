@@ -2,7 +2,10 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { RouteData } from '../contexts/RouteContext';
 import {
   collectRouteOccurrenceRecords,
+  editOccurrenceRecord,
+  resolveOccurrenceRecord,
   type OccurrenceRecord,
+  type OccurrenceResolution,
 } from './occurrenceRecords.ts';
 
 export interface HistoryEntry {
@@ -71,6 +74,10 @@ export async function saveCompletedRouteToHistory(storage: RouteStorage, route: 
       ...record,
       reason: record.reason ?? previous?.reason,
       registeredAt: record.registeredAt ?? previous?.registeredAt,
+      occurrenceResolution:
+        record.occurrenceResolution ?? previous?.occurrenceResolution,
+      occurrenceResolvedAt:
+        record.occurrenceResolvedAt ?? previous?.occurrenceResolvedAt,
     };
   });
   const entry: HistoryEntry = {
@@ -91,6 +98,85 @@ export async function saveCompletedRouteToHistory(storage: RouteStorage, route: 
   deduped.unshift(entry);
   await writeJSON(storage, KEY_HISTORY, deduped.slice(0, 50));
   await storage.removeItem(KEY_CURRENT);
+}
+
+export async function resolveHistoryOccurrenceInStorage(
+  storage: RouteStorage,
+  routeId: string,
+  completedAt: string,
+  packageId: string,
+  resolution: OccurrenceResolution,
+  resolvedAt: string
+): Promise<boolean> {
+  const history = await loadHistoryFromStorage(storage);
+  const routeIndex = history.findIndex(
+    entry => entry.id === routeId && entry.completedAt === completedAt
+  );
+  if (routeIndex === -1) return false;
+
+  const occurrences = history[routeIndex].occurrences;
+  if (!occurrences) return false;
+  const target = occurrences.find(record => record.packageId === packageId);
+  if (!target) return false;
+  const newlyDelivered =
+    target.occurrenceResolution === undefined && resolution === 'delivered';
+
+  history[routeIndex] = {
+    ...history[routeIndex],
+    deliveredPackages: newlyDelivered
+      ? Math.min(
+          history[routeIndex].totalPackages,
+          history[routeIndex].deliveredPackages + 1
+        )
+      : history[routeIndex].deliveredPackages,
+    occurrences: occurrences.map(record =>
+      record.packageId === packageId
+        ? resolveOccurrenceRecord(record, resolution, resolvedAt)
+        : record
+    ),
+  };
+  await writeJSON(storage, KEY_HISTORY, history);
+  return true;
+}
+
+export async function editHistoryOccurrenceInStorage(
+  storage: RouteStorage,
+  routeId: string,
+  completedAt: string,
+  packageId: string,
+  reason: string,
+  resolution?: OccurrenceResolution
+): Promise<boolean> {
+  const history = await loadHistoryFromStorage(storage);
+  const routeIndex = history.findIndex(
+    entry => entry.id === routeId && entry.completedAt === completedAt
+  );
+  if (routeIndex === -1) return false;
+
+  const occurrences = history[routeIndex].occurrences;
+  if (!occurrences) return false;
+  const target = occurrences.find(record => record.packageId === packageId);
+  if (!target) return false;
+
+  const edited = editOccurrenceRecord(target, reason, resolution);
+  const deliveredDelta =
+    Number(edited.occurrenceResolution === 'delivered') -
+    Number(target.occurrenceResolution === 'delivered');
+  history[routeIndex] = {
+    ...history[routeIndex],
+    deliveredPackages: Math.max(
+      0,
+      Math.min(
+        history[routeIndex].totalPackages,
+        history[routeIndex].deliveredPackages + deliveredDelta
+      )
+    ),
+    occurrences: occurrences.map(record =>
+      record.packageId === packageId ? edited : record
+    ),
+  };
+  await writeJSON(storage, KEY_HISTORY, history);
+  return true;
 }
 
 export async function renameRouteInStorage(

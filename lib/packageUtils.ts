@@ -28,6 +28,8 @@ export interface PackageItem {
   status: 'pending' | 'delivered' | 'skipped';
   occurrenceReason?: string;
   occurrenceRegisteredAt?: string;
+  occurrenceResolution?: 'delivered' | 'returned_to_hub';
+  occurrenceResolvedAt?: string;
 }
 
 // A group of packages sharing the same full address within a Stop

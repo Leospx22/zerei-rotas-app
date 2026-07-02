@@ -1,15 +1,39 @@
-import React, { useCallback, useMemo } from 'react';
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import React, { useCallback, useMemo, useState } from 'react';
+import {
+  Alert,
+  Modal,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { AlertCircle, ArrowLeft, MapPin, Package } from 'lucide-react-native';
+import { AlertCircle, ArrowLeft, CheckCircle2, MapPin, Package, Pencil } from 'lucide-react-native';
 import { useRoute } from '@/contexts/RouteContext';
+import { usePersistence } from '@/hooks/usePersistence';
 import {
   collectAllOccurrenceRecords,
+  hasOccurrenceEditChanges,
   occurrenceReasonLabel,
+  occurrenceResolutionLabel,
+  partitionOccurrenceRecords,
+  type CollectedOccurrenceRecord,
+  type OccurrenceResolution,
 } from '@/lib/occurrenceRecords';
 import { BorderRadius, Colors, FontSizes, Spacing } from '@/constants/theme';
 
-function formatRegisteredAt(value?: string): string | null {
+const OCCURRENCE_REASONS = [
+  'Cliente ausente',
+  'Endereço não localizado',
+  'Cliente recusou',
+  'Estabelecimento fechado',
+  'Reagendado',
+  'Outro',
+] as const;
+
+function formatDateTime(value?: string): string | null {
   if (!value) return null;
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return null;
@@ -22,13 +46,149 @@ function formatRegisteredAt(value?: string): string | null {
   });
 }
 
+interface OccurrenceCardProps {
+  record: CollectedOccurrenceRecord;
+  onResolve?: (record: CollectedOccurrenceRecord, resolution: OccurrenceResolution) => void;
+  onEdit: (record: CollectedOccurrenceRecord) => void;
+}
+
+function OccurrenceCard({ record, onResolve, onEdit }: OccurrenceCardProps) {
+  const registeredAt = formatDateTime(record.registeredAt);
+  const resolvedAt = formatDateTime(record.occurrenceResolvedAt);
+
+  return (
+    <View style={styles.card}>
+      <View style={styles.packageHeader}>
+        <Package size={18} color={Colors.gold[400]} />
+        <View style={styles.packageHeaderText}>
+          <Text style={styles.label}>Pacote</Text>
+          <Text style={styles.packageCode}>{record.packageCode ?? record.packageId}</Text>
+        </View>
+      </View>
+
+      <View style={styles.detailRow}>
+        <MapPin size={16} color={Colors.gray} />
+        <View style={styles.detailContent}>
+          <Text style={styles.label}>Endereço</Text>
+          <Text style={styles.value}>{record.address}</Text>
+          {record.normalizedAddress && record.normalizedAddress !== record.address ? (
+            <Text style={styles.normalizedAddress}>{record.normalizedAddress}</Text>
+          ) : null}
+        </View>
+      </View>
+
+      <View style={styles.reasonBox}>
+        <Text style={styles.label}>Motivo</Text>
+        <Text style={styles.reason}>{occurrenceReasonLabel(record.reason)}</Text>
+      </View>
+
+      <View style={styles.metaGrid}>
+        <View style={styles.metaItem}>
+          <Text style={styles.label}>Rota</Text>
+          <Text style={styles.value}>{record.routeName ?? 'Rota não informada'}</Text>
+        </View>
+        <View style={styles.metaItem}>
+          <Text style={styles.label}>Parada</Text>
+          <Text style={styles.value}>
+            {record.stopNumber !== undefined ? `#${record.stopNumber}` : 'Não informada'}
+          </Text>
+        </View>
+      </View>
+
+      {registeredAt ? (
+        <View>
+          <Text style={styles.label}>Registrado em</Text>
+          <Text style={styles.value}>{registeredAt}</Text>
+        </View>
+      ) : null}
+
+      {record.occurrenceResolution ? (
+        <View style={styles.resolutionBox}>
+          <View style={styles.resolutionHeader}>
+            <CheckCircle2 size={17} color={Colors.success} />
+            <View>
+              <Text style={styles.label}>Resultado</Text>
+              <Text style={styles.resolutionText}>
+                {occurrenceResolutionLabel(record.occurrenceResolution)}
+              </Text>
+            </View>
+          </View>
+          {resolvedAt ? (
+            <View>
+              <Text style={styles.label}>Resolvido em</Text>
+              <Text style={styles.value}>{resolvedAt}</Text>
+            </View>
+          ) : null}
+        </View>
+      ) : onResolve ? (
+        <View style={styles.actions}>
+          <TouchableOpacity
+            style={[styles.actionButton, styles.deliveredButton]}
+            onPress={() => onResolve(record, 'delivered')}
+            activeOpacity={0.78}
+            accessibilityRole="button"
+            accessibilityLabel={`Marcar ${record.packageCode ?? record.packageId} como entregue`}
+          >
+            <Text style={styles.deliveredButtonText}>Entregue</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.actionButton, styles.returnedButton]}
+            onPress={() => onResolve(record, 'returned_to_hub')}
+            activeOpacity={0.78}
+            accessibilityRole="button"
+            accessibilityLabel={`Marcar ${record.packageCode ?? record.packageId} como devolvido ao Hub`}
+          >
+            <Text style={styles.returnedButtonText}>Devolvido ao Hub</Text>
+          </TouchableOpacity>
+        </View>
+      ) : null}
+
+      <TouchableOpacity
+        style={styles.editButton}
+        onPress={() => onEdit(record)}
+        activeOpacity={0.78}
+        accessibilityRole="button"
+        accessibilityLabel={`Editar ocorrência de ${record.packageCode ?? record.packageId}`}
+      >
+        <Pencil size={15} color={Colors.gold[400]} />
+        <Text style={styles.editButtonText}>Editar</Text>
+      </TouchableOpacity>
+    </View>
+  );
+}
+
 export default function OccurrencesScreen() {
   const router = useRouter();
-  const { currentRoute, routeHistory, reloadHistory } = useRoute();
+  const {
+    currentRoute,
+    routeHistory,
+    reloadHistory,
+    resolvePackageOccurrence,
+    editPackageOccurrence,
+  } = useRoute();
+  const { resolveHistoryOccurrence, editHistoryOccurrence } = usePersistence();
+  const [resolutionRequest, setResolutionRequest] = useState<{
+    record: CollectedOccurrenceRecord;
+    resolution: OccurrenceResolution;
+  } | null>(null);
+  const [isResolving, setIsResolving] = useState(false);
+  const [editTarget, setEditTarget] = useState<CollectedOccurrenceRecord | null>(null);
+  const [editReason, setEditReason] = useState('');
+  const [editResolution, setEditResolution] = useState<OccurrenceResolution | undefined>();
+  const [isSavingEdit, setIsSavingEdit] = useState(false);
   const occurrenceRecords = useMemo(
     () => collectAllOccurrenceRecords(currentRoute, routeHistory),
     [currentRoute, routeHistory]
   );
+  const sections = useMemo(
+    () => partitionOccurrenceRecords(occurrenceRecords),
+    [occurrenceRecords]
+  );
+  const visibleOccurrenceCount =
+    sections.pending.length + sections.resolvedRecently.length;
+  const editHasChanges = editTarget
+    ? hasOccurrenceEditChanges(editTarget, editReason, editResolution)
+    : false;
 
   useFocusEffect(
     useCallback(() => {
@@ -36,7 +196,109 @@ export default function OccurrencesScreen() {
     }, [reloadHistory])
   );
 
+  const requestResolution = useCallback((
+    record: CollectedOccurrenceRecord,
+    resolution: OccurrenceResolution
+  ) => {
+    setResolutionRequest({ record, resolution });
+  }, []);
+
+  const confirmResolution = useCallback(async () => {
+    if (!resolutionRequest || isResolving) return;
+    const { record, resolution } = resolutionRequest;
+    setIsResolving(true);
+    try {
+      if (record.source === 'current') {
+        resolvePackageOccurrence(record.packageId, resolution);
+        setResolutionRequest(null);
+        return;
+      }
+      if (!record.historyCompletedAt) {
+        Alert.alert('Não foi possível resolver a ocorrência.');
+        return;
+      }
+      const resolved = await resolveHistoryOccurrence(
+        record.routeId,
+        record.historyCompletedAt,
+        record.packageId,
+        resolution
+      );
+      if (!resolved) {
+        Alert.alert('Não foi possível resolver a ocorrência.');
+        return;
+      }
+      await reloadHistory();
+      setResolutionRequest(null);
+    } finally {
+      setIsResolving(false);
+    }
+  }, [
+    isResolving,
+    reloadHistory,
+    resolutionRequest,
+    resolveHistoryOccurrence,
+    resolvePackageOccurrence,
+  ]);
+
+  const openEdit = useCallback((record: CollectedOccurrenceRecord) => {
+    setEditTarget(record);
+    setEditReason(record.reason ?? '');
+    setEditResolution(record.occurrenceResolution);
+  }, []);
+
+  const closeEdit = useCallback(() => {
+    if (isSavingEdit) return;
+    setEditTarget(null);
+    setEditReason('');
+    setEditResolution(undefined);
+  }, [isSavingEdit]);
+
+  const saveEdit = useCallback(async () => {
+    if (!editTarget || !editHasChanges || isSavingEdit) return;
+    setIsSavingEdit(true);
+    try {
+      if (editTarget.source === 'current') {
+        editPackageOccurrence(
+          editTarget.packageId,
+          editReason,
+          editTarget.occurrenceResolution ? editResolution : undefined
+        );
+        setEditTarget(null);
+        return;
+      }
+      if (!editTarget.historyCompletedAt) {
+        Alert.alert('Não foi possível salvar as alterações.');
+        return;
+      }
+      const edited = await editHistoryOccurrence(
+        editTarget.routeId,
+        editTarget.historyCompletedAt,
+        editTarget.packageId,
+        editReason,
+        editTarget.occurrenceResolution ? editResolution : undefined
+      );
+      if (!edited) {
+        Alert.alert('Não foi possível salvar as alterações.');
+        return;
+      }
+      await reloadHistory();
+      setEditTarget(null);
+    } finally {
+      setIsSavingEdit(false);
+    }
+  }, [
+    editHistoryOccurrence,
+    editPackageOccurrence,
+    editReason,
+    editResolution,
+    editHasChanges,
+    editTarget,
+    isSavingEdit,
+    reloadHistory,
+  ]);
+
   return (
+    <>
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <View style={styles.header}>
         <TouchableOpacity
@@ -54,67 +316,179 @@ export default function OccurrencesScreen() {
         <View style={styles.headerSpacer} />
       </View>
 
-      {occurrenceRecords.length === 0 ? (
+      {visibleOccurrenceCount === 0 ? (
         <View style={styles.emptyState}>
           <AlertCircle size={48} color={Colors.cardBorder} />
           <Text style={styles.emptyText}>Nenhuma ocorrência registrada</Text>
         </View>
       ) : (
-        occurrenceRecords.map((record, index) => {
-          const registeredAt = formatRegisteredAt(record.registeredAt);
-          return (
-            <View
-              key={`${record.routeName ?? 'rota'}-${record.packageId}-${record.registeredAt ?? index}`}
-              style={styles.card}
-            >
-              <View style={styles.packageHeader}>
-                <Package size={18} color={Colors.gold[400]} />
-                <View style={styles.packageHeaderText}>
-                  <Text style={styles.label}>Pacote</Text>
-                  <Text style={styles.packageCode}>{record.packageCode ?? record.packageId}</Text>
-                </View>
-              </View>
-
-              <View style={styles.detailRow}>
-                <MapPin size={16} color={Colors.gray} />
-                <View style={styles.detailContent}>
-                  <Text style={styles.label}>Endereço</Text>
-                  <Text style={styles.value}>{record.address}</Text>
-                  {record.normalizedAddress && record.normalizedAddress !== record.address ? (
-                    <Text style={styles.normalizedAddress}>{record.normalizedAddress}</Text>
-                  ) : null}
-                </View>
-              </View>
-
-              <View style={styles.reasonBox}>
-                <Text style={styles.label}>Motivo</Text>
-                <Text style={styles.reason}>{occurrenceReasonLabel(record.reason)}</Text>
-              </View>
-
-              <View style={styles.metaGrid}>
-                <View style={styles.metaItem}>
-                  <Text style={styles.label}>Rota</Text>
-                  <Text style={styles.value}>{record.routeName ?? 'Rota não informada'}</Text>
-                </View>
-                <View style={styles.metaItem}>
-                  <Text style={styles.label}>Parada</Text>
-                  <Text style={styles.value}>
-                    {record.stopNumber !== undefined ? `#${record.stopNumber}` : 'Não informada'}
-                  </Text>
-                </View>
-              </View>
-
-              {registeredAt ? (
-                <View>
-                  <Text style={styles.label}>Registrado em</Text>
-                  <Text style={styles.value}>{registeredAt}</Text>
-                </View>
-              ) : null}
+        <>
+          <Text style={styles.sectionTitle}>Pendentes</Text>
+          {sections.pending.length === 0 ? (
+            <View style={styles.sectionEmptyState}>
+              <Text style={styles.sectionEmptyText}>Nenhuma ocorrência pendente</Text>
             </View>
-          );
-        })
+          ) : (
+            sections.pending.map(record => (
+              <OccurrenceCard
+                key={`pending-${record.routeId}-${record.packageId}`}
+                record={record}
+                onResolve={requestResolution}
+                onEdit={openEdit}
+              />
+            ))
+          )}
+
+          {sections.resolvedRecently.length > 0 ? (
+            <>
+              <Text style={styles.sectionTitle}>Resolvidas recentemente</Text>
+              {sections.resolvedRecently.map(record => (
+                <OccurrenceCard
+                  key={`resolved-${record.routeId}-${record.packageId}`}
+                  record={record}
+                  onEdit={openEdit}
+                />
+              ))}
+            </>
+          ) : null}
+        </>
       )}
     </ScrollView>
+      <Modal
+        visible={resolutionRequest !== null}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setResolutionRequest(null)}
+      >
+        <View style={styles.modalRoot}>
+          <Pressable
+            style={styles.modalBackdrop}
+            onPress={() => setResolutionRequest(null)}
+            accessibilityRole="button"
+            accessibilityLabel="Cancelar"
+          />
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>
+              {resolutionRequest?.resolution === 'delivered'
+                ? 'Marcar ocorrência como entregue?'
+                : 'Marcar como devolvido ao Hub?'}
+            </Text>
+            <View style={styles.modalActions}>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.modalCancelButton]}
+                onPress={() => setResolutionRequest(null)}
+                disabled={isResolving}
+                accessibilityRole="button"
+              >
+                <Text style={styles.modalCancelText}>Cancelar</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.modalConfirmButton]}
+                onPress={confirmResolution}
+                disabled={isResolving}
+                accessibilityRole="button"
+              >
+                <Text style={styles.modalConfirmText}>
+                  {isResolving ? 'Salvando...' : 'Confirmar'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+      <Modal
+        visible={editTarget !== null}
+        transparent
+        animationType="fade"
+        onRequestClose={closeEdit}
+      >
+        <View style={styles.modalRoot}>
+          <Pressable
+            style={styles.modalBackdrop}
+            onPress={closeEdit}
+            accessibilityRole="button"
+            accessibilityLabel="Cancelar"
+          />
+          <View style={styles.editModalCard}>
+            <Text style={styles.modalTitle}>Editar ocorrência</Text>
+
+            <Text style={styles.fieldLabel}>Motivo</Text>
+            <View style={styles.optionGrid}>
+              {OCCURRENCE_REASONS.map(reason => (
+                <TouchableOpacity
+                  key={reason}
+                  style={[styles.optionChip, editReason === reason && styles.optionChipSelected]}
+                  onPress={() => setEditReason(reason)}
+                  activeOpacity={0.78}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: editReason === reason }}
+                >
+                  <Text style={[
+                    styles.optionChipText,
+                    editReason === reason && styles.optionChipTextSelected,
+                  ]}>
+                    {reason}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            {editTarget?.occurrenceResolution ? (
+              <>
+                <Text style={styles.fieldLabel}>Resultado</Text>
+                <View style={styles.optionGrid}>
+                  {(['delivered', 'returned_to_hub'] as const).map(resolution => (
+                    <TouchableOpacity
+                      key={resolution}
+                      style={[
+                        styles.optionChip,
+                        editResolution === resolution && styles.optionChipSelected,
+                      ]}
+                      onPress={() => setEditResolution(resolution)}
+                      activeOpacity={0.78}
+                      accessibilityRole="button"
+                      accessibilityState={{ selected: editResolution === resolution }}
+                    >
+                      <Text style={[
+                        styles.optionChipText,
+                        editResolution === resolution && styles.optionChipTextSelected,
+                      ]}>
+                        {occurrenceResolutionLabel(resolution)}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </>
+            ) : null}
+
+            <View style={styles.modalActions}>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.modalCancelButton]}
+                onPress={closeEdit}
+                disabled={isSavingEdit}
+                accessibilityRole="button"
+              >
+                <Text style={styles.modalCancelText}>Cancelar</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  styles.modalButton,
+                  styles.modalConfirmButton,
+                  !editHasChanges && styles.modalButtonDisabled,
+                ]}
+                onPress={saveEdit}
+                disabled={!editHasChanges || isSavingEdit}
+                accessibilityRole="button"
+              >
+                <Text style={styles.modalConfirmText}>
+                  {isSavingEdit ? 'Salvando...' : 'Salvar alterações'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+    </>
   );
 }
 
@@ -131,6 +505,7 @@ const styles = StyleSheet.create({
   titleRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
   title: { color: Colors.white, fontSize: FontSizes.xxl, fontWeight: '800' },
   headerSpacer: { width: 44 },
+  sectionTitle: { color: Colors.white, fontSize: FontSizes.lg, fontWeight: '800' },
   emptyState: {
     alignItems: 'center',
     justifyContent: 'center',
@@ -138,6 +513,12 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.xxl,
   },
   emptyText: { color: Colors.gray, fontSize: FontSizes.lg, fontWeight: '700' },
+  sectionEmptyState: {
+    padding: Spacing.md,
+    borderRadius: BorderRadius.sm,
+    backgroundColor: Colors.cardBg,
+  },
+  sectionEmptyText: { color: Colors.gray, fontSize: FontSizes.md },
   card: {
     padding: Spacing.md,
     gap: Spacing.md,
@@ -170,4 +551,99 @@ const styles = StyleSheet.create({
   reason: { color: Colors.error, fontSize: FontSizes.md, fontWeight: '800' },
   metaGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.md },
   metaItem: { flex: 1, minWidth: 120, gap: 2 },
+  actions: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm },
+  actionButton: {
+    minHeight: 46,
+    flexGrow: 1,
+    flexBasis: 140,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: Spacing.md,
+    borderRadius: BorderRadius.sm,
+    borderWidth: 1,
+  },
+  deliveredButton: { borderColor: Colors.successBorder, backgroundColor: Colors.successBg },
+  deliveredButtonText: { color: Colors.success, fontSize: FontSizes.md, fontWeight: '800' },
+  returnedButton: { borderColor: Colors.warningBorder, backgroundColor: Colors.warningBg },
+  returnedButtonText: { color: Colors.warning, fontSize: FontSizes.md, fontWeight: '800' },
+  resolutionBox: {
+    gap: Spacing.sm,
+    padding: Spacing.sm,
+    borderRadius: BorderRadius.sm,
+    borderWidth: 1,
+    borderColor: Colors.successBorder,
+    backgroundColor: Colors.successBg,
+  },
+  resolutionHeader: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
+  resolutionText: { color: Colors.success, fontSize: FontSizes.md, fontWeight: '800' },
+  editButton: {
+    minHeight: 40,
+    alignSelf: 'flex-end',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: Spacing.xs,
+    paddingHorizontal: Spacing.md,
+    borderRadius: BorderRadius.sm,
+    borderWidth: 1,
+    borderColor: Colors.gold[700],
+    backgroundColor: Colors.overlay,
+  },
+  editButtonText: { color: Colors.gold[400], fontSize: FontSizes.sm, fontWeight: '800' },
+  modalRoot: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: Spacing.lg },
+  modalBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0, 0, 0, 0.72)',
+  },
+  modalCard: {
+    width: '100%',
+    maxWidth: 420,
+    gap: Spacing.lg,
+    padding: Spacing.lg,
+    borderRadius: BorderRadius.lg,
+    borderWidth: 1,
+    borderColor: Colors.cardBorder,
+    backgroundColor: Colors.cardBg,
+  },
+  editModalCard: {
+    width: '100%',
+    maxWidth: 520,
+    maxHeight: '90%',
+    gap: Spacing.md,
+    padding: Spacing.lg,
+    borderRadius: BorderRadius.lg,
+    borderWidth: 1,
+    borderColor: Colors.cardBorder,
+    backgroundColor: Colors.cardBg,
+  },
+  modalTitle: { color: Colors.white, fontSize: FontSizes.xl, fontWeight: '800' },
+  fieldLabel: { color: Colors.white, fontSize: FontSizes.md, fontWeight: '800' },
+  optionGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm },
+  optionChip: {
+    minHeight: 42,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: Spacing.md,
+    borderRadius: BorderRadius.full,
+    borderWidth: 1,
+    borderColor: Colors.cardBorder,
+    backgroundColor: Colors.background,
+  },
+  optionChipSelected: { borderColor: Colors.gold[500], backgroundColor: Colors.overlay },
+  optionChipText: { color: Colors.gray, fontSize: FontSizes.sm, fontWeight: '700' },
+  optionChipTextSelected: { color: Colors.gold[400] },
+  modalActions: { flexDirection: 'row', gap: Spacing.sm },
+  modalButton: {
+    minHeight: 46,
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: BorderRadius.sm,
+    borderWidth: 1,
+  },
+  modalCancelButton: { borderColor: Colors.cardBorder, backgroundColor: Colors.background },
+  modalCancelText: { color: Colors.gray, fontSize: FontSizes.md, fontWeight: '800' },
+  modalConfirmButton: { borderColor: Colors.gold[700], backgroundColor: Colors.gold[500] },
+  modalButtonDisabled: { opacity: 0.45 },
+  modalConfirmText: { color: Colors.primary[900], fontSize: FontSizes.md, fontWeight: '900' },
 });

@@ -14,7 +14,12 @@ import {
 } from '@/lib/packageUtils';
 import { usePersistence } from '@/hooks/usePersistence';
 import type { HistoryEntry } from '@/lib/routePersistence';
-import { applyPackageOccurrenceToStops } from '@/lib/occurrenceRecords';
+import {
+  applyPackageOccurrenceToStops,
+  editPackageOccurrenceInStops,
+  resolvePackageOccurrenceInStops,
+  type OccurrenceResolution,
+} from '@/lib/occurrenceRecords';
 
 export interface RouteData {
   id: string;
@@ -41,8 +46,14 @@ interface RouteContextType {
   renameCurrentRoute: (name: string) => Promise<boolean>;
   updateStopStatus: (stopId: string, status: GroupedStop['status']) => void;
   updatePackageStatus: (stopId: string, packageId: string, status: PackageItem['status']) => void;
-  // Sets occurrence reason and delegates status change to existing updatePackageStatus
+  // Persists occurrence reason and the existing skipped status convention.
   updatePackageOccurrence: (stopId: string, packageId: string, reason: string) => void;
+  resolvePackageOccurrence: (packageId: string, resolution: OccurrenceResolution) => void;
+  editPackageOccurrence: (
+    packageId: string,
+    reason: string,
+    resolution?: OccurrenceResolution
+  ) => void;
   removeDuplicates: () => void;
   reorderStops: () => void;
   getSummary: () => ImportSummary;
@@ -192,6 +203,53 @@ export function RouteProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
+  const resolvePackageOccurrence = useCallback((
+    packageId: string,
+    resolution: OccurrenceResolution
+  ) => {
+    const resolvedAt = new Date().toISOString();
+    setCurrentRouteState(prev => {
+      if (!prev) return prev;
+      const stops = resolvePackageOccurrenceInStops(
+        prev.stops,
+        packageId,
+        resolution,
+        resolvedAt
+      );
+      const completedStops = stops.filter(stop => stop.status === 'completed').length;
+      const deliveredPackages = stops.reduce(
+        (sum, stop) =>
+          sum + stop.packages.filter(packageItem => packageItem.status === 'delivered').length,
+        0
+      );
+      return checkCompletion({ ...prev, stops, completedStops, deliveredPackages });
+    });
+  }, []);
+
+  const editPackageOccurrence = useCallback((
+    packageId: string,
+    reason: string,
+    resolution?: OccurrenceResolution
+  ) => {
+    setOccurrences(prev => ({ ...prev, [packageId]: reason }));
+    setCurrentRouteState(prev => {
+      if (!prev) return prev;
+      const stops = editPackageOccurrenceInStops(
+        prev.stops,
+        packageId,
+        reason,
+        resolution
+      );
+      const completedStops = stops.filter(stop => stop.status === 'completed').length;
+      const deliveredPackages = stops.reduce(
+        (sum, stop) =>
+          sum + stop.packages.filter(packageItem => packageItem.status === 'delivered').length,
+        0
+      );
+      return checkCompletion({ ...prev, stops, completedStops, deliveredPackages });
+    });
+  }, []);
+
   const removeDuplicates = useCallback(() => {
     setCurrentRouteState(prev => {
       if (!prev) return prev;
@@ -259,6 +317,8 @@ export function RouteProvider({ children }: { children: ReactNode }) {
       updateStopStatus,
       updatePackageStatus,
       updatePackageOccurrence,
+      resolvePackageOccurrence,
+      editPackageOccurrence,
       removeDuplicates,
       reorderStops,
       getSummary,

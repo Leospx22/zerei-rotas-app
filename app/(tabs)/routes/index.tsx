@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect, useRef } from 'react';
+import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import {
   View,
   Text,
@@ -10,12 +10,10 @@ import {
   Pressable,
 } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
-import { LinearGradient } from 'expo-linear-gradient';
 import {
   MapPin,
   Crown,
   Package,
-  FileSpreadsheet,
   Pencil,
   Trash2,
   Play,
@@ -32,7 +30,17 @@ import {
   routeDisplayStatusLabel,
   type RouteDisplayStatus,
 } from '@/lib/routePresentation';
-import { collectRouteOccurrenceRecords } from '@/lib/occurrenceRecords';
+import {
+  collectAllOccurrenceRecords,
+  collectRouteOccurrenceRecords,
+  partitionOccurrenceRecords,
+  type OccurrenceRecord,
+} from '@/lib/occurrenceRecords';
+
+function visibleOccurrenceCount(records: readonly OccurrenceRecord[]): number {
+  const sections = partitionOccurrenceRecords(records);
+  return sections.pending.length + sections.resolvedRecently.length;
+}
 
 interface RouteItem {
   id: string;
@@ -59,6 +67,12 @@ export default function RoutesScreen() {
   const [editName, setEditName] = useState('');
   const editNameRef = useRef('');
   const [deleteTarget, setDeleteTarget] = useState<RouteItem | null>(null);
+  const occurrenceSummary = useMemo(
+    () => partitionOccurrenceRecords(
+      collectAllOccurrenceRecords(currentRoute, routeHistory)
+    ),
+    [currentRoute, routeHistory]
+  );
 
   const loadRoutes = useCallback(async () => {
     await reloadHistory();
@@ -78,7 +92,7 @@ export default function RoutesScreen() {
         deliveredPackages: currentRoute.deliveredPackages,
         completedStops: currentRoute.completedStops,
         isCurrentRoute: true,
-        occurrenceCount: collectRouteOccurrenceRecords(currentRoute).length,
+        occurrenceCount: visibleOccurrenceCount(collectRouteOccurrenceRecords(currentRoute)),
       });
     }
 
@@ -94,7 +108,7 @@ export default function RoutesScreen() {
         deliveredPackages: entry.deliveredPackages,
         completedStops: entry.completedStops,
         isCurrentRoute: false,
-        occurrenceCount: entry.occurrences?.length ?? 0,
+        occurrenceCount: visibleOccurrenceCount(entry.occurrences ?? []),
         completedAt: entry.completedAt,
       });
     });
@@ -167,18 +181,40 @@ export default function RoutesScreen() {
           <Text style={styles.pageTitle}>Minhas Rotas</Text>
         </View>
 
-        <TouchableOpacity
-          style={styles.importButton}
-          onPress={() => router.push('/(tabs)/routes/import')}
-        >
-          <LinearGradient
-            colors={[Colors.gold[500], Colors.gold[700]]}
-            style={styles.importGradient}
+        <View style={styles.occurrenceSummaryCard}>
+          <View style={styles.occurrenceSummaryHeader}>
+            <AlertCircle size={20} color={Colors.error} />
+            <Text style={styles.occurrenceSummaryTitle}>Ocorrências</Text>
+          </View>
+          {occurrenceSummary.pending.length === 0 &&
+          occurrenceSummary.resolvedRecently.length === 0 ? (
+            <Text style={styles.occurrenceSummaryEmpty}>Nenhuma ocorrência pendente</Text>
+          ) : (
+            <View style={styles.occurrenceSummaryCounts}>
+              <Text style={styles.occurrencePendingText}>
+                {occurrenceSummary.pending.length}{' '}
+                {occurrenceSummary.pending.length === 1 ? 'pendente' : 'pendentes'}
+              </Text>
+              {occurrenceSummary.resolvedRecently.length > 0 ? (
+                <Text style={styles.occurrenceResolvedText}>
+                  {occurrenceSummary.resolvedRecently.length}{' '}
+                  {occurrenceSummary.resolvedRecently.length === 1
+                    ? 'resolvida recentemente'
+                    : 'resolvidas recentemente'}
+                </Text>
+              ) : null}
+            </View>
+          )}
+          <TouchableOpacity
+            style={styles.occurrenceSummaryAction}
+            onPress={() => router.push('/(tabs)/routes/occurrences')}
+            activeOpacity={0.78}
+            accessibilityRole="button"
+            accessibilityLabel="Ver ocorrências"
           >
-            <FileSpreadsheet size={22} color={Colors.primary[900]} />
-            <Text style={styles.importText}>Importar Planilha</Text>
-          </LinearGradient>
-        </TouchableOpacity>
+            <Text style={styles.occurrenceSummaryActionText}>Ver ocorrências</Text>
+          </TouchableOpacity>
+        </View>
 
         {routes.length === 0 ? (
           <View style={styles.emptyState}>
@@ -405,23 +441,39 @@ const styles = StyleSheet.create({
     color: Colors.white,
   },
 
-  importButton: {
-    borderRadius: BorderRadius.md,
-    overflow: 'hidden',
+  occurrenceSummaryCard: {
+    gap: Spacing.sm,
+    padding: Spacing.md,
     marginBottom: Spacing.xl,
+    borderRadius: BorderRadius.md,
+    borderWidth: 1,
+    borderColor: Colors.errorBorder,
+    backgroundColor: Colors.cardBg,
   },
-  importGradient: {
+  occurrenceSummaryHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    height: 52,
     gap: Spacing.sm,
   },
-  importText: {
+  occurrenceSummaryTitle: {
     fontSize: FontSizes.lg,
     fontWeight: '800',
-    color: Colors.primary[900],
+    color: Colors.white,
   },
+  occurrenceSummaryCounts: { gap: 4 },
+  occurrenceSummaryEmpty: { color: Colors.gray, fontSize: FontSizes.md },
+  occurrencePendingText: { color: Colors.error, fontSize: FontSizes.md, fontWeight: '800' },
+  occurrenceResolvedText: { color: Colors.success, fontSize: FontSizes.sm, fontWeight: '700' },
+  occurrenceSummaryAction: {
+    minHeight: 42,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: BorderRadius.sm,
+    borderWidth: 1,
+    borderColor: Colors.errorBorder,
+    backgroundColor: Colors.errorBg,
+  },
+  occurrenceSummaryActionText: { color: Colors.error, fontSize: FontSizes.md, fontWeight: '800' },
 
   emptyState: {
     alignItems: 'center',

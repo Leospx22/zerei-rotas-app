@@ -46,7 +46,10 @@ import {
   getAddressGroupOccurrenceAction,
   type OccurrenceTarget,
 } from '@/lib/occurrenceFlow';
-import { collectRouteOccurrenceRecords } from '@/lib/occurrenceRecords';
+import {
+  collectRouteOccurrenceRecords,
+  partitionOccurrenceRecords,
+} from '@/lib/occurrenceRecords';
 import {
   togglePackageGroupSelection,
   togglePackageSelection,
@@ -126,7 +129,12 @@ export default function RouteExecutionScreen() {
     [currentRoute]
   );
   const currentOccurrenceCount = React.useMemo(
-    () => collectRouteOccurrenceRecords(currentRoute).length,
+    () => {
+      const sections = partitionOccurrenceRecords(
+        collectRouteOccurrenceRecords(currentRoute)
+      );
+      return sections.pending.length + sections.resolvedRecently.length;
+    },
     [currentRoute]
   );
   const [executionStep, setExecutionStep] = useState<ExecutionStep>(

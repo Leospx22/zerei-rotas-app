@@ -141,6 +141,7 @@ Use `replace()` between sequential wizard screens to avoid accumulating hidden l
 - Current-route rename through `renameCurrentRoute`
 - Stop and package status updates
 - Atomic occurrence status, reason, and registration timestamp updates
+- Current-route occurrence resolution as delivered or returned to the hub
 - Completion detection and elapsed-duration calculation
 - Duplicate-stop removal and stop reordering
 - Import summary calculation
@@ -201,9 +202,15 @@ Stops are grouped exclusively by the spreadsheet Stop column. Sequence/order col
 ```ts
 occurrenceReason?: string;
 occurrenceRegisteredAt?: string;
+occurrenceResolution?: 'delivered' | 'returned_to_hub';
+occurrenceResolvedAt?: string;
 ```
 
-Both fields are optional so previously persisted routes remain valid. A package occurrence continues using the existing `skipped` status convention. Current-route AsyncStorage persistence serializes these fields with the route; skipped packages without a saved reason display `Motivo não informado`.
+These fields are optional so previously persisted routes remain valid. A package occurrence continues using the existing `skipped` status convention. Current-route AsyncStorage persistence serializes these fields with the route; skipped packages without a saved reason display `Motivo não informado`.
+
+Occurrence resolution is also additive. `delivered` changes only the target package to the existing delivered status; `returned_to_hub` retains the skipped status. Both preserve the original reason and registration timestamp. The Ocorrências screen shows unresolved records under Pendentes and resolved records for seven days under Resolvidas recentemente.
+
+Occurrence edits target the existing package or exact completed-history summary. Pending edits may change only the reason. Resolved edits may change the reason and reverse the result; result reversal preserves both timestamps and adjusts delivered counters by exactly one without duplicating records.
 
 ## History Model
 
@@ -233,6 +240,7 @@ History invariants:
 - A completed entry is uniquely targeted for rename by `id + completedAt`.
 - `routeHistory` in RouteContext is the read source for Painel, Minhas Rotas, and Historico.
 - Occurrence summaries are optional and preserve package code, address, normalized address, reason, registration time, route name, and stop number after completion.
+- Occurrence summaries may also preserve `occurrenceResolution` and `occurrenceResolvedAt`; completed-history resolution targets the exact route completion and package.
 - History records created before occurrence summaries remain valid and expose an empty occurrence collection.
 - `reloadHistory()` is the synchronization boundary after a history mutation.
 

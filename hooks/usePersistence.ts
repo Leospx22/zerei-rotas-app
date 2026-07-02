@@ -2,13 +2,16 @@ import { useCallback, useState } from 'react';
 import { RouteData } from '@/contexts/RouteContext';
 import {
   deleteRouteFromStorage,
+  editHistoryOccurrenceInStorage,
   getRouteStorage,
   loadCurrentRouteFromStorage,
   loadHistoryFromStorage,
   renameRouteInStorage,
+  resolveHistoryOccurrenceInStorage,
   saveCompletedRouteToHistory,
   saveRouteToStorage,
 } from '@/lib/routePersistence';
+import type { OccurrenceResolution } from '@/lib/occurrenceRecords';
 export type { HistoryEntry } from '@/lib/routePersistence';
 
 export function usePersistence() {
@@ -63,6 +66,47 @@ export function usePersistence() {
     }
   }, [storage]);
 
+  const resolveHistoryOccurrence = useCallback(async (
+    routeId: string,
+    completedAt: string,
+    packageId: string,
+    resolution: OccurrenceResolution
+  ): Promise<boolean> => {
+    try {
+      return await resolveHistoryOccurrenceInStorage(
+        storage,
+        routeId,
+        completedAt,
+        packageId,
+        resolution,
+        new Date().toISOString()
+      );
+    } catch {
+      return false;
+    }
+  }, [storage]);
+
+  const editHistoryOccurrence = useCallback(async (
+    routeId: string,
+    completedAt: string,
+    packageId: string,
+    reason: string,
+    resolution?: OccurrenceResolution
+  ): Promise<boolean> => {
+    try {
+      return await editHistoryOccurrenceInStorage(
+        storage,
+        routeId,
+        completedAt,
+        packageId,
+        reason,
+        resolution
+      );
+    } catch {
+      return false;
+    }
+  }, [storage]);
+
   return {
     isLoading,
     error,
@@ -72,5 +116,7 @@ export function usePersistence() {
     getHistory,
     renameRoute,
     deleteRoute,
+    resolveHistoryOccurrence,
+    editHistoryOccurrence,
   };
 }

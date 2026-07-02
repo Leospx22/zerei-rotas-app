@@ -47,6 +47,9 @@ All notable product and architecture changes are recorded here. Versions follow 
 - Persistent package occurrence reasons and registration timestamps.
 - Read-only Ocorrências screen for current and completed routes.
 - Optional completed-history occurrence summaries and route-card occurrence access.
+- Occurrence resolution as Entregue or Devolvido ao Hub with confirmation actions.
+- Seven-day recently resolved occurrence audit trail.
+- Occurrence reason editing and safe Entregue/Devolvido ao Hub result correction.
 
 ### Changed
 
@@ -67,6 +70,9 @@ All notable product and architecture changes are recorded here. Versions follow 
 - Polished per-address Place Information headers, saved indicators, and compact field hierarchy.
 - Removed the duplicate stop-wide delivery action after address-group delivery became primary.
 - Persisted occurrence metadata inside the existing current-route and history storage records.
+- Split the Ocorrências screen into pending and recently resolved sections.
+- Replaced the large Minhas Rotas import banner with a pending/recent occurrence summary.
+- Preserved occurrence timestamps while editing reasons or reversing resolved outcomes.
 
 ### Fixed
 
@@ -91,6 +97,8 @@ All notable product and architecture changes are recorded here. Versions follow 
 - Completed address groups exposing selection and occurrence actions with no pending target.
 - The empty execution state labeling its Minhas Rotas destination as Painel.
 - Legacy whole-stop completion controls competing with address-level delivery actions.
+- Occurrence resolution confirmations not invoking callbacks reliably on web.
+- Occurrence edit save remaining disabled for result-only changes without a reason.
 
 ### Removed
 

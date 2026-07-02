@@ -150,9 +150,14 @@ export function ExecutionCard({
               const groupPlaceInfo = placeInfoByAddressKey[group.key] ?? null;
               const groupCompleted = isExecutionPackageGroupCompleted(group);
               const groupPackageIds = group.packages.map(pkg => pkg.id);
+              const selectableGroupPackageIds = isPickup
+                ? groupPackageIds
+                : group.packages
+                    .filter(pkg => pkg.status === 'pending')
+                    .map(pkg => pkg.id);
               const groupSelected = isPackageGroupSelected(
                 separatedPackageIds,
-                groupPackageIds
+                selectableGroupPackageIds
               );
               return (
                 <View key={group.key} style={styles.packageGroup}>
@@ -207,10 +212,10 @@ export function ExecutionCard({
                             </Text>
                           </TouchableOpacity>
                         ) : null}
-                        {onToggleAddressGroupSeparated ? (
+                        {onToggleAddressGroupSeparated && selectableGroupPackageIds.length > 0 ? (
                           <TouchableOpacity
                             style={styles.groupHeaderAction}
-                            onPress={() => onToggleAddressGroupSeparated(groupPackageIds)}
+                            onPress={() => onToggleAddressGroupSeparated(selectableGroupPackageIds)}
                             activeOpacity={0.78}
                             accessibilityRole="button"
                             accessibilityLabel={
@@ -233,6 +238,7 @@ export function ExecutionCard({
 
                 {group.packages.map(pkg => {
                   const separated = separatedPackageIds.has(pkg.id);
+                  const selectionDisabled = !isPickup && pkg.status !== 'pending';
                   const packageStateLabel = isPickup
                     ? 'Separado'
                     : pkg.status === 'delivered'
@@ -250,11 +256,15 @@ export function ExecutionCard({
                       ]}
                     >
                       <TouchableOpacity
-                        style={styles.packageSelectionArea}
+                        style={[
+                          styles.packageSelectionArea,
+                          selectionDisabled && styles.packageSelectionAreaDisabled,
+                        ]}
                         onPress={() => onTogglePackageSeparated(pkg.id)}
+                        disabled={selectionDisabled}
                         activeOpacity={0.78}
                         accessibilityRole="checkbox"
-                        accessibilityState={{ checked: separated }}
+                        accessibilityState={{ checked: separated, disabled: selectionDisabled }}
                         accessibilityLabel={`${pkg.trackingNumber}, ${packageStateLabel}`}
                       >
                         <View style={[styles.checkbox, separated && styles.checkboxSelected]}>
@@ -319,7 +329,7 @@ export function ExecutionCard({
                       </TouchableOpacity>
                     )
                   ) : null}
-                  {!isPickup && onAddressGroupOccurrence ? (
+                  {!isPickup && !groupCompleted && onAddressGroupOccurrence ? (
                     <TouchableOpacity
                       style={styles.groupOccurrenceButton}
                       onPress={() => onAddressGroupOccurrence(group)}
@@ -597,6 +607,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.sm,
+  },
+  packageSelectionAreaDisabled: {
+    opacity: 0.55,
   },
   packageOccurrenceAction: {
     minWidth: 68,

@@ -84,6 +84,9 @@ All notable product and architecture changes are recorded here. Versions follow 
 - Import Summary making customized route order appear reverted after leaving Route Review.
 - Individual package selection being disabled during the delivery phase.
 - Group occurrence requiring package reselection even when pending packages were already selected.
+- Completed address groups exposing selection and occurrence actions with no pending target.
+- The empty execution state labeling its Minhas Rotas destination as Painel.
+- Legacy whole-stop completion controls competing with address-level delivery actions.
 
 ### Removed
 

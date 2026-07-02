@@ -411,7 +411,7 @@ export default function RouteExecutionScreen() {
       <View style={styles.emptyContainer}>
         <Text style={styles.emptyText}>Nenhuma rota ativa</Text>
         <TouchableOpacity onPress={() => router.replace('/(tabs)/routes')}>
-          <Text style={styles.emptyLink}>Voltar ao painel</Text>
+          <Text style={styles.emptyLink}>Voltar para Minhas Rotas</Text>
         </TouchableOpacity>
       </View>
     );
@@ -612,23 +612,6 @@ export default function RouteExecutionScreen() {
                     )}
                   </View>
                 </View>
-
-                {stop.status === 'pending' && (
-                  <View style={styles.stopActions}>
-                    <TouchableOpacity
-                      style={styles.completeButton}
-                      onPress={() => updateStopStatus(stop.id, 'completed')}
-                    >
-                      <CheckCircle2 size={24} color={Colors.success} />
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={styles.skipButton}
-                      onPress={() => updateStopStatus(stop.id, 'skipped')}
-                    >
-                      <SkipForward size={20} color={Colors.gray} />
-                    </TouchableOpacity>
-                  </View>
-                )}
 
                 {stop.status === 'completed' && <CheckCircle2 size={24} color={Colors.success} />}
                 {stop.status === 'skipped' && <SkipForward size={20} color={Colors.gray} />}
@@ -897,9 +880,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 5, paddingVertical: 2, borderWidth: 1, borderColor: Colors.warningBorder,
   },
   warnBadgeText: { fontSize: FontSizes.xs, color: Colors.warning, fontWeight: '600' },
-  stopActions: { flexDirection: 'row', gap: Spacing.sm, alignItems: 'center' },
-  completeButton: { padding: Spacing.xs },
-  skipButton: { padding: Spacing.xs },
   expandButton: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
     paddingVertical: Spacing.sm, gap: 4,

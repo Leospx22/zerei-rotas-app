@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useState } from 'react';
 import {
   Alert,
   Linking,
@@ -20,11 +20,13 @@ import {
   Play,
 } from 'lucide-react-native';
 import RouteMap from '@/components/RouteMap';
+import RouteSequenceList from '@/components/RouteSequenceList';
 import { BorderRadius, Colors, FontSizes, Spacing } from '@/constants/theme';
 import { useRoute } from '@/contexts/RouteContext';
 import { buildGoogleMapsSearchUrl } from '@/lib/mapNavigation';
+import { useMapStops } from '@/hooks/useMapStops';
 import {
-  buildMapStops,
+  getMapCoordinateSummary,
   getMapCoordinateState,
   mapStopStatusLabel,
 } from '@/lib/mapOverview';
@@ -32,25 +34,33 @@ import {
 export default function MapOverviewScreen() {
   const router = useRouter();
   const { currentRoute } = useRoute();
-  const mapStops = useMemo(
-    () => currentRoute ? buildMapStops(currentRoute) : [],
-    [currentRoute]
-  );
+  const mapStops = useMapStops(currentRoute);
   const initialStop = mapStops.find(stop => stop.status === 'current') ?? mapStops[0] ?? null;
   const [selectedStopId, setSelectedStopId] = useState<string | null>(initialStop?.id ?? null);
+  const [focusStopId, setFocusStopId] = useState<string | null>(null);
   const selectedStop = mapStops.find(stop => stop.id === selectedStopId) ?? initialStop;
   const coordinateState = getMapCoordinateState(mapStops);
+  const coordinateSummary = getMapCoordinateSummary(mapStops);
 
-  const navigateToStop = async () => {
-    if (!selectedStop) return;
+  const selectStopFromList = (stopId: string) => {
+    setSelectedStopId(stopId);
+    setFocusStopId(stopId);
+  };
+
+  const navigateToAddress = async (address: string) => {
     try {
-      const url = buildGoogleMapsSearchUrl(selectedStop.address);
+      const url = buildGoogleMapsSearchUrl(address);
       const supported = await Linking.canOpenURL(url);
       if (!supported) throw new Error('Unsupported map URL');
       await Linking.openURL(url);
     } catch {
       Alert.alert('Não foi possível abrir o mapa.');
     }
+  };
+
+  const navigateToStop = async () => {
+    if (!selectedStop) return;
+    await navigateToAddress(selectedStop.address);
   };
 
   if (!currentRoute) {
@@ -94,7 +104,17 @@ export default function MapOverviewScreen() {
         </View>
       </View>
 
-      {coordinateState === 'unavailable' ? (
+      {coordinateState === 'partial' ? (
+        <View style={styles.warningCard}>
+          <AlertTriangle size={19} color={Colors.warning} />
+          <View style={styles.warningCopy}>
+            <Text style={styles.warningText}>Algumas paradas possuem coordenadas inválidas ou ausentes.</Text>
+            <Text style={styles.warningCount}>
+              {coordinateSummary.displayedCount} de {coordinateSummary.totalCount} paradas exibidas no mapa.
+            </Text>
+          </View>
+        </View>
+      ) : coordinateState === 'unavailable' ? (
         <View style={styles.warningCard}>
           <AlertTriangle size={19} color={Colors.warning} />
           <View style={styles.warningCopy}>
@@ -104,18 +124,12 @@ export default function MapOverviewScreen() {
             </Text>
           </View>
         </View>
-      ) : coordinateState === 'partial' ? (
-        <View style={styles.warningCard}>
-          <AlertTriangle size={19} color={Colors.warning} />
-          <Text style={styles.warningText}>
-            Algumas paradas não possuem coordenadas.
-          </Text>
-        </View>
       ) : null}
 
       <RouteMap
         stops={mapStops}
         selectedStopId={selectedStop?.id ?? null}
+        focusStopId={focusStopId}
         onSelectStop={setSelectedStopId}
       />
 
@@ -151,6 +165,14 @@ export default function MapOverviewScreen() {
               </View>
             ) : null}
           </View>
+          {selectedStop.latitude === null || selectedStop.longitude === null ? (
+            <View style={styles.selectedCoordinateWarning}>
+              <AlertTriangle size={15} color={Colors.warning} />
+              <Text style={styles.selectedCoordinateWarningText}>
+                Coordenadas indisponíveis para esta parada.
+              </Text>
+            </View>
+          ) : null}
           <View style={styles.actions}>
             <TouchableOpacity style={styles.primaryButton} onPress={navigateToStop}>
               <Navigation size={17} color={Colors.primary[900]} />
@@ -175,6 +197,17 @@ export default function MapOverviewScreen() {
           </View>
         </View>
       ) : null}
+
+      <View style={styles.routeListSection}>
+        <Text style={styles.routeListTitle}>Ordem da rota</Text>
+        <Text style={styles.routeListHint}>Toque em uma parada para selecioná-la no mapa.</Text>
+        <RouteSequenceList
+          stops={mapStops}
+          selectedStopId={selectedStop?.id ?? null}
+          onSelectStop={selectStopFromList}
+          onNavigateStop={stop => navigateToAddress(stop.address)}
+        />
+      </View>
     </ScrollView>
   );
 }
@@ -226,6 +259,7 @@ const styles = StyleSheet.create({
   warningCopy: { flex: 1, gap: 3 },
   warningTitle: { color: Colors.warning, fontSize: FontSizes.md, fontWeight: '800' },
   warningText: { flex: 1, color: Colors.gray, fontSize: FontSizes.sm, lineHeight: 18 },
+  warningCount: { color: Colors.warning, fontSize: FontSizes.sm, fontWeight: '700' },
   detailCard: {
     gap: Spacing.md,
     padding: Spacing.md,
@@ -251,6 +285,15 @@ const styles = StyleSheet.create({
   metrics: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.md },
   metric: { flexDirection: 'row', alignItems: 'center', gap: Spacing.xs },
   metricText: { color: Colors.gray, fontSize: FontSizes.sm },
+  selectedCoordinateWarning: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.xs,
+    padding: Spacing.sm,
+    borderRadius: BorderRadius.sm,
+    backgroundColor: Colors.warningBg,
+  },
+  selectedCoordinateWarningText: { flex: 1, color: Colors.warning, fontSize: FontSizes.sm },
   actions: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm },
   primaryButton: {
     minHeight: 46,
@@ -280,4 +323,7 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.overlay,
   },
   secondaryButtonText: { color: Colors.gold[400], fontSize: FontSizes.md, fontWeight: '800' },
+  routeListSection: { gap: Spacing.sm },
+  routeListTitle: { color: Colors.white, fontSize: FontSizes.xl, fontWeight: '800' },
+  routeListHint: { color: Colors.gray, fontSize: FontSizes.sm },
 });

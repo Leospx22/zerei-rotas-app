@@ -1,6 +1,11 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { buildMapStops, getMapCoordinateState } from '../lib/mapOverview.ts';
+import {
+  buildMapStops,
+  getLocatedMapStops,
+  getMapCoordinateSummary,
+  getMapCoordinateState,
+} from '../lib/mapOverview.ts';
 import { groupPackagesByStop, parseSpreadsheetData } from '../lib/packageUtils.ts';
 import {
   loadCurrentRouteFromStorage,
@@ -55,6 +60,23 @@ test('map stops preserve the customized route order and use one-based labels', (
   assert.deepEqual(mapStops.map(stop => stop.order), [1, 2, 3]);
 });
 
+test('all coordinate-bearing stops reach the native marker renderer', () => {
+  const packages = Array.from({ length: 15 }, (_, index) =>
+    rawPackage(
+      `PKG-${index + 1}`,
+      index + 1,
+      -23.50 - index * 0.001,
+      -46.60 - index * 0.001
+    )
+  );
+  const mapStops = buildMapStops(route(groupPackagesByStop(packages)));
+  const locatedStops = getLocatedMapStops(mapStops);
+
+  assert.equal(mapStops.length, 15);
+  assert.equal(locatedStops.length, 15);
+  assert.deepEqual(locatedStops.map(stop => stop.order), Array.from({ length: 15 }, (_, index) => index + 1));
+});
+
 test('active route marks completed stops and the first remaining stop as current', () => {
   const stops = groupPackagesByStop([
     rawPackage('A', 1, -23.51, -46.61),
@@ -102,6 +124,82 @@ test('coordinate availability distinguishes complete, partial, and unavailable r
   assert.equal(getMapCoordinateState(complete), 'available');
   assert.equal(getMapCoordinateState(partial), 'partial');
   assert.equal(getMapCoordinateState(unavailable), 'unavailable');
+});
+
+test('normal valid coordinates remain unchanged', () => {
+  const [stop] = buildMapStops(route(groupPackagesByStop([
+    rawPackage('A', 1, -23.5505, -46.6333),
+  ])));
+
+  assert.equal(stop.latitude, -23.5505);
+  assert.equal(stop.longitude, -46.6333);
+  assert.equal(stop.coordinateStatus, 'valid');
+});
+
+test('invalid coordinate ranges are rejected', () => {
+  const [stop] = buildMapStops(route(groupPackagesByStop([
+    rawPackage('A', 1, 95, -46.6333),
+  ])));
+
+  assert.equal(stop.latitude, null);
+  assert.equal(stop.longitude, null);
+  assert.equal(stop.coordinateStatus, 'invalid');
+});
+
+test('a swapped route outlier is corrected when swapping makes it clearly closer', () => {
+  const stops = groupPackagesByStop([
+    rawPackage('A', 1, -23.5505, -46.6333),
+    rawPackage('B', 2, -23.5515, -46.6343),
+    rawPackage('C', 3, -23.5525, -46.6353),
+    rawPackage('D', 4, -46.6363, -23.5535),
+  ]);
+  const corrected = buildMapStops(route(stops));
+
+  assert.equal(corrected[3].latitude, -23.5535);
+  assert.equal(corrected[3].longitude, -46.6363);
+  assert.equal(corrected[3].coordinateStatus, 'corrected');
+  assert.equal(getLocatedMapStops(corrected).length, 4);
+});
+
+test('an unfixable extreme route outlier is excluded from markers but kept in the list', () => {
+  const stops = groupPackagesByStop([
+    rawPackage('A', 1, -23.5505, -46.6333),
+    rawPackage('B', 2, -23.5515, -46.6343),
+    rawPackage('C', 3, -23.5525, -46.6353),
+    rawPackage('D', 4, 0, 0),
+  ]);
+  const mapStops = buildMapStops(route(stops));
+  const summary = getMapCoordinateSummary(mapStops);
+
+  assert.equal(mapStops.length, 4);
+  assert.equal(mapStops[3].coordinateStatus, 'invalid');
+  assert.equal(mapStops[3].latitude, null);
+  assert.equal(mapStops[3].address, 'Rua Teste, 40');
+  assert.equal(getLocatedMapStops(mapStops).length, 3);
+  assert.deepEqual(summary, {
+    totalCount: 4,
+    displayedCount: 3,
+    correctedCount: 0,
+    invalidCount: 1,
+    missingCount: 0,
+  });
+});
+
+test('selecting a stop without coordinates keeps every route item and marker candidate stable', () => {
+  const mapStops = buildMapStops(route(groupPackagesByStop([
+    rawPackage('A', 1, -23.5505, -46.6333),
+    rawPackage('B', 2, -23.5515, -46.6343),
+    rawPackage('C', 3, null, null),
+  ])));
+  const markersBeforeSelection = getLocatedMapStops(mapStops);
+  const selected = mapStops.find(stop => stop.id === 'stop-3');
+  const markersAfterSelection = getLocatedMapStops(mapStops);
+
+  assert.equal(mapStops.length, 3);
+  assert.equal(selected?.address, 'Rua Teste, 30');
+  assert.equal(selected?.packageCount, 1);
+  assert.equal(selected?.coordinateStatus, 'missing');
+  assert.deepEqual(markersAfterSelection, markersBeforeSelection);
 });
 
 test('spreadsheet latitude and longitude are parsed safely, including zero', () => {

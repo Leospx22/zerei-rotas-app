@@ -8,39 +8,58 @@ interface RouteSequenceListProps {
   stops: MapStop[];
   selectedStopId: string | null;
   onSelectStop: (stopId: string) => void;
+  onNavigateStop?: (stop: MapStop) => void;
 }
 
 export default function RouteSequenceList({
   stops,
   selectedStopId,
   onSelectStop,
+  onNavigateStop,
 }: RouteSequenceListProps) {
   return (
     <View style={styles.container}>
       {stops.map(stop => (
-        <TouchableOpacity
+        <View
           key={stop.id}
           style={[styles.stopRow, selectedStopId === stop.id && styles.stopRowSelected]}
-          onPress={() => onSelectStop(stop.id)}
-          activeOpacity={0.78}
-          accessibilityRole="button"
-          accessibilityLabel={`Parada ${stop.order}: ${stop.address}`}
         >
-          <View style={[
-            styles.number,
-            stop.status === 'current' && styles.numberCurrent,
-            stop.status === 'completed' && styles.numberCompleted,
-          ]}>
-            <Text style={styles.numberText}>{stop.status === 'completed' ? '✓' : stop.order}</Text>
-          </View>
-          <View style={styles.stopCopy}>
-            <Text style={styles.address}>{stop.address}</Text>
-            <Text style={styles.meta}>
-              {stop.packageCount} {stop.packageCount === 1 ? 'pacote' : 'pacotes'} · {mapStopStatusLabel(stop.status)}
-            </Text>
-          </View>
-          <MapPin size={18} color={Colors.gold[400]} />
-        </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.selectArea}
+            onPress={() => onSelectStop(stop.id)}
+            activeOpacity={0.78}
+            accessibilityRole="button"
+            accessibilityLabel={`Parada ${stop.order}: ${stop.address}`}
+          >
+            <View style={[
+              styles.number,
+              stop.status === 'current' && styles.numberCurrent,
+              stop.status === 'completed' && styles.numberCompleted,
+            ]}>
+              <Text style={styles.numberText}>{stop.status === 'completed' ? '✓' : stop.order}</Text>
+            </View>
+            <View style={styles.stopCopy}>
+              <Text style={styles.address}>{stop.address}</Text>
+              <Text style={styles.meta}>
+                {stop.packageCount} {stop.packageCount === 1 ? 'pacote' : 'pacotes'} · {mapStopStatusLabel(stop.status)}
+                {stop.latitude === null || stop.longitude === null ? ' · Sem coordenadas' : ''}
+              </Text>
+            </View>
+          </TouchableOpacity>
+          {onNavigateStop ? (
+            <TouchableOpacity
+              style={styles.navigateAction}
+              onPress={() => onNavigateStop(stop)}
+              activeOpacity={0.72}
+              accessibilityRole="button"
+              accessibilityLabel={`Navegar até esta parada: ${stop.address}`}
+            >
+              <MapPin size={20} color={Colors.gold[400]} />
+            </TouchableOpacity>
+          ) : (
+            <MapPin size={18} color={Colors.gold[400]} />
+          )}
+        </View>
       ))}
     </View>
   );
@@ -60,6 +79,13 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.cardBg,
   },
   stopRowSelected: { borderColor: Colors.gold[500] },
+  selectArea: {
+    flex: 1,
+    minWidth: 0,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+  },
   number: {
     width: 34,
     height: 34,
@@ -74,4 +100,11 @@ const styles = StyleSheet.create({
   stopCopy: { flex: 1, gap: 3 },
   address: { color: Colors.white, fontSize: FontSizes.md, fontWeight: '700' },
   meta: { color: Colors.gray, fontSize: FontSizes.sm },
+  navigateAction: {
+    width: 44,
+    height: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: BorderRadius.full,
+  },
 });

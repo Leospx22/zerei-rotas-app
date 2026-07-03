@@ -1,23 +1,23 @@
-import React, { useEffect, useMemo, useRef } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import MapView, { Marker, Polyline } from 'react-native-maps';
 import { BorderRadius, Colors, FontSizes } from '@/constants/theme';
-import RouteSequenceList from '@/components/RouteSequenceList';
-import type { MapStop } from '@/lib/mapOverview';
+import { getLocatedMapStops, type MapStop } from '@/lib/mapOverview';
 
 interface RouteMapProps {
   stops: MapStop[];
   selectedStopId: string | null;
+  focusStopId: string | null;
   onSelectStop: (stopId: string) => void;
 }
 
-export default function RouteMap({ stops, selectedStopId, onSelectStop }: RouteMapProps) {
+export default function RouteMap({ stops, selectedStopId, focusStopId, onSelectStop }: RouteMapProps) {
   const mapRef = useRef<MapView>(null);
+  const [isMapReady, setIsMapReady] = useState(false);
+  const [isMapLaidOut, setIsMapLaidOut] = useState(false);
+  const [tracksMarkerChanges, setTracksMarkerChanges] = useState(true);
   const locatedStops = useMemo(
-    () => stops.filter(
-      (stop): stop is MapStop & { latitude: number; longitude: number } =>
-        stop.latitude !== null && stop.longitude !== null
-    ),
+    () => getLocatedMapStops(stops),
     [stops]
   );
   const coordinates = useMemo(
@@ -26,23 +26,39 @@ export default function RouteMap({ stops, selectedStopId, onSelectStop }: RouteM
   );
 
   useEffect(() => {
-    if (coordinates.length === 0) return;
+    if (!isMapReady || !isMapLaidOut || coordinates.length === 0) return;
     const timer = setTimeout(() => {
       mapRef.current?.fitToCoordinates(coordinates, {
         edgePadding: { top: 48, right: 48, bottom: 48, left: 48 },
         animated: false,
       });
-    }, 250);
+    }, 100);
     return () => clearTimeout(timer);
-  }, [coordinates]);
+  }, [coordinates, isMapLaidOut, isMapReady]);
+
+  useEffect(() => {
+    setTracksMarkerChanges(true);
+    const timer = setTimeout(() => setTracksMarkerChanges(false), 1000);
+    return () => clearTimeout(timer);
+  }, [selectedStopId, stops]);
+
+  useEffect(() => {
+    if (!isMapReady || !focusStopId) return;
+    const stop = locatedStops.find(candidate => candidate.id === focusStopId);
+    if (!stop) return;
+    mapRef.current?.animateToRegion({
+      latitude: stop.latitude,
+      longitude: stop.longitude,
+      latitudeDelta: 0.02,
+      longitudeDelta: 0.02,
+    }, 300);
+  }, [focusStopId, isMapReady, locatedStops]);
 
   if (locatedStops.length === 0) {
     return (
-      <RouteSequenceList
-        stops={stops}
-        selectedStopId={selectedStopId}
-        onSelectStop={onSelectStop}
-      />
+      <View style={styles.unavailable}>
+        <Text style={styles.unavailableText}>Nenhuma parada com coordenadas válidas.</Text>
+      </View>
     );
   }
 
@@ -59,6 +75,8 @@ export default function RouteMap({ stops, selectedStopId, onSelectStop }: RouteM
         longitudeDelta: 0.08,
       }}
       toolbarEnabled={false}
+      onMapReady={() => setIsMapReady(true)}
+      onLayout={() => setIsMapLaidOut(true)}
     >
       {coordinates.length > 1 ? (
         <Polyline coordinates={coordinates} strokeColor={Colors.gold[500]} strokeWidth={3} />
@@ -72,7 +90,7 @@ export default function RouteMap({ stops, selectedStopId, onSelectStop }: RouteM
             key={stop.id}
             coordinate={{ latitude: stop.latitude, longitude: stop.longitude }}
             onPress={() => onSelectStop(stop.id)}
-            tracksViewChanges={selected}
+            tracksViewChanges={tracksMarkerChanges}
             accessibilityLabel={`Parada ${stop.order}: ${stop.address}`}
           >
             <View style={[
@@ -92,6 +110,14 @@ export default function RouteMap({ stops, selectedStopId, onSelectStop }: RouteM
 
 const styles = StyleSheet.create({
   map: { width: '100%', height: 390, borderRadius: BorderRadius.lg },
+  unavailable: {
+    minHeight: 160,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: BorderRadius.lg,
+    backgroundColor: Colors.cardBg,
+  },
+  unavailableText: { color: Colors.gray, fontSize: FontSizes.md },
   marker: {
     minWidth: 34,
     height: 34,

@@ -35,6 +35,8 @@ import { AppButton, AppCard, AppText } from '@/components/ui';
 import { useRoute } from '@/contexts/RouteContext';
 import { getPrimaryExecutionAddress } from '@/lib/executionPresentation';
 import { buildGoogleMapsSearchUrl } from '@/lib/mapNavigation';
+import { useMapStops } from '@/hooks/useMapStops';
+import { mapStopStatusLabel } from '@/lib/mapOverview';
 import {
   moveRouteStop,
   moveRouteStopToIndex,
@@ -57,6 +59,7 @@ export default function DeliveryPreparationScreen() {
   const [targetPosition, setTargetPosition] = useState('');
   const [moveError, setMoveError] = useState<string | null>(null);
   const cameFromImportSummary = from === 'import-summary';
+  const reviewMapStops = useMapStops(currentRoute);
 
   if (!currentRoute) {
     return (
@@ -270,19 +273,41 @@ export default function DeliveryPreparationScreen() {
         const mainAddress = getPrimaryExecutionAddress(stop);
         const isFirstStop = index === 0;
         const isLastStop = index === currentRoute.stops.length - 1;
+        const mapStop = reviewMapStops[index];
+        const isCompleted = mapStop?.status === 'completed';
+        const isCurrent = mapStop?.status === 'current';
 
         return (
-          <View key={stop.id} style={styles.stopCard}>
+          <View
+            key={stop.id}
+            style={[
+              styles.stopCard,
+              isCurrent && styles.stopCardCurrent,
+              isCompleted && styles.stopCardCompleted,
+            ]}
+          >
             <TouchableOpacity
               style={styles.stopHeader}
               onPress={() => toggleExpand(stop.id)}
               activeOpacity={0.7}
             >
               <View style={styles.stopNumberWrap}>
-                <View style={styles.stopNumberCircle}>
-                  <Text style={styles.stopNumberText}>#{index + 1}</Text>
+                <View style={[
+                  styles.stopNumberCircle,
+                  isCurrent && styles.stopNumberCircleCurrent,
+                  isCompleted && styles.stopNumberCircleCompleted,
+                ]}>
+                  <Text style={styles.stopNumberText}>
+                    {isCompleted ? '✓' : `#${index + 1}`}
+                  </Text>
                 </View>
-                <Text style={styles.stopLabel}>Parada</Text>
+                <Text style={[
+                  styles.stopLabel,
+                  isCurrent && styles.stopLabelCurrent,
+                  isCompleted && styles.stopLabelCompleted,
+                ]}>
+                  {mapStop ? mapStopStatusLabel(mapStop.status) : 'Planejada'}
+                </Text>
                 {stop.optimizedOrderIndex !== undefined && stop.optimizedOrderIndex !== null && (
                   <View style={styles.optimizedBadge}>
                     <Text style={styles.optimizedBadgeText}>#{stop.optimizedOrderIndex}</Text>
@@ -307,6 +332,20 @@ export default function DeliveryPreparationScreen() {
                       {stop.addressCount} {stop.addressCount === 1 ? 'endereço' : 'endereços'}
                     </Text>
                   </View>
+                  {mapStop && mapStop.deliveredCount > 0 ? (
+                    <View style={[styles.metaBadge, styles.metaBadgeDelivered]}>
+                      <CheckCircle2 size={11} color={Colors.success} />
+                      <Text style={[styles.metaBadgeText, { color: Colors.success }]}>
+                        {mapStop.deliveredCount} {mapStop.deliveredCount === 1 ? 'entregue' : 'entregues'}
+                      </Text>
+                    </View>
+                  ) : null}
+                  {mapStop && (mapStop.latitude === null || mapStop.longitude === null) ? (
+                    <View style={[styles.metaBadge, styles.metaBadgeWarn]}>
+                      <AlertTriangle size={11} color={Colors.warning} />
+                      <Text style={[styles.metaBadgeText, { color: Colors.warning }]}>Sem coordenadas</Text>
+                    </View>
+                  ) : null}
                   {stop.duplicateAddressWarning && (
                     <View style={[styles.metaBadge, styles.metaBadgeWarn]}>
                       <AlertTriangle size={11} color={Colors.warning} />
@@ -560,15 +599,21 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.cardBg, borderWidth: 1, borderColor: Colors.cardBorder,
     borderRadius: BorderRadius.md, marginBottom: Spacing.sm, overflow: 'hidden',
   },
+  stopCardCurrent: { borderColor: Colors.gold[500] },
+  stopCardCompleted: { borderColor: Colors.darkGray, backgroundColor: Colors.overlay },
   stopHeader: { flexDirection: 'row', alignItems: 'center', padding: Spacing.md, gap: Spacing.md },
   stopNumberWrap: { alignItems: 'center', gap: 3 },
   stopNumberCircle: {
-    width: 40, height: 40, borderRadius: 20, backgroundColor: Colors.primary[500],
+    width: 40, height: 40, borderRadius: 20, backgroundColor: Colors.gold[600],
     alignItems: 'center', justifyContent: 'center',
     borderWidth: 1, borderColor: 'rgba(212,160,23,0.3)',
   },
-  stopNumberText: { fontSize: FontSizes.lg, fontWeight: '900', color: Colors.gold[400] },
+  stopNumberCircleCurrent: { backgroundColor: Colors.gold[400], borderColor: Colors.white, borderWidth: 2 },
+  stopNumberCircleCompleted: { backgroundColor: Colors.darkGray, borderColor: Colors.gray },
+  stopNumberText: { fontSize: FontSizes.lg, fontWeight: '900', color: Colors.white },
   stopLabel: { fontSize: FontSizes.xs, color: Colors.gray, fontWeight: '500' },
+  stopLabelCurrent: { color: Colors.gold[400], fontWeight: '800' },
+  stopLabelCompleted: { color: Colors.gray, fontWeight: '700' },
   optimizedBadge: {
     marginTop: 2, paddingHorizontal: 5, paddingVertical: 2,
     backgroundColor: 'rgba(34,197,94,0.15)', borderRadius: 4,
@@ -585,6 +630,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 6, paddingVertical: 2, gap: 3,
   },
   metaBadgeWarn: { backgroundColor: Colors.warningBg, borderWidth: 1, borderColor: Colors.warningBorder },
+  metaBadgeDelivered: { backgroundColor: Colors.successBg, borderWidth: 1, borderColor: Colors.successBorder },
   metaBadgeText: { fontSize: FontSizes.xs, fontWeight: '600', color: Colors.gold[400] },
 
   expandControl: { alignItems: 'center', gap: 2 },

@@ -206,12 +206,21 @@ export function parseSpreadsheetData(rows: any[][], headers: string[]): RawPacka
       : '';
     const stopNum = rawStop !== '' ? parseInt(rawStop, 10) || null : null;
 
+    const parseCoordinate = (value: unknown, minimum: number, maximum: number) => {
+      const parsed = Number.parseFloat(String(value ?? '').replace(',', '.'));
+      return Number.isFinite(parsed) && parsed >= minimum && parsed <= maximum ? parsed : null;
+    };
+
     packages.push({
       trackingNumber: finalTracking,
       destinationAddress: address,
       zipCode: mapping.zipCode !== null ? String(row[mapping.zipCode] ?? '').trim() : '',
-      latitude: mapping.latitude !== null ? parseFloat(String(row[mapping.latitude])) || null : null,
-      longitude: mapping.longitude !== null ? parseFloat(String(row[mapping.longitude])) || null : null,
+      latitude: mapping.latitude !== null
+        ? parseCoordinate(row[mapping.latitude], -90, 90)
+        : null,
+      longitude: mapping.longitude !== null
+        ? parseCoordinate(row[mapping.longitude], -180, 180)
+        : null,
       stopNumber: stopNum,
     });
   }
@@ -287,6 +296,9 @@ export function groupPackagesByStop(rawPackages: RawPackage[]): GroupedStop[] {
   sortedKeys.forEach((stopNum, orderIndex) => {
     const rawPkgs = stopMap.get(stopNum)!;
     const first = rawPkgs[0];
+    const coordinateSource = rawPkgs.find(
+      pkg => pkg.latitude !== null && pkg.longitude !== null
+    ) ?? first;
     const normalizedAddr = normalizeAddress(first.destinationAddress);
     const houseNum = extractHouseNumber(first.destinationAddress);
 
@@ -317,8 +329,8 @@ export function groupPackagesByStop(rawPackages: RawPackage[]): GroupedStop[] {
       normalizedAddress: normalizedAddr,
       originalAddress: first.destinationAddress,
       zipCode: first.zipCode,
-      latitude: first.latitude,
-      longitude: first.longitude,
+      latitude: coordinateSource.latitude,
+      longitude: coordinateSource.longitude,
       packages,
       packageCount: packages.length,
       addressGroups,

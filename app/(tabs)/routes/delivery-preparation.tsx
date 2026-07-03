@@ -217,6 +217,12 @@ export default function DeliveryPreparationScreen() {
 
       <View style={styles.secondaryActions}>
         <AppButton
+          label="Mostrar no mapa"
+          variant="secondary"
+          leftIcon={<MapPin size={19} color={Colors.gold[400]} />}
+          onPress={() => router.push('./map-overview')}
+        />
+        <AppButton
           label={isEditing ? 'Fechar edição' : 'Editar rota'}
           variant="secondary"
           leftIcon={<Pencil size={19} color={Colors.gold[400]} />}

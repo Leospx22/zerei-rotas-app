@@ -10,6 +10,7 @@ export default function RoutesStackLayout() {
       <Stack.Screen name="route-organizer" />
       <Stack.Screen name="route-execution" />
       <Stack.Screen name="route-completed" />
+      <Stack.Screen name="map-overview" />
     </Stack>
   );
 }

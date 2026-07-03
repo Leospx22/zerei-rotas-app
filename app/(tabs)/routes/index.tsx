@@ -9,7 +9,7 @@ import {
   TextInput,
   Pressable,
 } from 'react-native';
-import { useRouter, useFocusEffect } from 'expo-router';
+import { useRouter, useFocusEffect, type Href } from 'expo-router';
 import {
   MapPin,
   Crown,
@@ -308,6 +308,19 @@ export default function RoutesScreen() {
                   </TouchableOpacity>
                 </View>
               ) : null}
+
+              {route.isCurrentRoute ? (
+                <TouchableOpacity
+                  style={[styles.routeActionButton, styles.mapActionButton]}
+                  onPress={() => router.push('/(tabs)/routes/map-overview' as Href)}
+                  activeOpacity={0.78}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Mostrar ${route.name} no mapa`}
+                >
+                  <MapPin size={15} color={Colors.primary[200]} />
+                  <Text style={styles.mapActionText}>Mapa</Text>
+                </TouchableOpacity>
+              ) : null}
             </View>
           ))
         )}
@@ -530,6 +543,15 @@ const styles = StyleSheet.create({
     fontSize: FontSizes.sm,
     fontWeight: '900',
     color: Colors.primary[900],
+  },
+  mapActionButton: {
+    borderColor: Colors.primary[400],
+    backgroundColor: Colors.primary[800],
+  },
+  mapActionText: {
+    fontSize: FontSizes.sm,
+    fontWeight: '800',
+    color: Colors.primary[200],
   },
 
   // Modals

@@ -18,6 +18,7 @@ export interface OccurrenceRecord {
   stopNumber?: number;
   occurrenceResolution?: OccurrenceResolution;
   occurrenceResolvedAt?: string;
+  occurrenceUpdatedAt?: string;
 }
 
 export interface OccurrenceHistorySource {
@@ -90,6 +91,7 @@ export function collectRouteOccurrenceRecords(route: RouteData | null): Occurren
         stopNumber: stop.stopNumber,
         occurrenceResolution: packageItem.occurrenceResolution,
         occurrenceResolvedAt: packageItem.occurrenceResolvedAt,
+        occurrenceUpdatedAt: packageItem.occurrenceUpdatedAt,
       }))
   );
 }
@@ -134,6 +136,29 @@ export function occurrenceReasonLabel(reason?: string): string {
 
 export function occurrenceResolutionLabel(resolution: OccurrenceResolution): string {
   return resolution === 'delivered' ? 'Entregue' : 'Devolvido ao Hub';
+}
+
+export function getOccurrenceDisplayTimestamps(record: OccurrenceRecord): {
+  registeredAt?: string;
+  updatedAt?: string;
+} {
+  return {
+    registeredAt: record.registeredAt,
+    updatedAt: record.occurrenceUpdatedAt ?? record.occurrenceResolvedAt,
+  };
+}
+
+export function formatOccurrenceDateTime(value?: string): string | null {
+  if (!value) return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  return date.toLocaleString('pt-BR', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
 }
 
 export function partitionOccurrenceRecords<T extends OccurrenceRecord>(
@@ -182,6 +207,7 @@ export function resolvePackageOccurrenceInStops(
             status: resolution === 'delivered' ? 'delivered' as const : 'skipped' as const,
             occurrenceResolution: resolution,
             occurrenceResolvedAt: resolvedAt,
+            occurrenceUpdatedAt: resolvedAt,
           }
         : packageItem
     );
@@ -207,6 +233,7 @@ export function resolveOccurrenceRecord(
     ...record,
     occurrenceResolution: resolution,
     occurrenceResolvedAt: resolvedAt,
+    occurrenceUpdatedAt: resolvedAt,
   };
 }
 
@@ -214,7 +241,8 @@ export function editPackageOccurrenceInStops(
   stops: readonly GroupedStop[],
   packageId: string,
   reason: string,
-  resolution?: OccurrenceResolution
+  resolution?: OccurrenceResolution,
+  updatedAt = new Date().toISOString()
 ): GroupedStop[] {
   return stops.map(stop => {
     const target = stop.packages.find(packageItem => packageItem.id === packageId);
@@ -235,6 +263,7 @@ export function editPackageOccurrenceInStops(
             status: nextResolution === 'delivered' ? 'delivered' as const : 'skipped' as const,
             occurrenceReason: reason.trim() ? reason : packageItem.occurrenceReason,
             occurrenceResolution: nextResolution,
+            occurrenceUpdatedAt: updatedAt,
           }
         : packageItem
     );
@@ -250,10 +279,46 @@ export function editPackageOccurrenceInStops(
   });
 }
 
+export function deletePackageOccurrenceInStops(
+  stops: readonly GroupedStop[],
+  packageId: string
+): GroupedStop[] {
+  return stops.map(stop => {
+    const hasTarget = stop.packages.some(packageItem => packageItem.id === packageId);
+    if (!hasTarget) return stop;
+
+    const packages = stop.packages.map(packageItem => {
+      if (packageItem.id !== packageId) return packageItem;
+      const {
+        occurrenceReason: _occurrenceReason,
+        occurrenceRegisteredAt: _occurrenceRegisteredAt,
+        occurrenceResolution: _occurrenceResolution,
+        occurrenceResolvedAt: _occurrenceResolvedAt,
+        occurrenceUpdatedAt: _occurrenceUpdatedAt,
+        ...packageWithoutOccurrence
+      } = packageItem;
+      return {
+        ...packageWithoutOccurrence,
+        status: packageItem.status === 'delivered' ? 'delivered' as const : 'pending' as const,
+      };
+    });
+    const allHandled = packages.every(
+      packageItem => packageItem.status === 'delivered' || packageItem.status === 'skipped'
+    );
+    return {
+      ...stop,
+      packages,
+      status: allHandled ? 'completed' : 'pending',
+      packageCount: packages.length,
+    };
+  });
+}
+
 export function editOccurrenceRecord(
   record: OccurrenceRecord,
   reason: string,
-  resolution?: OccurrenceResolution
+  resolution?: OccurrenceResolution,
+  updatedAt = new Date().toISOString()
 ): OccurrenceRecord {
   const nextResolution = record.occurrenceResolution
     ? resolution ?? record.occurrenceResolution
@@ -262,6 +327,7 @@ export function editOccurrenceRecord(
     ...record,
     reason: reason.trim() ? reason : record.reason,
     occurrenceResolution: nextResolution,
+    occurrenceUpdatedAt: updatedAt,
   };
 }
 

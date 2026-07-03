@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -31,7 +31,6 @@ import {
   type RouteDisplayStatus,
 } from '@/lib/routePresentation';
 import {
-  collectAllOccurrenceRecords,
   collectRouteOccurrenceRecords,
   partitionOccurrenceRecords,
   type OccurrenceRecord,
@@ -67,13 +66,6 @@ export default function RoutesScreen() {
   const [editName, setEditName] = useState('');
   const editNameRef = useRef('');
   const [deleteTarget, setDeleteTarget] = useState<RouteItem | null>(null);
-  const occurrenceSummary = useMemo(
-    () => partitionOccurrenceRecords(
-      collectAllOccurrenceRecords(currentRoute, routeHistory)
-    ),
-    [currentRoute, routeHistory]
-  );
-
   const loadRoutes = useCallback(async () => {
     await reloadHistory();
     const items: RouteItem[] = [];
@@ -181,41 +173,6 @@ export default function RoutesScreen() {
           <Text style={styles.pageTitle}>Minhas Rotas</Text>
         </View>
 
-        <View style={styles.occurrenceSummaryCard}>
-          <View style={styles.occurrenceSummaryHeader}>
-            <AlertCircle size={20} color={Colors.error} />
-            <Text style={styles.occurrenceSummaryTitle}>Ocorrências</Text>
-          </View>
-          {occurrenceSummary.pending.length === 0 &&
-          occurrenceSummary.resolvedRecently.length === 0 ? (
-            <Text style={styles.occurrenceSummaryEmpty}>Nenhuma ocorrência pendente</Text>
-          ) : (
-            <View style={styles.occurrenceSummaryCounts}>
-              <Text style={styles.occurrencePendingText}>
-                {occurrenceSummary.pending.length}{' '}
-                {occurrenceSummary.pending.length === 1 ? 'pendente' : 'pendentes'}
-              </Text>
-              {occurrenceSummary.resolvedRecently.length > 0 ? (
-                <Text style={styles.occurrenceResolvedText}>
-                  {occurrenceSummary.resolvedRecently.length}{' '}
-                  {occurrenceSummary.resolvedRecently.length === 1
-                    ? 'resolvida recentemente'
-                    : 'resolvidas recentemente'}
-                </Text>
-              ) : null}
-            </View>
-          )}
-          <TouchableOpacity
-            style={styles.occurrenceSummaryAction}
-            onPress={() => router.push('/(tabs)/routes/occurrences')}
-            activeOpacity={0.78}
-            accessibilityRole="button"
-            accessibilityLabel="Ver ocorrências"
-          >
-            <Text style={styles.occurrenceSummaryActionText}>Ver ocorrências</Text>
-          </TouchableOpacity>
-        </View>
-
         {routes.length === 0 ? (
           <View style={styles.emptyState}>
             <MapPin size={48} color={Colors.cardBorder} />
@@ -288,7 +245,7 @@ export default function RoutesScreen() {
                   </View>
                   <TouchableOpacity
                     style={styles.occurrenceAction}
-                    onPress={() => router.push('/(tabs)/routes/occurrences')}
+                    onPress={() => router.push('/(tabs)/occurrences')}
                     activeOpacity={0.78}
                     accessibilityRole="button"
                     accessibilityLabel={`Ver ocorrências de ${route.name}`}
@@ -440,40 +397,6 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: Colors.white,
   },
-
-  occurrenceSummaryCard: {
-    gap: Spacing.sm,
-    padding: Spacing.md,
-    marginBottom: Spacing.xl,
-    borderRadius: BorderRadius.md,
-    borderWidth: 1,
-    borderColor: Colors.errorBorder,
-    backgroundColor: Colors.cardBg,
-  },
-  occurrenceSummaryHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.sm,
-  },
-  occurrenceSummaryTitle: {
-    fontSize: FontSizes.lg,
-    fontWeight: '800',
-    color: Colors.white,
-  },
-  occurrenceSummaryCounts: { gap: 4 },
-  occurrenceSummaryEmpty: { color: Colors.gray, fontSize: FontSizes.md },
-  occurrencePendingText: { color: Colors.error, fontSize: FontSizes.md, fontWeight: '800' },
-  occurrenceResolvedText: { color: Colors.success, fontSize: FontSizes.sm, fontWeight: '700' },
-  occurrenceSummaryAction: {
-    minHeight: 42,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: BorderRadius.sm,
-    borderWidth: 1,
-    borderColor: Colors.errorBorder,
-    backgroundColor: Colors.errorBg,
-  },
-  occurrenceSummaryActionText: { color: Colors.error, fontSize: FontSizes.md, fontWeight: '800' },
 
   emptyState: {
     alignItems: 'center',

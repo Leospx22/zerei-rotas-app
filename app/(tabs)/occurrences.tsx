@@ -10,11 +10,21 @@ import {
   View,
 } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { AlertCircle, ArrowLeft, CheckCircle2, MapPin, Package, Pencil } from 'lucide-react-native';
+import {
+  AlertCircle,
+  ArrowLeft,
+  CheckCircle2,
+  MapPin,
+  Package,
+  Pencil,
+  Trash2,
+} from 'lucide-react-native';
 import { useRoute } from '@/contexts/RouteContext';
 import { usePersistence } from '@/hooks/usePersistence';
 import {
   collectAllOccurrenceRecords,
+  formatOccurrenceDateTime,
+  getOccurrenceDisplayTimestamps,
   hasOccurrenceEditChanges,
   occurrenceReasonLabel,
   occurrenceResolutionLabel,
@@ -33,28 +43,17 @@ const OCCURRENCE_REASONS = [
   'Outro',
 ] as const;
 
-function formatDateTime(value?: string): string | null {
-  if (!value) return null;
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return null;
-  return date.toLocaleString('pt-BR', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-}
-
 interface OccurrenceCardProps {
   record: CollectedOccurrenceRecord;
   onResolve?: (record: CollectedOccurrenceRecord, resolution: OccurrenceResolution) => void;
   onEdit: (record: CollectedOccurrenceRecord) => void;
+  onDelete: (record: CollectedOccurrenceRecord) => void;
 }
 
-function OccurrenceCard({ record, onResolve, onEdit }: OccurrenceCardProps) {
-  const registeredAt = formatDateTime(record.registeredAt);
-  const resolvedAt = formatDateTime(record.occurrenceResolvedAt);
+function OccurrenceCard({ record, onResolve, onEdit, onDelete }: OccurrenceCardProps) {
+  const timestamps = getOccurrenceDisplayTimestamps(record);
+  const registeredAt = formatOccurrenceDateTime(timestamps.registeredAt) ?? 'Não informado';
+  const updatedAt = formatOccurrenceDateTime(timestamps.updatedAt);
   const isResolved = Boolean(record.occurrenceResolution);
 
   return (
@@ -93,10 +92,15 @@ function OccurrenceCard({ record, onResolve, onEdit }: OccurrenceCardProps) {
         </Text>
       </View>
 
-      {registeredAt ? (
+      <View>
+        <Text style={styles.label}>Registrado em</Text>
+        <Text style={styles.value}>{registeredAt}</Text>
+      </View>
+
+      {updatedAt ? (
         <View>
-          <Text style={styles.label}>Registrado em</Text>
-          <Text style={styles.value}>{registeredAt}</Text>
+          <Text style={styles.label}>Atualizado em</Text>
+          <Text style={styles.value}>{updatedAt}</Text>
         </View>
       ) : null}
 
@@ -111,12 +115,6 @@ function OccurrenceCard({ record, onResolve, onEdit }: OccurrenceCardProps) {
               </Text>
             </View>
           </View>
-          {resolvedAt ? (
-            <View>
-              <Text style={styles.label}>Resolvido em</Text>
-              <Text style={styles.value}>{resolvedAt}</Text>
-            </View>
-          ) : null}
         </View>
       ) : onResolve ? (
         <View style={styles.actions}>
@@ -148,20 +146,42 @@ function OccurrenceCard({ record, onResolve, onEdit }: OccurrenceCardProps) {
             <Pencil size={15} color={Colors.gold[400]} />
             <Text style={styles.editButtonText}>Editar</Text>
           </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.actionButton, styles.deleteActionButton]}
+            onPress={() => onDelete(record)}
+            activeOpacity={0.78}
+            accessibilityRole="button"
+            accessibilityLabel={`Excluir ocorrência de ${record.packageCode ?? record.packageId}`}
+          >
+            <Trash2 size={15} color={Colors.error} />
+            <Text style={styles.deleteButtonText}>Excluir ocorrência</Text>
+          </TouchableOpacity>
         </View>
       ) : null}
 
       {isResolved ? (
-        <TouchableOpacity
-          style={styles.editButton}
-          onPress={() => onEdit(record)}
-          activeOpacity={0.78}
-          accessibilityRole="button"
-          accessibilityLabel={`Editar ocorrência de ${record.packageCode ?? record.packageId}`}
-        >
-          <Pencil size={15} color={Colors.gold[400]} />
-          <Text style={styles.editButtonText}>Editar</Text>
-        </TouchableOpacity>
+        <View style={styles.resolvedActions}>
+          <TouchableOpacity
+            style={styles.editButton}
+            onPress={() => onEdit(record)}
+            activeOpacity={0.78}
+            accessibilityRole="button"
+            accessibilityLabel={`Editar ocorrência de ${record.packageCode ?? record.packageId}`}
+          >
+            <Pencil size={15} color={Colors.gold[400]} />
+            <Text style={styles.editButtonText}>Editar</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.deleteButton}
+            onPress={() => onDelete(record)}
+            activeOpacity={0.78}
+            accessibilityRole="button"
+            accessibilityLabel={`Excluir ocorrência de ${record.packageCode ?? record.packageId}`}
+          >
+            <Trash2 size={15} color={Colors.error} />
+            <Text style={styles.deleteButtonText}>Excluir ocorrência</Text>
+          </TouchableOpacity>
+        </View>
       ) : null}
     </View>
   );
@@ -175,8 +195,13 @@ export default function OccurrencesScreen() {
     reloadHistory,
     resolvePackageOccurrence,
     editPackageOccurrence,
+    deletePackageOccurrence,
   } = useRoute();
-  const { resolveHistoryOccurrence, editHistoryOccurrence } = usePersistence();
+  const {
+    resolveHistoryOccurrence,
+    editHistoryOccurrence,
+    deleteHistoryOccurrence,
+  } = usePersistence();
   const [resolutionRequest, setResolutionRequest] = useState<{
     record: CollectedOccurrenceRecord;
     resolution: OccurrenceResolution;
@@ -186,6 +211,8 @@ export default function OccurrencesScreen() {
   const [editReason, setEditReason] = useState('');
   const [editResolution, setEditResolution] = useState<OccurrenceResolution | undefined>();
   const [isSavingEdit, setIsSavingEdit] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<CollectedOccurrenceRecord | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
   const occurrenceRecords = useMemo(
     () => collectAllOccurrenceRecords(currentRoute, routeHistory),
     [currentRoute, routeHistory]
@@ -307,6 +334,41 @@ export default function OccurrencesScreen() {
     reloadHistory,
   ]);
 
+  const confirmDelete = useCallback(async () => {
+    if (!deleteTarget || isDeleting) return;
+    setIsDeleting(true);
+    try {
+      if (deleteTarget.source === 'current') {
+        deletePackageOccurrence(deleteTarget.packageId);
+        setDeleteTarget(null);
+        return;
+      }
+      if (!deleteTarget.historyCompletedAt) {
+        Alert.alert('Não foi possível excluir a ocorrência.');
+        return;
+      }
+      const deleted = await deleteHistoryOccurrence(
+        deleteTarget.routeId,
+        deleteTarget.historyCompletedAt,
+        deleteTarget.packageId
+      );
+      if (!deleted) {
+        Alert.alert('Não foi possível excluir a ocorrência.');
+        return;
+      }
+      await reloadHistory();
+      setDeleteTarget(null);
+    } finally {
+      setIsDeleting(false);
+    }
+  }, [
+    deleteHistoryOccurrence,
+    deletePackageOccurrence,
+    deleteTarget,
+    isDeleting,
+    reloadHistory,
+  ]);
+
   return (
     <>
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
@@ -359,6 +421,7 @@ export default function OccurrencesScreen() {
                 record={record}
                 onResolve={requestResolution}
                 onEdit={openEdit}
+                onDelete={setDeleteTarget}
               />
             ))
           )}
@@ -371,6 +434,7 @@ export default function OccurrencesScreen() {
                   key={`resolved-${record.routeId}-${record.packageId}`}
                   record={record}
                   onEdit={openEdit}
+                  onDelete={setDeleteTarget}
                 />
               ))}
             </>
@@ -414,6 +478,47 @@ export default function OccurrencesScreen() {
               >
                 <Text style={styles.modalConfirmText}>
                   {isResolving ? 'Salvando...' : 'Confirmar'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+      <Modal
+        visible={deleteTarget !== null}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setDeleteTarget(null)}
+      >
+        <View style={styles.modalRoot}>
+          <Pressable
+            style={styles.modalBackdrop}
+            onPress={() => setDeleteTarget(null)}
+            accessibilityRole="button"
+            accessibilityLabel="Cancelar"
+          />
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>Excluir esta ocorrência?</Text>
+            <Text style={styles.modalMessage}>
+              Esta ação removerá o registro desta ocorrência.
+            </Text>
+            <View style={styles.modalActions}>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.modalCancelButton]}
+                onPress={() => setDeleteTarget(null)}
+                disabled={isDeleting}
+                accessibilityRole="button"
+              >
+                <Text style={styles.modalCancelText}>Cancelar</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.modalDeleteButton]}
+                onPress={confirmDelete}
+                disabled={isDeleting}
+                accessibilityRole="button"
+              >
+                <Text style={styles.modalDeleteText}>
+                  {isDeleting ? 'Excluindo...' : 'Excluir'}
                 </Text>
               </TouchableOpacity>
             </View>
@@ -617,6 +722,7 @@ const styles = StyleSheet.create({
   returnedButton: { borderColor: Colors.warningBorder, backgroundColor: Colors.warningBg },
   returnedButtonText: { color: Colors.warning, fontSize: FontSizes.md, fontWeight: '800' },
   editActionButton: { borderColor: Colors.gold[700], backgroundColor: Colors.overlay },
+  deleteActionButton: { borderColor: Colors.errorBorder, backgroundColor: Colors.errorBg },
   resolutionBox: {
     gap: Spacing.sm,
     padding: Spacing.sm,
@@ -627,6 +733,7 @@ const styles = StyleSheet.create({
   },
   resolutionHeader: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
   resolutionText: { color: Colors.success, fontSize: FontSizes.md, fontWeight: '800' },
+  resolvedActions: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'flex-end', gap: Spacing.sm },
   editButton: {
     minHeight: 40,
     alignSelf: 'flex-end',
@@ -641,6 +748,19 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.overlay,
   },
   editButtonText: { color: Colors.gold[400], fontSize: FontSizes.sm, fontWeight: '800' },
+  deleteButton: {
+    minHeight: 40,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: Spacing.xs,
+    paddingHorizontal: Spacing.md,
+    borderRadius: BorderRadius.sm,
+    borderWidth: 1,
+    borderColor: Colors.errorBorder,
+    backgroundColor: Colors.errorBg,
+  },
+  deleteButtonText: { color: Colors.error, fontSize: FontSizes.sm, fontWeight: '800' },
   modalRoot: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: Spacing.lg },
   modalBackdrop: {
     ...StyleSheet.absoluteFillObject,
@@ -668,6 +788,7 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.cardBg,
   },
   modalTitle: { color: Colors.white, fontSize: FontSizes.xl, fontWeight: '800' },
+  modalMessage: { color: Colors.gray, fontSize: FontSizes.md, lineHeight: 20 },
   fieldLabel: { color: Colors.white, fontSize: FontSizes.md, fontWeight: '800' },
   optionGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm },
   optionChip: {
@@ -695,6 +816,8 @@ const styles = StyleSheet.create({
   modalCancelButton: { borderColor: Colors.cardBorder, backgroundColor: Colors.background },
   modalCancelText: { color: Colors.gray, fontSize: FontSizes.md, fontWeight: '800' },
   modalConfirmButton: { borderColor: Colors.gold[700], backgroundColor: Colors.gold[500] },
+  modalDeleteButton: { borderColor: Colors.errorBorder, backgroundColor: Colors.errorBg },
   modalButtonDisabled: { opacity: 0.45 },
   modalConfirmText: { color: Colors.primary[900], fontSize: FontSizes.md, fontWeight: '900' },
+  modalDeleteText: { color: Colors.error, fontSize: FontSizes.md, fontWeight: '900' },
 });

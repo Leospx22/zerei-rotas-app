@@ -78,6 +78,8 @@ export async function saveCompletedRouteToHistory(storage: RouteStorage, route: 
         record.occurrenceResolution ?? previous?.occurrenceResolution,
       occurrenceResolvedAt:
         record.occurrenceResolvedAt ?? previous?.occurrenceResolvedAt,
+      occurrenceUpdatedAt:
+        record.occurrenceUpdatedAt ?? previous?.occurrenceUpdatedAt,
     };
   });
   const entry: HistoryEntry = {
@@ -145,7 +147,8 @@ export async function editHistoryOccurrenceInStorage(
   completedAt: string,
   packageId: string,
   reason: string,
-  resolution?: OccurrenceResolution
+  resolution?: OccurrenceResolution,
+  updatedAt = new Date().toISOString()
 ): Promise<boolean> {
   const history = await loadHistoryFromStorage(storage);
   const routeIndex = history.findIndex(
@@ -158,7 +161,7 @@ export async function editHistoryOccurrenceInStorage(
   const target = occurrences.find(record => record.packageId === packageId);
   if (!target) return false;
 
-  const edited = editOccurrenceRecord(target, reason, resolution);
+  const edited = editOccurrenceRecord(target, reason, resolution, updatedAt);
   const deliveredDelta =
     Number(edited.occurrenceResolution === 'delivered') -
     Number(target.occurrenceResolution === 'delivered');
@@ -174,6 +177,31 @@ export async function editHistoryOccurrenceInStorage(
     occurrences: occurrences.map(record =>
       record.packageId === packageId ? edited : record
     ),
+  };
+  await writeJSON(storage, KEY_HISTORY, history);
+  return true;
+}
+
+export async function deleteHistoryOccurrenceInStorage(
+  storage: RouteStorage,
+  routeId: string,
+  completedAt: string,
+  packageId: string
+): Promise<boolean> {
+  const history = await loadHistoryFromStorage(storage);
+  const routeIndex = history.findIndex(
+    entry => entry.id === routeId && entry.completedAt === completedAt
+  );
+  if (routeIndex === -1) return false;
+
+  const occurrences = history[routeIndex].occurrences;
+  if (!occurrences) return false;
+  const nextOccurrences = occurrences.filter(record => record.packageId !== packageId);
+  if (nextOccurrences.length === occurrences.length) return false;
+
+  history[routeIndex] = {
+    ...history[routeIndex],
+    occurrences: nextOccurrences.length > 0 ? nextOccurrences : undefined,
   };
   await writeJSON(storage, KEY_HISTORY, history);
   return true;

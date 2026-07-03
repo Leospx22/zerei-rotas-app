@@ -6,6 +6,8 @@ All notable product and architecture changes are recorded here. Versions follow 
 
 ### Added
 
+- Added confirmed occurrence deletion for current-route packages and exact completed-history summaries.
+
 - Expo Router application shell with login, Painel, Rotas, Historico, and Perfil.
 - Nested route lifecycle Stack under the Rotas tab.
 - XLSX, XLS, CSV, and pasted CSV/TSV import flows.
@@ -53,6 +55,10 @@ All notable product and architecture changes are recorded here. Versions follow 
 
 ### Changed
 
+- Simplified occurrence cards to show only registration and latest-update timestamps, with compatibility fallback for older resolved records.
+
+- Promoted Ocorrências to its own bottom tab and restored Rotas as a route-management-only screen.
+
 - Polished Ocorrências with compact summary counts, clearer card hierarchy, calmer resolved states, and consolidated actions.
 
 - Moved the complete route lifecycle from the root Stack into the nested Rotas Stack.
@@ -77,6 +83,10 @@ All notable product and architecture changes are recorded here. Versions follow 
 - Preserved occurrence timestamps while editing reasons or reversing resolved outcomes.
 
 ### Fixed
+
+- Made every occurrence card show Registrado em, using Não informado for legacy records without a registration timestamp.
+
+- Restored the Minhas Rotas control-center hierarchy so the compact occurrence summary no longer obscures route cards, statuses, or actions.
 
 - Planning routes not being persisted after import.
 - Imported routes not appearing immediately in Minhas Rotas.

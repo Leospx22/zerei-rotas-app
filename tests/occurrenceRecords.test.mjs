@@ -4,7 +4,10 @@ import {
   applyPackageOccurrenceToStops,
   collectAllOccurrenceRecords,
   collectRouteOccurrenceRecords,
+  deletePackageOccurrenceInStops,
   editPackageOccurrenceInStops,
+  formatOccurrenceDateTime,
+  getOccurrenceDisplayTimestamps,
   hasOccurrenceEditChanges,
   occurrenceReasonLabel,
   partitionOccurrenceRecords,
@@ -12,6 +15,7 @@ import {
 } from '../lib/occurrenceRecords.ts';
 import {
   loadHistoryFromStorage,
+  deleteHistoryOccurrenceInStorage,
   editHistoryOccurrenceInStorage,
   resolveHistoryOccurrenceInStorage,
   saveCompletedRouteToHistory,
@@ -191,6 +195,7 @@ test('resolves an occurrence as delivered while preserving its reason', () => {
   assert.equal(resolvedPackage.occurrenceRegisteredAt, registeredAt);
   assert.equal(resolvedPackage.occurrenceResolution, 'delivered');
   assert.equal(resolvedPackage.occurrenceResolvedAt, resolvedAt);
+  assert.equal(resolvedPackage.occurrenceUpdatedAt, resolvedAt);
 });
 
 test('quick delivered resolution does not require or overwrite an occurrence reason', () => {
@@ -298,6 +303,7 @@ test('completed history resolution preserves reason and writes result timestamp'
   assert.equal(resolvedOccurrence.reason, 'Cliente recusou');
   assert.equal(resolvedOccurrence.occurrenceResolution, 'delivered');
   assert.equal(resolvedOccurrence.occurrenceResolvedAt, resolvedAt);
+  assert.equal(resolvedOccurrence.occurrenceUpdatedAt, resolvedAt);
   assert.equal(resolvedEntry.deliveredPackages, 1);
 
   await resolveHistoryOccurrenceInStorage(
@@ -350,7 +356,9 @@ test('edits a pending occurrence reason without changing lifecycle fields', () =
   const [editedStop] = editPackageOccurrenceInStops(
     [stop([occurrencePackage])],
     occurrencePackage.id,
-    'Reagendado'
+    'Reagendado',
+    undefined,
+    '2026-07-02T19:00:00.000Z'
   );
   const editedPackage = editedStop.packages[0];
 
@@ -358,10 +366,11 @@ test('edits a pending occurrence reason without changing lifecycle fields', () =
   assert.equal(editedPackage.occurrenceRegisteredAt, occurrencePackage.occurrenceRegisteredAt);
   assert.equal(editedPackage.occurrenceResolution, undefined);
   assert.equal(editedPackage.occurrenceResolvedAt, undefined);
+  assert.equal(editedPackage.occurrenceUpdatedAt, '2026-07-02T19:00:00.000Z');
   assert.equal(editedPackage.status, 'skipped');
 });
 
-test('edits a resolved reason without changing result or timestamps', () => {
+test('edits a resolved reason without changing lifecycle timestamps', () => {
   const occurrencePackage = {
     ...packageItem('resolved-reason-edit', 'delivered'),
     occurrenceReason: 'Cliente ausente',
@@ -372,7 +381,9 @@ test('edits a resolved reason without changing result or timestamps', () => {
   const [editedStop] = editPackageOccurrenceInStops(
     [stop([occurrencePackage])],
     occurrencePackage.id,
-    'Outro'
+    'Outro',
+    undefined,
+    '2026-07-02T19:00:00.000Z'
   );
   const editedPackage = editedStop.packages[0];
 
@@ -380,7 +391,49 @@ test('edits a resolved reason without changing result or timestamps', () => {
   assert.equal(editedPackage.occurrenceResolution, 'delivered');
   assert.equal(editedPackage.occurrenceRegisteredAt, occurrencePackage.occurrenceRegisteredAt);
   assert.equal(editedPackage.occurrenceResolvedAt, occurrencePackage.occurrenceResolvedAt);
+  assert.equal(editedPackage.occurrenceUpdatedAt, '2026-07-02T19:00:00.000Z');
   assert.equal(editedPackage.status, 'delivered');
+});
+
+test('uses updated timestamp first and resolved timestamp as a compatibility fallback', () => {
+  assert.deepEqual(
+    getOccurrenceDisplayTimestamps({
+      packageId: 'updated-display',
+      address: 'Rua Teste, 10',
+      registeredAt: '2026-07-02T17:00:00.000Z',
+      occurrenceResolvedAt: '2026-07-02T18:00:00.000Z',
+      occurrenceUpdatedAt: '2026-07-02T19:00:00.000Z',
+    }),
+    {
+      registeredAt: '2026-07-02T17:00:00.000Z',
+      updatedAt: '2026-07-02T19:00:00.000Z',
+    }
+  );
+  assert.equal(
+    getOccurrenceDisplayTimestamps({
+      packageId: 'legacy-display',
+      address: 'Rua Teste, 20',
+      occurrenceResolvedAt: '2026-07-02T18:00:00.000Z',
+    }).updatedAt,
+    '2026-07-02T18:00:00.000Z'
+  );
+});
+
+test('formats occurrence timestamps and keeps missing registration explicit', () => {
+  assert.match(
+    formatOccurrenceDateTime('2026-07-02T17:00:00'),
+    /^02\/07\/2026, 17:00$/
+  );
+  assert.equal(formatOccurrenceDateTime(undefined), null);
+  assert.equal(formatOccurrenceDateTime('invalid-date'), null);
+
+  const missingRegistration = getOccurrenceDisplayTimestamps({
+    packageId: 'missing-registration',
+    address: 'Rua Teste, 30',
+    occurrenceResolvedAt: '2026-07-02T18:00:00.000Z',
+  });
+  assert.equal(missingRegistration.registeredAt, undefined);
+  assert.equal(missingRegistration.updatedAt, '2026-07-02T18:00:00.000Z');
 });
 
 test('reverses current-route occurrence result in both directions safely', () => {
@@ -434,13 +487,15 @@ test('edits one completed-history occurrence without duplicates or stat drift', 
     savedEntry.completedAt,
     returnedPackage.id,
     'Cliente recusou',
-    'delivered'
+    'delivered',
+    '2026-07-02T19:00:00.000Z'
   ), true);
   let [editedEntry] = await loadHistoryFromStorage(storage);
   assert.equal(editedEntry.occurrences.length, 1);
   assert.equal(editedEntry.occurrences[0].reason, 'Cliente recusou');
   assert.equal(editedEntry.occurrences[0].occurrenceResolution, 'delivered');
   assert.equal(editedEntry.occurrences[0].occurrenceResolvedAt, returnedPackage.occurrenceResolvedAt);
+  assert.equal(editedEntry.occurrences[0].occurrenceUpdatedAt, '2026-07-02T19:00:00.000Z');
   assert.equal(editedEntry.deliveredPackages, 1);
 
   assert.equal(await editHistoryOccurrenceInStorage(
@@ -449,11 +504,13 @@ test('edits one completed-history occurrence without duplicates or stat drift', 
     savedEntry.completedAt,
     returnedPackage.id,
     'Cliente recusou',
-    'returned_to_hub'
+    'returned_to_hub',
+    '2026-07-02T20:00:00.000Z'
   ), true);
   [editedEntry] = await loadHistoryFromStorage(storage);
   assert.equal(editedEntry.occurrences.length, 1);
   assert.equal(editedEntry.occurrences[0].occurrenceResolution, 'returned_to_hub');
+  assert.equal(editedEntry.occurrences[0].occurrenceUpdatedAt, '2026-07-02T20:00:00.000Z');
   assert.equal(editedEntry.deliveredPackages, 0);
 });
 
@@ -497,4 +554,102 @@ test('result-only edit preserves a missing reason and reverses package status', 
   assert.equal(editedPackage.occurrenceReason, undefined);
   assert.equal(occurrenceReasonLabel(editedPackage.occurrenceReason), 'Motivo não informado');
   assert.equal(editedPackage.occurrenceResolvedAt, resolvedPackage.occurrenceResolvedAt);
+});
+
+test('deletes a pending current-route occurrence without deleting its package', () => {
+  const occurrencePackage = {
+    ...packageItem('delete-pending', 'skipped'),
+    occurrenceReason: 'Cliente ausente',
+    occurrenceRegisteredAt: '2026-07-02T17:00:00.000Z',
+    occurrenceUpdatedAt: '2026-07-02T18:00:00.000Z',
+  };
+  const untouchedPackage = {
+    ...packageItem('delete-untouched', 'skipped'),
+    occurrenceReason: 'Outro',
+  };
+
+  const [updatedStop] = deletePackageOccurrenceInStops(
+    [stop([occurrencePackage, untouchedPackage])],
+    occurrencePackage.id
+  );
+  const deletedOccurrencePackage = updatedStop.packages[0];
+
+  assert.equal(updatedStop.packages.length, 2);
+  assert.equal(deletedOccurrencePackage.id, occurrencePackage.id);
+  assert.equal(deletedOccurrencePackage.status, 'pending');
+  assert.equal(deletedOccurrencePackage.occurrenceReason, undefined);
+  assert.equal(deletedOccurrencePackage.occurrenceRegisteredAt, undefined);
+  assert.equal(deletedOccurrencePackage.occurrenceResolution, undefined);
+  assert.equal(deletedOccurrencePackage.occurrenceResolvedAt, undefined);
+  assert.equal(deletedOccurrencePackage.occurrenceUpdatedAt, undefined);
+  assert.equal(updatedStop.packages[1].occurrenceReason, 'Outro');
+  assert.equal(collectRouteOccurrenceRecords(route([updatedStop])).length, 1);
+});
+
+test('deletes a resolved occurrence without resetting a delivered package', () => {
+  const deliveredPackage = {
+    ...packageItem('delete-delivered', 'delivered'),
+    occurrenceReason: 'Reagendado',
+    occurrenceRegisteredAt: '2026-07-02T17:00:00.000Z',
+    occurrenceResolution: 'delivered',
+    occurrenceResolvedAt: '2026-07-02T18:00:00.000Z',
+    occurrenceUpdatedAt: '2026-07-02T18:00:00.000Z',
+  };
+
+  const [updatedStop] = deletePackageOccurrenceInStops(
+    [stop([deliveredPackage])],
+    deliveredPackage.id
+  );
+  const updatedPackage = updatedStop.packages[0];
+
+  assert.equal(updatedPackage.id, deliveredPackage.id);
+  assert.equal(updatedPackage.status, 'delivered');
+  assert.equal(updatedPackage.occurrenceReason, undefined);
+  assert.equal(updatedPackage.occurrenceResolution, undefined);
+  assert.equal(collectRouteOccurrenceRecords(route([updatedStop])).length, 0);
+});
+
+test('deletes a legacy skipped occurrence safely', () => {
+  const legacyPackage = packageItem('delete-legacy', 'skipped');
+  const [updatedStop] = deletePackageOccurrenceInStops(
+    [stop([legacyPackage])],
+    legacyPackage.id
+  );
+
+  assert.equal(updatedStop.packages[0].status, 'pending');
+  assert.equal(updatedStop.packages[0].id, legacyPackage.id);
+});
+
+test('deletes only the exact completed-history occurrence summary', async () => {
+  const storage = new MemoryStorage();
+  const firstOccurrence = {
+    ...packageItem('history-delete-first', 'skipped'),
+    occurrenceReason: 'Cliente ausente',
+  };
+  const secondOccurrence = {
+    ...packageItem('history-delete-second', 'skipped'),
+    occurrenceReason: 'Outro',
+  };
+  await saveCompletedRouteToHistory(
+    storage,
+    route([{ ...stop([firstOccurrence, secondOccurrence]), status: 'completed' }], 'completed')
+  );
+  const [savedEntry] = await loadHistoryFromStorage(storage);
+  const deliveredBefore = savedEntry.deliveredPackages;
+
+  assert.equal(await deleteHistoryOccurrenceInStorage(
+    storage,
+    savedEntry.id,
+    savedEntry.completedAt,
+    firstOccurrence.id
+  ), true);
+  const [updatedEntry] = await loadHistoryFromStorage(storage);
+
+  assert.deepEqual(
+    updatedEntry.occurrences.map(record => record.packageId),
+    [secondOccurrence.id]
+  );
+  assert.equal(updatedEntry.deliveredPackages, deliveredBefore);
+  assert.equal(updatedEntry.id, savedEntry.id);
+  assert.equal(updatedEntry.completedAt, savedEntry.completedAt);
 });

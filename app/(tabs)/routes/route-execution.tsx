@@ -516,7 +516,7 @@ export default function RouteExecutionScreen() {
         {currentOccurrenceCount > 0 ? (
           <TouchableOpacity
             style={styles.viewOccurrencesButton}
-            onPress={() => router.push('/(tabs)/routes/occurrences')}
+            onPress={() => router.push('/(tabs)/occurrences')}
             activeOpacity={0.78}
             accessibilityRole="button"
             accessibilityLabel="Ver ocorrências"

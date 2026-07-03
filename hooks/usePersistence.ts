@@ -2,6 +2,7 @@ import { useCallback, useState } from 'react';
 import { RouteData } from '@/contexts/RouteContext';
 import {
   deleteRouteFromStorage,
+  deleteHistoryOccurrenceInStorage,
   editHistoryOccurrenceInStorage,
   getRouteStorage,
   loadCurrentRouteFromStorage,
@@ -100,7 +101,25 @@ export function usePersistence() {
         completedAt,
         packageId,
         reason,
-        resolution
+        resolution,
+        new Date().toISOString()
+      );
+    } catch {
+      return false;
+    }
+  }, [storage]);
+
+  const deleteHistoryOccurrence = useCallback(async (
+    routeId: string,
+    completedAt: string,
+    packageId: string
+  ): Promise<boolean> => {
+    try {
+      return await deleteHistoryOccurrenceInStorage(
+        storage,
+        routeId,
+        completedAt,
+        packageId
       );
     } catch {
       return false;
@@ -118,5 +137,6 @@ export function usePersistence() {
     deleteRoute,
     resolveHistoryOccurrence,
     editHistoryOccurrence,
+    deleteHistoryOccurrence,
   };
 }

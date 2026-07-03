@@ -1,6 +1,6 @@
 import { Tabs } from 'expo-router';
 import { getFocusedRouteNameFromRoute } from '@react-navigation/native';
-import { Home, Map, BarChart3, User } from 'lucide-react-native';
+import { AlertTriangle, Home, Map, BarChart3, User } from 'lucide-react-native';
 import { Colors } from '@/constants/theme';
 
 const TAB_BAR_STYLE = {
@@ -18,7 +18,6 @@ const ROUTE_LIFECYCLE_SCREENS = new Set([
   'delivery-preparation',
   'route-organizer',
   'route-execution',
-  'occurrences',
   'route-completed',
 ]);
 
@@ -56,6 +55,13 @@ export default function TabLayout() {
               : TAB_BAR_STYLE,
             tabBarIcon: ({ size, color }) => <Map size={size} color={color} />,
           };
+        }}
+      />
+      <Tabs.Screen
+        name="occurrences"
+        options={{
+          title: 'Ocorrências',
+          tabBarIcon: ({ size, color }) => <AlertTriangle size={size} color={color} />,
         }}
       />
       <Tabs.Screen

@@ -23,6 +23,7 @@ app/
   (tabs)/
     _layout.tsx                Bottom Tabs navigator
     index.tsx                  Painel dashboard
+    occurrences.tsx            Current/history occurrence management
     history.tsx                Completed-route history
     profile.tsx                Profile and sign-out
     routes/
@@ -33,7 +34,6 @@ app/
       delivery-preparation.tsx Route review and activation
       route-organizer.tsx      Optional route organization screen
       route-execution.tsx      Delivery execution
-      occurrences.tsx          Read-only current/history occurrence review
       route-completed.tsx      Completion summary
 
 assets/images/                 Application icons and static images
@@ -74,8 +74,8 @@ Root Stack
 |   |   |-- delivery-preparation
 |   |   |-- route-organizer
 |   |   |-- route-execution
-|   |   |-- occurrences
 |   |   `-- route-completed
+|   |-- occurrences            Ocorrencias
 |   |-- history                Historico
 |   `-- profile                Perfil
 `-- +not-found
@@ -95,7 +95,7 @@ The application must not create another `NavigationContainer`. Expo Router owns 
 
 `app/(tabs)/_layout.tsx` owns the real bottom tab bar. The working Android dimensions are `height: 100`, `paddingBottom: 24`, and `paddingTop: 8`; these values account for the device navigation/gesture area and should not be reduced without device testing.
 
-The tab bar is visible on Painel, Minhas Rotas, Historico, and Perfil. It is hidden when the focused child of the routes Stack is one of the lifecycle screens: import, import-summary, delivery-preparation, route-organizer, route-execution, occurrences, or route-completed.
+The tab bar is visible on Painel, Minhas Rotas, Ocorrencias, Historico, and Perfil. It is hidden when the focused child of the routes Stack is one of the lifecycle screens: import, import-summary, delivery-preparation, route-organizer, route-execution, or route-completed.
 
 ## Route Lifecycle
 
@@ -142,6 +142,7 @@ Use `replace()` between sequential wizard screens to avoid accumulating hidden l
 - Stop and package status updates
 - Atomic occurrence status, reason, and registration timestamp updates
 - Current-route occurrence resolution as delivered or returned to the hub
+- Current-route occurrence deletion clears only occurrence metadata and safely restores non-delivered packages to pending
 - Completion detection and elapsed-duration calculation
 - Duplicate-stop removal and stop reordering
 - Import summary calculation
@@ -204,9 +205,10 @@ occurrenceReason?: string;
 occurrenceRegisteredAt?: string;
 occurrenceResolution?: 'delivered' | 'returned_to_hub';
 occurrenceResolvedAt?: string;
+occurrenceUpdatedAt?: string;
 ```
 
-These fields are optional so previously persisted routes remain valid. A package occurrence continues using the existing `skipped` status convention. Current-route AsyncStorage persistence serializes these fields with the route; skipped packages without a saved reason display `Motivo não informado`.
+These fields are optional so previously persisted routes remain valid. A package occurrence continues using the existing `skipped` status convention. Current-route AsyncStorage persistence serializes these fields with the route; skipped packages without a saved reason display `Motivo não informado`. Occurrence edits and resolutions set `occurrenceUpdatedAt`; older resolved records fall back to `occurrenceResolvedAt` when displaying their latest update.
 
 Occurrence resolution is also additive. `delivered` changes only the target package to the existing delivered status; `returned_to_hub` retains the skipped status. Both preserve the original reason and registration timestamp. The Ocorrências screen shows unresolved records under Pendentes and resolved records for seven days under Resolvidas recentemente.
 

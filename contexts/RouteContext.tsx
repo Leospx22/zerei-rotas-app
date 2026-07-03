@@ -16,6 +16,7 @@ import { usePersistence } from '@/hooks/usePersistence';
 import type { HistoryEntry } from '@/lib/routePersistence';
 import {
   applyPackageOccurrenceToStops,
+  deletePackageOccurrenceInStops,
   editPackageOccurrenceInStops,
   resolvePackageOccurrenceInStops,
   type OccurrenceResolution,
@@ -54,6 +55,7 @@ interface RouteContextType {
     reason: string,
     resolution?: OccurrenceResolution
   ) => void;
+  deletePackageOccurrence: (packageId: string) => void;
   removeDuplicates: () => void;
   reorderStops: () => void;
   getSummary: () => ImportSummary;
@@ -231,6 +233,7 @@ export function RouteProvider({ children }: { children: ReactNode }) {
     reason: string,
     resolution?: OccurrenceResolution
   ) => {
+    const updatedAt = new Date().toISOString();
     setOccurrences(prev => ({ ...prev, [packageId]: reason }));
     setCurrentRouteState(prev => {
       if (!prev) return prev;
@@ -238,8 +241,28 @@ export function RouteProvider({ children }: { children: ReactNode }) {
         prev.stops,
         packageId,
         reason,
-        resolution
+        resolution,
+        updatedAt
       );
+      const completedStops = stops.filter(stop => stop.status === 'completed').length;
+      const deliveredPackages = stops.reduce(
+        (sum, stop) =>
+          sum + stop.packages.filter(packageItem => packageItem.status === 'delivered').length,
+        0
+      );
+      return checkCompletion({ ...prev, stops, completedStops, deliveredPackages });
+    });
+  }, []);
+
+  const deletePackageOccurrence = useCallback((packageId: string) => {
+    setOccurrences(prev => {
+      const next = { ...prev };
+      delete next[packageId];
+      return next;
+    });
+    setCurrentRouteState(prev => {
+      if (!prev) return prev;
+      const stops = deletePackageOccurrenceInStops(prev.stops, packageId);
       const completedStops = stops.filter(stop => stop.status === 'completed').length;
       const deliveredPackages = stops.reduce(
         (sum, stop) =>
@@ -319,6 +342,7 @@ export function RouteProvider({ children }: { children: ReactNode }) {
       updatePackageOccurrence,
       resolvePackageOccurrence,
       editPackageOccurrence,
+      deletePackageOccurrence,
       removeDuplicates,
       reorderStops,
       getSummary,

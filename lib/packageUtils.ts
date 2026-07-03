@@ -30,6 +30,7 @@ export interface PackageItem {
   occurrenceRegisteredAt?: string;
   occurrenceResolution?: 'delivered' | 'returned_to_hub';
   occurrenceResolvedAt?: string;
+  occurrenceUpdatedAt?: string;
 }
 
 // A group of packages sharing the same full address within a Stop

@@ -95,6 +95,8 @@ The application must not create another `NavigationContainer`. Expo Router owns 
 
 `app/(tabs)/_layout.tsx` owns the real bottom tab bar. The working Android dimensions are `height: 100`, `paddingBottom: 24`, and `paddingTop: 8`; these values account for the device navigation/gesture area and should not be reduced without device testing.
 
+Current-route presentation treats a route as Em rota when `status` is active, `startTime` exists, or delivery progress exists. A started route therefore remains resumable even before its first delivered package.
+
 The tab bar is visible on Painel, Minhas Rotas, Ocorrencias, Historico, and Perfil. It is hidden when the focused child of the routes Stack is one of the lifecycle screens: import, import-summary, delivery-preparation, route-organizer, route-execution, or route-completed.
 
 ## Route Lifecycle

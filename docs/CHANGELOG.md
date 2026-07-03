@@ -84,6 +84,8 @@ All notable product and architecture changes are recorded here. Versions follow 
 
 ### Fixed
 
+- Preserved the Em rota presentation and Continuar action after reloading a started route with zero deliveries.
+
 - Made every occurrence card show Registrado em, using Não informado for legacy records without a registration timestamp.
 
 - Restored the Minhas Rotas control-center hierarchy so the compact occurrence summary no longer obscures route cards, statuses, or actions.

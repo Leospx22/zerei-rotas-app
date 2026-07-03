@@ -62,7 +62,9 @@ test('planning to active overwrites the current route without duplication', asyn
   await saveRouteToStorage(storage, route('planning'));
   await saveRouteToStorage(storage, route('active'));
 
-  assert.equal((await loadCurrentRouteFromStorage(storage))?.status, 'active');
+  const reloaded = await loadCurrentRouteFromStorage(storage);
+  assert.equal(reloaded?.status, 'active');
+  assert.equal(reloaded?.startTime, 1);
   assert.equal(JSON.parse(await storage.getItem(KEY_CURRENT)).id, 'route-1');
   assert.equal((await loadHistoryFromStorage(storage)).length, 0);
 });

@@ -77,7 +77,11 @@ export default function RoutesScreen() {
         date: currentRoute.startTime
           ? new Date(currentRoute.startTime).toLocaleDateString('pt-BR')
           : new Date().toLocaleDateString('pt-BR'),
-        status: deriveRouteDisplayStatus(true, currentRoute.deliveredPackages),
+        status: deriveRouteDisplayStatus(
+          true,
+          currentRoute.deliveredPackages,
+          currentRoute.status === 'active' || currentRoute.startTime !== null
+        ),
         totalPackages: currentRoute.totalPackages,
         totalStops: currentRoute.stops.length,
         distance: currentRoute.estimatedDistanceKm,

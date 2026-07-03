@@ -2,10 +2,11 @@ export type RouteDisplayStatus = 'planning' | 'active' | 'completed';
 
 export function deriveRouteDisplayStatus(
   isCurrentRoute: boolean,
-  deliveredPackages: number
+  deliveredPackages: number,
+  hasStarted = false
 ): RouteDisplayStatus {
   if (!isCurrentRoute) return 'completed';
-  return deliveredPackages > 0 ? 'active' : 'planning';
+  return hasStarted || deliveredPackages > 0 ? 'active' : 'planning';
 }
 
 export function routeDisplayStatusLabel(status: RouteDisplayStatus): string {

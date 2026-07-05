@@ -6,6 +6,10 @@ All notable product and architecture changes are recorded here. Versions follow 
 
 ### Added
 
+- Supabase profile, seven-day trial, funnel-event, and future subscription database foundation with owner-scoped RLS.
+- Environment-safe account configuration and a real Perfil login, registration, profile editing, trial status, and sign-out experience.
+- Pure profile/trial helpers and regression coverage for configuration, trial dates, funnel stages, safe updates, and schema presence.
+
 - Added confirmed occurrence deletion for current-route packages and exact completed-history summaries.
 
 - Expo Router application shell with login, Painel, Rotas, Historico, and Perfil.

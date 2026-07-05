@@ -55,6 +55,7 @@ lib/routeOrdering.ts           Pure manual stop movement and order reindexing
 lib/routePresentation.ts       Pure route-card status and Portuguese label derivation
 lib/spreadsheetParser.ts       CSV, TSV, XLS, and XLSX parsing
 lib/supabase.ts                Supabase client and session storage configuration
+lib/userProfile.ts             Profile, trial, and funnel service/helpers
 supabase/migrations/           Supabase database migrations
 tests/routePersistence.test.mjs Persistence and route-lifecycle regressions
 types/                         Project-specific declarations
@@ -285,7 +286,9 @@ This hook adapts storage operations for React consumers. It catches storage fail
 
 Screens should prefer RouteContext for reads. Direct persistence calls are reserved for mutations not owned by the live current route, such as completed-history rename/delete.
 
-Supabase authentication persistence is separate. `lib/supabase.ts` configures Supabase Auth with AsyncStorage, token refresh, persisted sessions, and URL-session detection disabled for native operation.
+Supabase authentication persistence is separate. `lib/supabase.ts` only creates a client when `EXPO_PUBLIC_SUPABASE_URL` and `EXPO_PUBLIC_SUPABASE_ANON_KEY` are valid, then configures Auth with AsyncStorage, token refresh, persisted sessions, and URL-session detection disabled for native operation. Missing configuration leaves all local route features available.
+
+`AuthProvider` owns the current Supabase session and loaded `profiles` record. `lib/userProfile.ts` owns profile mutations and pure trial/funnel derivation. New auth users receive a seven-day trial profile and registration events through the database trigger in migration `004_auth_profile_foundation`; the client safely recovers a missing profile after login. Subscription writes remain server-only and no payment provider is connected.
 
 ## Import Pipeline
 

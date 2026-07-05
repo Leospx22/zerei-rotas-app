@@ -25,6 +25,7 @@ export default function LoginScreen() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
 
   const handleSubmit = async () => {
     if (!email || !password) {
@@ -37,9 +38,14 @@ export default function LoginScreen() {
     }
     setLoading(true);
     setError(null);
+    setMessage(null);
     try {
       if (isSignUp) {
-        await signUpWithEmail(email, password, name);
+        const result = await signUpWithEmail(email, password, name);
+        if (result.requiresEmailConfirmation) {
+          setMessage('Conta criada. Confirme seu e-mail antes de entrar.');
+          return;
+        }
       } else {
         await signInWithEmail(email, password);
       }
@@ -121,6 +127,7 @@ export default function LoginScreen() {
           </View>
 
           {error && <Text style={styles.errorText}>{error}</Text>}
+          {message && <Text style={styles.messageText}>{message}</Text>}
 
           <TouchableOpacity
             style={styles.primaryButton}
@@ -206,6 +213,11 @@ const styles = StyleSheet.create({
   eyeButton: { padding: Spacing.xs },
   errorText: {
     color: Colors.error,
+    fontSize: FontSizes.sm,
+    textAlign: 'center',
+  },
+  messageText: {
+    color: Colors.success,
     fontSize: FontSizes.sm,
     textAlign: 'center',
   },

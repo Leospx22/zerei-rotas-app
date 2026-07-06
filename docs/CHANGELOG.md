@@ -6,6 +6,8 @@ All notable product and architecture changes are recorded here. Versions follow 
 
 ### Added
 
+- Closed-beta status, support and feedback actions, build label, beta tester checklist, and optional `feedback_opened` funnel tracking.
+
 - Profile completion progress, Portuguese missing-field guidance, polished trial dates/status, and a one-time `profile_completed` funnel event.
 
 - Supabase profile, seven-day trial, funnel-event, and future subscription database foundation with owner-scoped RLS.

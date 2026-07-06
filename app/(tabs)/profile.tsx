@@ -1,6 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
+  Linking,
   ScrollView,
   StyleSheet,
   Text,
@@ -12,7 +14,10 @@ import {
   CalendarDays,
   CheckCircle2,
   Crown,
+  FlaskConical,
+  Headphones,
   LogOut,
+  MessageCircle,
   Save,
   ShieldCheck,
   UserRound,
@@ -26,9 +31,17 @@ import {
   getProfileCompletion,
   getTrialDisplay,
   recordProfileCompletedOnce,
+  recordFunnelEvent,
   shouldRecordProfileCompleted,
   updateUserProfile,
 } from '@/lib/userProfile';
+import {
+  BETA_STATUS_TEXT,
+  BETA_STATUS_TITLE,
+  getAppVersionLabel,
+  getFeedbackFormUrl,
+  getWhatsAppSupportUrl,
+} from '@/lib/appLinks';
 
 const FUNNEL_LABELS = {
   registered: 'Cadastrado',
@@ -137,6 +150,45 @@ export default function ProfileScreen() {
 
   const handleSignOut = () => runAction(signOut);
 
+  const handleFeedback = async () => {
+    const url = getFeedbackFormUrl();
+    if (!url) {
+      setError(null);
+      setMessage('Link de feedback ainda não configurado.');
+      Alert.alert('Feedback', 'Link de feedback ainda não configurado.');
+      return;
+    }
+    try {
+      setError(null);
+      setMessage(null);
+      const supported = await Linking.canOpenURL(url);
+      if (!supported) throw new Error('unsupported');
+      await Linking.openURL(url);
+      if (session?.user.id) {
+        await recordFunnelEvent(session.user.id, 'feedback_opened');
+      }
+    } catch {
+      setMessage(null);
+      setError('Não foi possível abrir o formulário de feedback.');
+      Alert.alert('Feedback', 'Não foi possível abrir o formulário de feedback.');
+    }
+  };
+
+  const handleSupport = async () => {
+    try {
+      setError(null);
+      setMessage(null);
+      const url = getWhatsAppSupportUrl();
+      const supported = await Linking.canOpenURL(url);
+      if (!supported) throw new Error('unsupported');
+      await Linking.openURL(url);
+    } catch {
+      setMessage(null);
+      setError('Não foi possível abrir o WhatsApp.');
+      Alert.alert('Suporte', 'Não foi possível abrir o WhatsApp.');
+    }
+  };
+
   const updateField = (field: keyof ProfileForm, value: string) => {
     setForm(current => ({ ...current, [field]: value }));
   };
@@ -212,6 +264,23 @@ export default function ProfileScreen() {
 
       {configured && session && (
         <>
+          <View style={styles.betaCard}>
+            <View style={styles.sectionHeader}>
+              <FlaskConical size={20} color={Colors.gold[400]} />
+              <Text style={styles.betaTitle}>{BETA_STATUS_TITLE}</Text>
+            </View>
+            <Text style={styles.betaText}>{BETA_STATUS_TEXT}</Text>
+            <View style={styles.betaStats}>
+              <StatusRow label="Status" value="Beta gratuito" />
+              <StatusRow label="Dias restantes" value={trial.daysLabel} />
+              <StatusRow label="Conta" value={trial.accountLabel} />
+              <StatusRow
+                label="Cadastro"
+                value={completion.isComplete ? 'Perfil completo' : `${completion.completedFields} de ${completion.totalFields}`}
+              />
+            </View>
+          </View>
+
           <View style={[styles.completionCard, completion.isComplete && styles.completionCardComplete]}>
             <View style={styles.completionHeader}>
               <CheckCircle2
@@ -304,6 +373,24 @@ export default function ProfileScreen() {
           </View>
 
           <View style={styles.card}>
+            <View style={styles.sectionHeader}>
+              <Headphones size={19} color={Colors.gold[400]} />
+              <Text style={styles.sectionTitle}>Suporte e feedback</Text>
+            </View>
+            <Text style={styles.helper}>
+              Conte como foi sua rota ou fale com o suporte durante o beta.
+            </Text>
+            <TouchableOpacity style={styles.primaryButton} onPress={handleFeedback}>
+              <MessageCircle size={18} color={Colors.primary[900]} />
+              <Text style={styles.primaryButtonText}>Enviar feedback</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.secondaryButton} onPress={handleSupport}>
+              <Headphones size={18} color={Colors.gold[400]} />
+              <Text style={styles.secondaryButtonText}>Falar com suporte</Text>
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.card}>
             <Text style={styles.sectionTitle}>Segurança</Text>
             <Text style={styles.helper}>Encerre a sessão neste dispositivo quando necessário.</Text>
             <TouchableOpacity
@@ -320,7 +407,10 @@ export default function ProfileScreen() {
 
       {error && <Text style={styles.error}>{error}</Text>}
       {message && <Text style={styles.success}>{message}</Text>}
-      <Text style={styles.version}>Zerei Rotas v1.0.0</Text>
+      <View style={styles.versionCard}>
+        <Text style={styles.versionLabel}>Versão do app</Text>
+        <Text style={styles.versionValue}>{getAppVersionLabel()}</Text>
+      </View>
     </ScrollView>
   );
 }
@@ -361,6 +451,10 @@ const styles = StyleSheet.create({
   infoCard: { backgroundColor: Colors.warningBg, borderWidth: 1, borderColor: Colors.warningBorder, borderRadius: BorderRadius.lg, padding: Spacing.lg, gap: Spacing.sm },
   completionCard: { backgroundColor: Colors.warningBg, borderWidth: 1, borderColor: Colors.warningBorder, borderRadius: BorderRadius.lg, padding: Spacing.md, gap: Spacing.md, marginBottom: Spacing.lg },
   completionCardComplete: { backgroundColor: Colors.successBg, borderColor: Colors.successBorder },
+  betaCard: { backgroundColor: Colors.cardBg, borderWidth: 1, borderColor: Colors.gold[700], borderRadius: BorderRadius.lg, padding: Spacing.md, gap: Spacing.md, marginBottom: Spacing.lg },
+  betaTitle: { flex: 1, color: Colors.gold[400], fontSize: FontSizes.lg, fontWeight: '800' },
+  betaText: { color: Colors.lightGray, fontSize: FontSizes.md, lineHeight: 20 },
+  betaStats: { borderTopWidth: 1, borderTopColor: Colors.cardBorder, paddingTop: Spacing.md, gap: Spacing.sm },
   completionHeader: { flexDirection: 'row', alignItems: 'flex-start', gap: Spacing.sm },
   completionTitleWrap: { flex: 1, gap: 2 },
   completionCount: { color: Colors.gray, fontSize: FontSizes.sm },
@@ -396,5 +490,7 @@ const styles = StyleSheet.create({
   signOutText: { color: Colors.lightGray, fontSize: FontSizes.lg, fontWeight: '700' },
   error: { color: Colors.error, textAlign: 'center', marginBottom: Spacing.md },
   success: { color: Colors.success, textAlign: 'center', marginBottom: Spacing.md, fontWeight: '700' },
-  version: { color: Colors.gray, fontSize: FontSizes.sm, textAlign: 'center', marginTop: Spacing.lg },
+  versionCard: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderTopWidth: 1, borderTopColor: Colors.cardBorder, paddingTop: Spacing.md, marginTop: Spacing.sm },
+  versionLabel: { color: Colors.gray, fontSize: FontSizes.sm },
+  versionValue: { color: Colors.lightGray, fontSize: FontSizes.sm, fontWeight: '700' },
 });

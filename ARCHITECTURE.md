@@ -45,6 +45,7 @@ hooks/usePersistence.ts        React-facing persistence adapter
 hooks/useImport.ts             Import-related hook retained by the project
 hooks/useNavigation.ts         Navigation-related hook retained by the project
 lib/packageUtils.ts            Package parsing, grouping, and route construction
+lib/appLinks.ts                Closed-beta links, copy, and version configuration
 lib/mapNavigation.ts           External map URL construction from normalized addresses
 lib/occurrenceFlow.ts          Direct package occurrence target validation
 lib/occurrenceRecords.ts       Occurrence metadata updates and record collection
@@ -289,6 +290,8 @@ Screens should prefer RouteContext for reads. Direct persistence calls are reser
 Supabase authentication persistence is separate. `lib/supabase.ts` only creates a client when `EXPO_PUBLIC_SUPABASE_URL` and `EXPO_PUBLIC_SUPABASE_ANON_KEY` are valid, then configures Auth with AsyncStorage, token refresh, persisted sessions, and URL-session detection disabled for native operation. Missing configuration leaves all local route features available.
 
 `AuthProvider` owns the current Supabase session and loaded `profiles` record. `lib/userProfile.ts` owns profile mutations, completion derivation, and pure trial/funnel presentation. New auth users receive a seven-day trial profile and registration events through the database trigger in migration `004_auth_profile_foundation`; the client safely recovers a missing profile after login and records `profile_completed` once when onboarding is finished. Expired-trial presentation is derived locally, while persisted expiration and subscription writes remain server-owned. No payment provider is connected.
+
+Closed-beta support links are isolated in `lib/appLinks.ts`. An unconfigured feedback form resolves to a safe null state, WhatsApp support uses an HTTPS configuration boundary, and opening a configured feedback form records the owner-scoped `feedback_opened` funnel event. These links do not gate local app usage.
 
 ## Import Pipeline
 

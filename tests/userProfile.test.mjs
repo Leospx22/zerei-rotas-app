@@ -6,7 +6,12 @@ import {
   createRegistrationProfile,
   createTrialPeriod,
   getFunnelStage,
+  getMissingProfileFields,
+  getProfileCompletion,
+  getTrialDisplay,
   sanitizeProfileUpdate,
+  shouldRecordProfileCompleted,
+  shouldSyncTrialExpiration,
 } from '../lib/userProfile.ts';
 import { hasSupabaseConfig } from '../lib/supabase.ts';
 
@@ -53,6 +58,88 @@ test('profile update payload contains only editable fields', () => {
     funnel_stage: 'subscribed',
   });
   assert.deepEqual(payload, { full_name: 'Nome permitido' });
+});
+
+test('profile completion reports missing required fields in Portuguese', () => {
+  const profile = { full_name: 'Motorista', phone: '11999990000', city: '' };
+  const completion = getProfileCompletion(profile);
+
+  assert.equal(completion.isComplete, false);
+  assert.equal(completion.completedFields, 2);
+  assert.deepEqual(getMissingProfileFields(profile), [
+    'Cidade',
+    'Estado',
+    'Tipo de veículo',
+    'Plataforma principal',
+  ]);
+});
+
+test('profile completion is complete when all six required fields are filled', () => {
+  const profile = {
+    full_name: 'Motorista',
+    phone: '11999990000',
+    city: 'São Paulo',
+    state: 'SP',
+    vehicle_type: 'Carro',
+    main_platform: 'Shopee',
+  };
+  assert.deepEqual(getProfileCompletion(profile), {
+    completedFields: 6,
+    totalFields: 6,
+    percentage: 100,
+    missingFields: [],
+    isComplete: true,
+  });
+});
+
+test('trial ending today displays the last-day state', () => {
+  const display = getTrialDisplay(
+    { subscription_status: 'trial', trial_ends_at: '2026-07-05T23:00:00.000Z' },
+    NOW
+  );
+  assert.equal(display.state, 'trial_last_day');
+  assert.equal(display.daysLabel, 'Último dia do teste');
+});
+
+test('trial and subscription labels reflect their effective states', () => {
+  assert.equal(
+    getTrialDisplay({ subscription_status: 'trial', trial_ends_at: '2026-07-12T12:00:00.000Z' }, NOW).accountLabel,
+    'Teste ativo'
+  );
+  assert.equal(
+    getTrialDisplay({ subscription_status: 'trial', trial_ends_at: '2026-07-04T12:00:00.000Z' }, NOW).accountLabel,
+    'Teste expirado'
+  );
+  assert.equal(
+    getTrialDisplay({ subscription_status: 'active', trial_ends_at: null }, NOW).accountLabel,
+    'Assinatura ativa'
+  );
+});
+
+test('client expiration readiness never targets an active subscription', () => {
+  assert.equal(
+    shouldSyncTrialExpiration({ subscription_status: 'active', trial_ends_at: '2026-07-04T12:00:00.000Z' }, NOW),
+    false
+  );
+  assert.equal(
+    shouldSyncTrialExpiration({ subscription_status: 'trial', trial_ends_at: '2026-07-04T12:00:00.000Z' }, NOW),
+    true
+  );
+});
+
+test('profile completion event is requested only once on incomplete-to-complete transition', () => {
+  const incomplete = { full_name: 'Motorista' };
+  const complete = {
+    full_name: 'Motorista',
+    phone: '11999990000',
+    city: 'São Paulo',
+    state: 'SP',
+    vehicle_type: 'Carro',
+    main_platform: 'Shopee',
+  };
+  assert.equal(shouldRecordProfileCompleted(incomplete, complete, false), true);
+  assert.equal(shouldRecordProfileCompleted(incomplete, complete, true), false);
+  assert.equal(shouldRecordProfileCompleted(complete, complete, false), false);
 });
 
 test('profile helpers return a safe null state without a Supabase client', async () => {

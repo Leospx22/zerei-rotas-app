@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   ScrollView,
@@ -8,23 +8,27 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { Crown, LogOut, Save, UserRound } from 'lucide-react-native';
+import {
+  CalendarDays,
+  CheckCircle2,
+  Crown,
+  LogOut,
+  Save,
+  ShieldCheck,
+  UserRound,
+} from 'lucide-react-native';
 import { Colors, Spacing, FontSizes, BorderRadius } from '@/constants/theme';
 import { useAuth } from '@/contexts/AuthContext';
 import {
-  calculateTrialDaysLeft,
+  formatProfileDate,
+  getAuthErrorMessage,
   getFunnelStage,
+  getProfileCompletion,
+  getTrialDisplay,
+  recordProfileCompletedOnce,
+  shouldRecordProfileCompleted,
   updateUserProfile,
-  type SubscriptionStatus,
 } from '@/lib/userProfile';
-
-const ACCOUNT_STATUS_LABELS: Record<SubscriptionStatus, string> = {
-  trial: 'Teste ativo',
-  active: 'Assinatura ativa',
-  expired: 'Teste expirado',
-  canceled: 'Cancelado',
-  none: 'Sem assinatura',
-};
 
 const FUNNEL_LABELS = {
   registered: 'Cadastrado',
@@ -84,6 +88,10 @@ export default function ProfileScreen() {
     });
   }, [profile]);
 
+  const completion = useMemo(() => getProfileCompletion(form), [form]);
+  const trial = useMemo(() => getTrialDisplay(profile), [profile]);
+  const funnelLabel = profile ? FUNNEL_LABELS[getFunnelStage(profile)] : 'Cadastrado';
+
   const runAction = async (action: () => Promise<void>) => {
     setBusy(true);
     setError(null);
@@ -91,7 +99,7 @@ export default function ProfileScreen() {
     try {
       await action();
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : 'Não foi possível concluir a ação.');
+      setError(getAuthErrorMessage(caught));
     } finally {
       setBusy(false);
     }
@@ -117,8 +125,14 @@ export default function ProfileScreen() {
   const handleSave = () => runAction(async () => {
     const saved = await updateUserProfile(form);
     if (!saved) throw new Error('Não foi possível salvar o perfil.');
+    if (
+      session?.user.id
+      && shouldRecordProfileCompleted(profile, saved, false)
+    ) {
+      await recordProfileCompletedOnce(session.user.id);
+    }
     await refreshProfile();
-    setMessage('Perfil salvo.');
+    setMessage('Perfil salvo com sucesso.');
   });
 
   const handleSignOut = () => runAction(signOut);
@@ -140,7 +154,9 @@ export default function ProfileScreen() {
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <View style={styles.header}>
         <View style={styles.avatar}>
-          {session ? <Crown size={30} color={Colors.primary[900]} /> : <UserRound size={30} color={Colors.primary[900]} />}
+          {session
+            ? <Crown size={30} color={Colors.primary[900]} />
+            : <UserRound size={30} color={Colors.primary[900]} />}
         </View>
         <Text style={styles.title}>Perfil</Text>
         {session?.user.email && <Text style={styles.subtitle}>{session.user.email}</Text>}
@@ -158,8 +174,11 @@ export default function ProfileScreen() {
 
       {configured && !session && (
         <View style={styles.card}>
+          <Text style={styles.sectionEyebrow}>CONTA</Text>
           <Text style={styles.cardTitle}>Entrar ou criar conta</Text>
-          <Text style={styles.helper}>Crie sua conta para iniciar o teste grátis de 7 dias.</Text>
+          <Text style={styles.helper}>
+            Crie sua conta para ativar o teste grátis e salvar seu perfil.
+          </Text>
           <ProfileInput label="Nome" value={registrationName} onChangeText={setRegistrationName} />
           <ProfileInput
             label="Email"
@@ -174,10 +193,18 @@ export default function ProfileScreen() {
             onChangeText={setPassword}
             secureTextEntry
           />
-          <TouchableOpacity style={styles.primaryButton} onPress={handleSignIn} disabled={busy}>
-            <Text style={styles.primaryButtonText}>Entrar</Text>
+          <TouchableOpacity
+            style={[styles.primaryButton, busy && styles.buttonDisabled]}
+            onPress={handleSignIn}
+            disabled={busy}
+          >
+            {busy ? <ActivityIndicator color={Colors.primary[900]} /> : <Text style={styles.primaryButtonText}>Entrar</Text>}
           </TouchableOpacity>
-          <TouchableOpacity style={styles.secondaryButton} onPress={handleSignUp} disabled={busy}>
+          <TouchableOpacity
+            style={[styles.secondaryButton, busy && styles.buttonDisabled]}
+            onPress={handleSignUp}
+            disabled={busy}
+          >
             <Text style={styles.secondaryButtonText}>Criar conta</Text>
           </TouchableOpacity>
         </View>
@@ -185,47 +212,112 @@ export default function ProfileScreen() {
 
       {configured && session && (
         <>
-          <View style={styles.statusCard}>
-            <View style={styles.statusRow}>
-              <Text style={styles.statusLabel}>Status da conta</Text>
-              <Text style={styles.statusValue}>
-                {ACCOUNT_STATUS_LABELS[profile?.subscription_status ?? 'none']}
-              </Text>
+          <View style={[styles.completionCard, completion.isComplete && styles.completionCardComplete]}>
+            <View style={styles.completionHeader}>
+              <CheckCircle2
+                size={22}
+                color={completion.isComplete ? Colors.success : Colors.gold[400]}
+              />
+              <View style={styles.completionTitleWrap}>
+                <Text style={styles.cardTitle}>
+                  {completion.isComplete ? 'Perfil completo' : 'Complete seu cadastro'}
+                </Text>
+                <Text style={styles.completionCount}>
+                  {completion.completedFields} de {completion.totalFields} campos preenchidos
+                </Text>
+              </View>
             </View>
-            <View style={styles.statusRow}>
-              <Text style={styles.statusLabel}>Dias restantes de teste</Text>
-              <Text style={styles.statusValue}>{calculateTrialDaysLeft(profile)}</Text>
+            <View style={styles.progressTrack}>
+              <View style={[styles.progressFill, { width: `${completion.percentage}%` }]} />
             </View>
-            <View style={styles.statusRow}>
-              <Text style={styles.statusLabel}>Etapa do funil</Text>
-              <Text style={styles.statusValue}>
-                {profile ? FUNNEL_LABELS[getFunnelStage(profile)] : 'Cadastrado'}
-              </Text>
-            </View>
+            {!completion.isComplete && (
+              <>
+                <Text style={styles.helper}>
+                  Isso ajuda a configurar sua conta e preparar seu teste grátis.
+                </Text>
+                <View style={styles.missingFields}>
+                  {completion.missingFields.map(field => (
+                    <View key={field} style={styles.missingChip}>
+                      <Text style={styles.missingChipText}>{field}</Text>
+                    </View>
+                  ))}
+                </View>
+              </>
+            )}
           </View>
 
           <View style={styles.card}>
+            <View style={styles.sectionHeader}>
+              <ShieldCheck size={19} color={Colors.gold[400]} />
+              <Text style={styles.sectionTitle}>Conta</Text>
+            </View>
+            <StatusRow label="Email" value={session.user.email ?? 'Não informado'} />
+            <StatusRow label="Status da conta" value={trial.accountLabel} />
+            <StatusRow label="Etapa do funil" value={funnelLabel} />
+          </View>
+
+          <View style={styles.card}>
+            <View style={styles.sectionHeader}>
+              <CalendarDays size={19} color={Colors.gold[400]} />
+              <Text style={styles.sectionTitle}>Teste grátis</Text>
+            </View>
+            <StatusRow label="Dias restantes" value={trial.daysLabel} />
+            <StatusRow label="Início do teste" value={formatProfileDate(profile?.trial_started_at ?? null)} />
+            <StatusRow label="Fim do teste" value={formatProfileDate(profile?.trial_ends_at ?? null)} />
+            {trial.isExpired && (
+              <View style={styles.expiredNotice}>
+                <Text style={styles.expiredText}>
+                  Seu teste expirou. Em breve você poderá ativar sua assinatura pelo app.
+                </Text>
+              </View>
+            )}
+          </View>
+
+          <View style={styles.card}>
+            <Text style={styles.sectionTitle}>Dados do motorista</Text>
             <ProfileInput label="Nome" value={form.full_name} onChangeText={value => updateField('full_name', value)} />
-            <ProfileInput label="Email" value={session.user.email ?? ''} editable={false} />
             <ProfileInput label="WhatsApp" value={form.phone} onChangeText={value => updateField('phone', value)} keyboardType="phone-pad" />
-            <ProfileInput label="Cidade" value={form.city} onChangeText={value => updateField('city', value)} />
-            <ProfileInput label="Estado" value={form.state} onChangeText={value => updateField('state', value)} autoCapitalize="characters" />
+            <View style={styles.inlineFields}>
+              <View style={styles.cityField}>
+                <ProfileInput label="Cidade" value={form.city} onChangeText={value => updateField('city', value)} />
+              </View>
+              <View style={styles.stateField}>
+                <ProfileInput label="Estado" value={form.state} onChangeText={value => updateField('state', value)} autoCapitalize="characters" maxLength={2} />
+              </View>
+            </View>
             <ProfileInput label="Tipo de veículo" value={form.vehicle_type} onChangeText={value => updateField('vehicle_type', value)} />
             <ProfileInput label="Plataforma principal" value={form.main_platform} onChangeText={value => updateField('main_platform', value)} />
-            <TouchableOpacity style={styles.primaryButton} onPress={handleSave} disabled={busy}>
-              <Save size={18} color={Colors.primary[900]} />
-              <Text style={styles.primaryButtonText}>Salvar perfil</Text>
+            <TouchableOpacity
+              style={[styles.primaryButton, busy && styles.buttonDisabled]}
+              onPress={handleSave}
+              disabled={busy}
+            >
+              {busy
+                ? <ActivityIndicator color={Colors.primary[900]} />
+                : (
+                  <>
+                    <Save size={18} color={Colors.primary[900]} />
+                    <Text style={styles.primaryButtonText}>Salvar perfil</Text>
+                  </>
+                )}
             </TouchableOpacity>
           </View>
 
-          <TouchableOpacity style={styles.signOutButton} onPress={handleSignOut} disabled={busy}>
-            <LogOut size={18} color={Colors.error} />
-            <Text style={styles.signOutText}>Sair</Text>
-          </TouchableOpacity>
+          <View style={styles.card}>
+            <Text style={styles.sectionTitle}>Segurança</Text>
+            <Text style={styles.helper}>Encerre a sessão neste dispositivo quando necessário.</Text>
+            <TouchableOpacity
+              style={[styles.signOutButton, busy && styles.buttonDisabled]}
+              onPress={handleSignOut}
+              disabled={busy}
+            >
+              <LogOut size={18} color={Colors.lightGray} />
+              <Text style={styles.signOutText}>Sair</Text>
+            </TouchableOpacity>
+          </View>
         </>
       )}
 
-      {busy && <ActivityIndicator style={styles.activity} color={Colors.gold[400]} />}
       {error && <Text style={styles.error}>{error}</Text>}
       {message && <Text style={styles.success}>{message}</Text>}
       <Text style={styles.version}>Zerei Rotas v1.0.0</Text>
@@ -248,6 +340,15 @@ function ProfileInput(props: React.ComponentProps<typeof TextInput> & { label: s
   );
 }
 
+function StatusRow({ label, value }: { label: string; value: string }) {
+  return (
+    <View style={styles.statusRow}>
+      <Text style={styles.statusLabel}>{label}</Text>
+      <Text style={styles.statusValue}>{value}</Text>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
   content: { padding: Spacing.lg, paddingBottom: 120 },
@@ -255,10 +356,22 @@ const styles = StyleSheet.create({
   header: { alignItems: 'center', marginBottom: Spacing.lg },
   avatar: { width: 68, height: 68, borderRadius: 34, backgroundColor: Colors.gold[500], alignItems: 'center', justifyContent: 'center', marginBottom: Spacing.sm },
   title: { color: Colors.white, fontSize: FontSizes.xxl, fontWeight: '800' },
-  subtitle: { color: Colors.gray, fontSize: FontSizes.md, marginTop: Spacing.xs },
+  subtitle: { color: Colors.gray, fontSize: FontSizes.md, marginTop: Spacing.xs, textAlign: 'center' },
   card: { backgroundColor: Colors.cardBg, borderWidth: 1, borderColor: Colors.cardBorder, borderRadius: BorderRadius.lg, padding: Spacing.md, gap: Spacing.md, marginBottom: Spacing.lg },
   infoCard: { backgroundColor: Colors.warningBg, borderWidth: 1, borderColor: Colors.warningBorder, borderRadius: BorderRadius.lg, padding: Spacing.lg, gap: Spacing.sm },
-  statusCard: { backgroundColor: Colors.cardBg, borderWidth: 1, borderColor: Colors.cardBorder, borderRadius: BorderRadius.lg, padding: Spacing.md, gap: Spacing.md, marginBottom: Spacing.lg },
+  completionCard: { backgroundColor: Colors.warningBg, borderWidth: 1, borderColor: Colors.warningBorder, borderRadius: BorderRadius.lg, padding: Spacing.md, gap: Spacing.md, marginBottom: Spacing.lg },
+  completionCardComplete: { backgroundColor: Colors.successBg, borderColor: Colors.successBorder },
+  completionHeader: { flexDirection: 'row', alignItems: 'flex-start', gap: Spacing.sm },
+  completionTitleWrap: { flex: 1, gap: 2 },
+  completionCount: { color: Colors.gray, fontSize: FontSizes.sm },
+  progressTrack: { height: 7, borderRadius: BorderRadius.full, backgroundColor: Colors.cardBorder, overflow: 'hidden' },
+  progressFill: { height: '100%', borderRadius: BorderRadius.full, backgroundColor: Colors.gold[400] },
+  missingFields: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm },
+  missingChip: { borderRadius: BorderRadius.full, borderWidth: 1, borderColor: Colors.warningBorder, backgroundColor: Colors.cardBg, paddingHorizontal: Spacing.sm, paddingVertical: 6 },
+  missingChipText: { color: Colors.lightGray, fontSize: FontSizes.sm, fontWeight: '700' },
+  sectionEyebrow: { color: Colors.gold[400], fontSize: FontSizes.xs, fontWeight: '800', letterSpacing: 1 },
+  sectionHeader: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
+  sectionTitle: { color: Colors.white, fontSize: FontSizes.lg, fontWeight: '800' },
   cardTitle: { color: Colors.white, fontSize: FontSizes.xl, fontWeight: '800' },
   helper: { color: Colors.gray, fontSize: FontSizes.md, lineHeight: 20 },
   offlineLabel: { color: Colors.gold[400], fontSize: FontSizes.sm, fontWeight: '700' },
@@ -266,17 +379,22 @@ const styles = StyleSheet.create({
   label: { color: Colors.lightGray, fontSize: FontSizes.sm, fontWeight: '700' },
   input: { minHeight: 50, borderWidth: 1, borderColor: Colors.cardBorder, borderRadius: BorderRadius.md, backgroundColor: Colors.background, color: Colors.white, fontSize: FontSizes.lg, paddingHorizontal: Spacing.md },
   inputDisabled: { color: Colors.gray, opacity: 0.8 },
+  inlineFields: { flexDirection: 'row', gap: Spacing.sm, alignItems: 'flex-start' },
+  cityField: { flex: 1 },
+  stateField: { width: 88 },
   primaryButton: { minHeight: 52, borderRadius: BorderRadius.md, backgroundColor: Colors.gold[500], flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: Spacing.sm, paddingHorizontal: Spacing.md },
   primaryButtonText: { color: Colors.primary[900], fontSize: FontSizes.lg, fontWeight: '800' },
   secondaryButton: { minHeight: 52, borderRadius: BorderRadius.md, borderWidth: 1, borderColor: Colors.gold[500], alignItems: 'center', justifyContent: 'center', paddingHorizontal: Spacing.md },
   secondaryButtonText: { color: Colors.gold[400], fontSize: FontSizes.lg, fontWeight: '800' },
-  statusRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: Spacing.md },
+  buttonDisabled: { opacity: 0.55 },
+  statusRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: Spacing.md },
   statusLabel: { flex: 1, color: Colors.gray, fontSize: FontSizes.md },
-  statusValue: { color: Colors.white, fontSize: FontSizes.md, fontWeight: '800', textAlign: 'right' },
-  signOutButton: { minHeight: 52, borderRadius: BorderRadius.md, borderWidth: 1, borderColor: Colors.errorBorder, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: Spacing.sm },
-  signOutText: { color: Colors.error, fontSize: FontSizes.lg, fontWeight: '800' },
-  activity: { marginBottom: Spacing.md },
+  statusValue: { flexShrink: 1, color: Colors.white, fontSize: FontSizes.md, fontWeight: '800', textAlign: 'right' },
+  expiredNotice: { borderRadius: BorderRadius.md, backgroundColor: Colors.warningBg, borderWidth: 1, borderColor: Colors.warningBorder, padding: Spacing.md },
+  expiredText: { color: Colors.lightGray, fontSize: FontSizes.sm, lineHeight: 19 },
+  signOutButton: { minHeight: 50, borderRadius: BorderRadius.md, borderWidth: 1, borderColor: Colors.cardBorder, backgroundColor: Colors.background, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: Spacing.sm },
+  signOutText: { color: Colors.lightGray, fontSize: FontSizes.lg, fontWeight: '700' },
   error: { color: Colors.error, textAlign: 'center', marginBottom: Spacing.md },
-  success: { color: Colors.success, textAlign: 'center', marginBottom: Spacing.md },
+  success: { color: Colors.success, textAlign: 'center', marginBottom: Spacing.md, fontWeight: '700' },
   version: { color: Colors.gray, fontSize: FontSizes.sm, textAlign: 'center', marginTop: Spacing.lg },
 });

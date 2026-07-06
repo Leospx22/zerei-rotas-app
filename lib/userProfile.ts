@@ -32,6 +32,32 @@ export type EditableUserProfile = Pick<
   'full_name' | 'phone' | 'city' | 'state' | 'vehicle_type' | 'main_platform'
 >;
 
+export type RequiredProfileField = keyof EditableUserProfile;
+
+export interface ProfileCompletion {
+  completedFields: number;
+  totalFields: number;
+  percentage: number;
+  missingFields: string[];
+  isComplete: boolean;
+}
+
+export type TrialDisplayState =
+  | 'trial_active'
+  | 'trial_last_day'
+  | 'trial_expired'
+  | 'subscription_active'
+  | 'canceled'
+  | 'none';
+
+export interface TrialDisplay {
+  state: TrialDisplayState;
+  accountLabel: string;
+  daysLabel: string;
+  daysRemaining: number;
+  isExpired: boolean;
+}
+
 const EDITABLE_PROFILE_FIELDS: ReadonlyArray<keyof EditableUserProfile> = [
   'full_name',
   'phone',
@@ -40,6 +66,49 @@ const EDITABLE_PROFILE_FIELDS: ReadonlyArray<keyof EditableUserProfile> = [
   'vehicle_type',
   'main_platform',
 ];
+
+const REQUIRED_PROFILE_FIELDS: ReadonlyArray<{
+  field: RequiredProfileField;
+  label: string;
+}> = [
+  { field: 'full_name', label: 'Nome' },
+  { field: 'phone', label: 'WhatsApp' },
+  { field: 'city', label: 'Cidade' },
+  { field: 'state', label: 'Estado' },
+  { field: 'vehicle_type', label: 'Tipo de veículo' },
+  { field: 'main_platform', label: 'Plataforma principal' },
+];
+
+function hasProfileValue(value: unknown): boolean {
+  return typeof value === 'string' && value.trim().length > 0;
+}
+
+export function getMissingProfileFields(
+  profile: Partial<EditableUserProfile> | null
+): string[] {
+  return REQUIRED_PROFILE_FIELDS
+    .filter(({ field }) => !hasProfileValue(profile?.[field]))
+    .map(({ label }) => label);
+}
+
+export function getProfileCompletion(
+  profile: Partial<EditableUserProfile> | null
+): ProfileCompletion {
+  const missingFields = getMissingProfileFields(profile);
+  const totalFields = REQUIRED_PROFILE_FIELDS.length;
+  const completedFields = totalFields - missingFields.length;
+  return {
+    completedFields,
+    totalFields,
+    percentage: Math.round((completedFields / totalFields) * 100),
+    missingFields,
+    isComplete: missingFields.length === 0,
+  };
+}
+
+export function isProfileComplete(profile: Partial<EditableUserProfile> | null): boolean {
+  return getProfileCompletion(profile).isComplete;
+}
 
 export function createTrialPeriod(now = new Date()): {
   trialStartedAt: string;
@@ -83,6 +152,84 @@ export function calculateTrialDaysLeft(
   const remainingMs = new Date(profile.trial_ends_at).getTime() - now.getTime();
   if (!Number.isFinite(remainingMs) || remainingMs <= 0) return 0;
   return Math.ceil(remainingMs / 86_400_000);
+}
+
+function isSameLocalCalendarDay(left: Date, right: Date): boolean {
+  return left.getFullYear() === right.getFullYear()
+    && left.getMonth() === right.getMonth()
+    && left.getDate() === right.getDate();
+}
+
+export function getTrialDisplay(
+  profile: Pick<UserProfile, 'subscription_status' | 'trial_ends_at'> | null,
+  now = new Date()
+): TrialDisplay {
+  if (!profile || profile.subscription_status === 'none') {
+    return { state: 'none', accountLabel: 'Sem assinatura', daysLabel: '—', daysRemaining: 0, isExpired: false };
+  }
+  if (profile.subscription_status === 'active') {
+    return { state: 'subscription_active', accountLabel: 'Assinatura ativa', daysLabel: '—', daysRemaining: 0, isExpired: false };
+  }
+  if (profile.subscription_status === 'canceled') {
+    return { state: 'canceled', accountLabel: 'Cancelado', daysLabel: '—', daysRemaining: 0, isExpired: false };
+  }
+
+  const trialEnd = profile.trial_ends_at ? new Date(profile.trial_ends_at) : null;
+  const trialEndTime = trialEnd?.getTime() ?? Number.NaN;
+  if (
+    profile.subscription_status === 'expired'
+    || !Number.isFinite(trialEndTime)
+    || trialEndTime <= now.getTime()
+  ) {
+    return { state: 'trial_expired', accountLabel: 'Teste expirado', daysLabel: '0', daysRemaining: 0, isExpired: true };
+  }
+  if (trialEnd && isSameLocalCalendarDay(trialEnd, now)) {
+    return { state: 'trial_last_day', accountLabel: 'Teste ativo', daysLabel: 'Último dia do teste', daysRemaining: 0, isExpired: false };
+  }
+
+  const daysRemaining = calculateTrialDaysLeft(profile, now);
+  return {
+    state: 'trial_active',
+    accountLabel: 'Teste ativo',
+    daysLabel: String(daysRemaining),
+    daysRemaining,
+    isExpired: false,
+  };
+}
+
+export function shouldSyncTrialExpiration(
+  profile: Pick<UserProfile, 'subscription_status' | 'trial_ends_at'> | null,
+  now = new Date()
+): boolean {
+  return profile?.subscription_status === 'trial' && getTrialDisplay(profile, now).isExpired;
+}
+
+export function shouldRecordProfileCompleted(
+  previousProfile: Partial<EditableUserProfile> | null,
+  nextProfile: Partial<EditableUserProfile> | null,
+  alreadyRecorded: boolean
+): boolean {
+  return !alreadyRecorded && !isProfileComplete(previousProfile) && isProfileComplete(nextProfile);
+}
+
+export function formatProfileDate(value: string | null): string {
+  if (!value) return 'Não informado';
+  const date = new Date(value);
+  if (!Number.isFinite(date.getTime())) return 'Não informado';
+  return date.toLocaleDateString('pt-BR');
+}
+
+export function getAuthErrorMessage(error: unknown): string {
+  const message = error instanceof Error ? error.message : String(error ?? '');
+  const normalized = message.toLocaleLowerCase('en-US');
+  if (normalized.includes('invalid login credentials')) return 'E-mail ou senha incorretos.';
+  if (normalized.includes('user already registered') || normalized.includes('already been registered')) return 'Este e-mail já está cadastrado.';
+  if (normalized.includes('email not confirmed')) return 'Confirme seu e-mail antes de entrar.';
+  if (normalized.includes('invalid email')) return 'Informe um e-mail válido.';
+  if (normalized.includes('password') && (normalized.includes('weak') || normalized.includes('least'))) {
+    return 'A senha deve ter pelo menos 6 caracteres.';
+  }
+  return message || 'Não foi possível concluir a ação.';
 }
 
 export function getFunnelStage(
@@ -184,4 +331,16 @@ export async function recordFunnelEvent(
     event_data: eventData,
   });
   return !error;
+}
+
+export async function recordProfileCompletedOnce(userId: string): Promise<boolean> {
+  if (!isSupabaseConfigured || !supabase) return false;
+  const { data, error } = await supabase
+    .from('user_funnel_events')
+    .select('id')
+    .eq('user_id', userId)
+    .eq('event_type', 'profile_completed')
+    .limit(1);
+  if (error || (data?.length ?? 0) > 0) return false;
+  return recordFunnelEvent(userId, 'profile_completed');
 }

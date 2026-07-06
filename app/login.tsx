@@ -11,9 +11,10 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Mail, Lock, Eye, EyeOff, Chrome, Crown } from 'lucide-react-native';
+import { Mail, Lock, Eye, EyeOff, Crown } from 'lucide-react-native';
 import { Colors, Spacing, FontSizes, BorderRadius } from '@/constants/theme';
 import { useAuth } from '@/contexts/AuthContext';
+import { getAuthErrorMessage } from '@/lib/userProfile';
 
 export default function LoginScreen() {
   const router = useRouter();
@@ -50,8 +51,8 @@ export default function LoginScreen() {
         await signInWithEmail(email, password);
       }
       router.replace('/(tabs)');
-    } catch (e: any) {
-      setError(e.message || 'Erro ao autenticar');
+    } catch (caught) {
+      setError(getAuthErrorMessage(caught));
     } finally {
       setLoading(false);
     }
@@ -73,6 +74,9 @@ export default function LoginScreen() {
           <Text style={styles.title}>Zerei Rotas</Text>
           <Text style={styles.subtitle}>
             Organize, otimize e conclua suas rotas de entrega mais rápido
+          </Text>
+          <Text style={styles.accountHelper}>
+            Crie sua conta para ativar o teste grátis e salvar seu perfil.
           </Text>
         </View>
 
@@ -130,7 +134,7 @@ export default function LoginScreen() {
           {message && <Text style={styles.messageText}>{message}</Text>}
 
           <TouchableOpacity
-            style={styles.primaryButton}
+            style={[styles.primaryButton, loading && styles.buttonDisabled]}
             onPress={handleSubmit}
             disabled={loading}
           >
@@ -143,19 +147,8 @@ export default function LoginScreen() {
             )}
           </TouchableOpacity>
 
-          <View style={styles.divider}>
-            <View style={styles.dividerLine} />
-            <Text style={styles.dividerText}>ou</Text>
-            <View style={styles.dividerLine} />
-          </View>
-
-          <TouchableOpacity style={styles.googleButton}>
-            <Chrome size={20} color={Colors.white} />
-            <Text style={styles.googleButtonText}>Entrar com Google</Text>
-          </TouchableOpacity>
-
           <TouchableOpacity
-            onPress={() => { setIsSignUp(!isSignUp); setError(null); }}
+            onPress={() => { setIsSignUp(!isSignUp); setError(null); setMessage(null); }}
             style={styles.toggleButton}
           >
             <Text style={styles.toggleText}>
@@ -216,6 +209,13 @@ const styles = StyleSheet.create({
     fontSize: FontSizes.sm,
     textAlign: 'center',
   },
+  accountHelper: {
+    fontSize: FontSizes.sm,
+    color: Colors.gold[400],
+    textAlign: 'center',
+    lineHeight: 19,
+    marginTop: Spacing.sm,
+  },
   messageText: {
     color: Colors.success,
     fontSize: FontSizes.sm,
@@ -234,33 +234,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: Colors.primary[900],
   },
-  divider: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginVertical: Spacing.sm,
-  },
-  dividerLine: { flex: 1, height: 1, backgroundColor: Colors.cardBorder },
-  dividerText: {
-    color: Colors.gray,
-    fontSize: FontSizes.sm,
-    marginHorizontal: Spacing.md,
-  },
-  googleButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: Colors.cardBg,
-    borderWidth: 1,
-    borderColor: Colors.cardBorder,
-    borderRadius: BorderRadius.md,
-    height: 52,
-    gap: Spacing.sm,
-  },
-  googleButtonText: {
-    fontSize: FontSizes.lg,
-    fontWeight: '600',
-    color: Colors.white,
-  },
+  buttonDisabled: { opacity: 0.55 },
   toggleButton: { alignItems: 'center', marginTop: Spacing.md },
   toggleText: {
     fontSize: FontSizes.md,

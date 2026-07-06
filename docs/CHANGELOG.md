@@ -6,6 +6,8 @@ All notable product and architecture changes are recorded here. Versions follow 
 
 ### Added
 
+- Profile completion progress, Portuguese missing-field guidance, polished trial dates/status, and a one-time `profile_completed` funnel event.
+
 - Supabase profile, seven-day trial, funnel-event, and future subscription database foundation with owner-scoped RLS.
 - Environment-safe account configuration and a real Perfil login, registration, profile editing, trial status, and sign-out experience.
 - Pure profile/trial helpers and regression coverage for configuration, trial dates, funnel stages, safe updates, and schema presence.
@@ -58,6 +60,9 @@ All notable product and architecture changes are recorded here. Versions follow 
 - Occurrence reason editing and safe Entregue/Devolvido ao Hub result correction.
 
 ### Changed
+
+- Reorganized Perfil into Conta, Teste grátis, Dados do motorista, and Segurança sections with clearer loading, success, and authentication errors.
+- Trial expiration is now derived correctly in the UI while server-managed status synchronization remains deferred.
 
 - Simplified occurrence cards to show only registration and latest-update timestamps, with compatibility fallback for older resolved records.
 

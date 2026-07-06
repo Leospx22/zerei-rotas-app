@@ -1,5 +1,3 @@
--- Sprint 4.1: authentication, profile, trial, funnel, and subscription foundation.
--- Run through the Supabase migration workflow. Never expose the service-role key in the app.
 
 create extension if not exists pgcrypto;
 

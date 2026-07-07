@@ -6,6 +6,8 @@ All notable product and architecture changes are recorded here. Versions follow 
 
 ### Added
 
+- Supabase waitlist lead/event schema, anonymous insert-only RLS boundary, safe lead helper, integration guide, and regression tests.
+
 - Closed-beta status, support and feedback actions, build label, beta tester checklist, and optional `feedback_opened` funnel tracking.
 
 - Profile completion progress, Portuguese missing-field guidance, polished trial dates/status, and a one-time `profile_completed` funnel event.

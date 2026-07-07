@@ -57,6 +57,7 @@ lib/routePresentation.ts       Pure route-card status and Portuguese label deriv
 lib/spreadsheetParser.ts       CSV, TSV, XLS, and XLSX parsing
 lib/supabase.ts                Supabase client and session storage configuration
 lib/userProfile.ts             Profile, trial, and funnel service/helpers
+lib/waitlistLeads.ts           Public lead validation and safe Supabase payloads
 supabase/migrations/           Supabase database migrations
 tests/routePersistence.test.mjs Persistence and route-lifecycle regressions
 types/                         Project-specific declarations
@@ -292,6 +293,8 @@ Supabase authentication persistence is separate. `lib/supabase.ts` only creates 
 `AuthProvider` owns the current Supabase session and loaded `profiles` record. `lib/userProfile.ts` owns profile mutations, completion derivation, and pure trial/funnel presentation. New auth users receive a seven-day trial profile and registration events through the database trigger in migration `004_auth_profile_foundation`; the client safely recovers a missing profile after login and records `profile_completed` once when onboarding is finished. Expired-trial presentation is derived locally, while persisted expiration and subscription writes remain server-owned. No payment provider is connected.
 
 Closed-beta support links are isolated in `lib/appLinks.ts`. An unconfigured feedback form resolves to a safe null state, WhatsApp support uses an HTTPS configuration boundary, and opening a configured feedback form records the owner-scoped `feedback_opened` funnel event. These links do not gate local app usage.
+
+The landing-page waitlist foundation is isolated from authenticated app data. Anonymous clients may insert constrained rows into `waitlist_leads` but have no read, update, or delete access; `waitlist_lead_events` is trigger-owned and unavailable to public clients. `lib/waitlistLeads.ts` mirrors that public payload boundary without exposing workflow fields.
 
 ## Import Pipeline
 

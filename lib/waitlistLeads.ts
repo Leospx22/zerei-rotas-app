@@ -1,6 +1,3 @@
-import type { SupabaseClient } from '@supabase/supabase-js';
-import { supabase } from './supabase.ts';
-
 export const WAITLIST_PLATFORMS = [
   'Shopee',
   'Mercado Livre',
@@ -19,6 +16,8 @@ export interface WaitlistLeadInput {
   main_platform: WaitlistPlatform | string;
 }
 
+// WaitlistLeadPayload preserves metadata for backward-compat with tests;
+// the REST call intentionally omits it per the external table contract.
 export interface WaitlistLeadPayload {
   name: string;
   whatsapp: string;
@@ -38,6 +37,11 @@ export interface WaitlistLeadResult {
   success: boolean;
   error: string | null;
 }
+
+const EXTERNAL_SUPABASE_URL = 'https://xmtvjzwcfvjkiaplaiay.supabase.co';
+const EXTERNAL_SUPABASE_ANON_KEY =
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhtdHZqendjZnZqa2lhcGxhaWF5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIxODc5NDcsImV4cCI6MjA5Nzc2Mzk0N30.cV8GVo2EmHEK6FOW3MRDuMP9MXT3XX3xdEB48qktDmA';
+const WAITLIST_REST_URL = `${EXTERNAL_SUPABASE_URL}/rest/v1/waitlist_leads`;
 
 export function normalizeWhatsApp(value: string): string {
   return value.replace(/\D/g, '');
@@ -103,21 +107,77 @@ export function getWaitlistLeadFriendlyError(error: unknown): string {
   return 'Não foi possível enviar seus dados agora. Tente novamente em instantes.';
 }
 
+/**
+ * Submits a waitlist lead directly to the external Supabase REST API.
+ * The Supabase client is not used. Only the six public fields are sent.
+ * Success is only returned when the REST response is ok (2xx).
+ */
 export async function submitWaitlistLead(
-  input: WaitlistLeadInput,
-  client: SupabaseClient | null = supabase
+  input: WaitlistLeadInput
 ): Promise<WaitlistLeadResult> {
   const validation = validateWaitlistLead(input);
   if (!validation.isValid) return { success: false, error: validation.errors[0] };
-  if (!client) {
+
+  const payload = {
+    name: input.name.trim(),
+    whatsapp: normalizeWhatsApp(input.whatsapp),
+    email: input.email?.trim() || null,
+    city: input.city?.trim() || null,
+    main_platform: input.main_platform.trim() as WaitlistPlatform,
+    source: 'landing_page' as const,
+  };
+
+  console.log(
+    'Submitting waitlist lead to external Supabase REST:',
+    WAITLIST_REST_URL
+  );
+  console.log('Waitlist payload:', payload);
+
+  try {
+    const response = await fetch(WAITLIST_REST_URL, {
+      method: 'POST',
+      headers: {
+        apikey: EXTERNAL_SUPABASE_ANON_KEY,
+        Authorization: `Bearer ${EXTERNAL_SUPABASE_ANON_KEY}`,
+        'Content-Type': 'application/json',
+        Prefer: 'return=minimal',
+      },
+      body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+      const responseBody = await response.text();
+      console.error('Waitlist REST insert failed:', response.status, responseBody);
+
+      if (
+        response.status === 409 ||
+        responseBody.includes('23505') ||
+        responseBody.includes('waitlist_leads_whatsapp_normalized_key') ||
+        responseBody.includes('duplicate key')
+      ) {
+        return { success: false, error: 'Este WhatsApp já está na lista de teste.' };
+      }
+
+      if (responseBody.includes('row-level security') || responseBody.includes('RLS')) {
+        return {
+          success: false,
+          error:
+            'Não foi possível salvar seus dados por configuração de segurança. Verifique a política RLS.',
+        };
+      }
+
+      return {
+        success: false,
+        error: 'Não foi possível enviar seus dados agora. Tente novamente em instantes.',
+      };
+    }
+
+    return { success: true, error: null };
+  } catch {
     return {
       success: false,
-      error: getWaitlistLeadFriendlyError({ code: 'WAITLIST_NOT_CONFIGURED' }),
+      error:
+        'Não foi possível conectar ao servidor. Verifique a configuração do Supabase.',
     };
   }
-
-  const payload = buildWaitlistLeadPayload(input);
-  const { error } = await client.from('waitlist_leads').insert(payload);
-  if (error) return { success: false, error: getWaitlistLeadFriendlyError(error) };
-  return { success: true, error: null };
 }

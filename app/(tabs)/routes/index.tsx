@@ -27,7 +27,6 @@ import { usePersistence } from '@/hooks/usePersistence';
 import { useRoute } from '@/contexts/RouteContext';
 import {
   deriveRouteDisplayStatus,
-  routePrimaryActionLabel,
   routeDisplayStatusLabel,
   type RouteDisplayStatus,
 } from '@/lib/routePresentation';
@@ -270,7 +269,7 @@ export default function RoutesScreen() {
                     accessibilityLabel={`Começar entrega ${route.name}`}
                   >
                     <Play size={15} color={Colors.primary[900]} />
-                    <Text style={styles.primaryRouteActionText}>{routePrimaryActionLabel(route.status)}</Text>
+                    <Text style={styles.primaryRouteActionText}>Começar entrega</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
                     style={[styles.routeActionButton, styles.reviewActionButton]}
@@ -292,10 +291,10 @@ export default function RoutesScreen() {
                     onPress={() => router.push('/(tabs)/routes/route-execution')}
                     activeOpacity={0.78}
                     accessibilityRole="button"
-                    accessibilityLabel={`Continuar entrega ${route.name}`}
+                    accessibilityLabel={`Continuar rota ${route.name}`}
                   >
                     <Play size={15} color={Colors.primary[900]} />
-                    <Text style={styles.primaryRouteActionText}>{routePrimaryActionLabel(route.status)}</Text>
+                    <Text style={styles.primaryRouteActionText}>Continuar</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
                     style={[styles.routeActionButton, styles.reviewActionButton]}

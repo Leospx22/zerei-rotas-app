@@ -5,29 +5,6 @@ import {
   createDirectOccurrenceTarget,
   getAddressGroupOccurrenceAction,
 } from '../lib/occurrenceFlow.ts';
-import { OCCURRENCE_REASONS } from '../lib/occurrenceReasons.ts';
-
-test('uses the exact Shopee occurrence reasons in field order', () => {
-  assert.deepEqual([...OCCURRENCE_REASONS], [
-    'Endereço não encontrado',
-    'Comércio Fechado',
-    'Área de Risco',
-    'Cliente Ausente',
-    'Mudança de Endereço',
-    'Terceiro Recusou',
-    'Cliente Recusou',
-    'Palavra-Chave',
-    'Item Perdido',
-    'Item Danificado',
-    'Clima Adverso',
-    'Problemas Mecânicos',
-    'Roubo/Assalto',
-    'Desisti da Rota',
-  ]);
-  assert.equal(OCCURRENCE_REASONS.includes('Endereço não localizado'), false);
-  assert.equal(OCCURRENCE_REASONS.includes('Reagendado'), false);
-  assert.equal(OCCURRENCE_REASONS.includes('Outro'), false);
-});
 
 test('creates a direct reason-selection target for the chosen package', () => {
   assert.deepEqual(

@@ -4,6 +4,7 @@ This register contains confirmed open limitations and risks in the current proje
 
 | ID | Description | Priority | Status | Owner | Notes |
 | --- | --- | --- | --- | --- | --- |
+| ZR-001 | Package occurrence reasons are stored only in RouteContext memory and are lost after an application restart. | P1 | Open | Unassigned | Package `skipped` status persists with the route, but the explanatory reason does not. Planned for MVP delivery-status hardening. |
 | ZR-002 | Deleting a completed history route targets only its route ID. If legacy history contains duplicate IDs, every matching entry can be removed. | P1 | Open | Unassigned | Rename already uses `id + completedAt`; delete should eventually use the same unique history identity without breaking current-route deletion. |
 | ZR-003 | Android tab interaction currently depends on fixed tab bar dimensions (`height: 100`, `paddingBottom: 24`). Behavior has not been verified across the supported Android device and navigation-mode matrix. | P1 | Open | Unassigned | Do not reduce these values without physical-device testing. Future work should validate gesture and three-button navigation with safe-area variations. |
 | ZR-004 | Native iOS document picking, spreadsheet parsing, navigation, persistence, and safe-area behavior have not been validated on a physical iOS device. | P1 | Open | Unassigned | TypeScript compatibility is not equivalent to runtime validation. Complete the iOS section of the release checklist before an iOS release. |

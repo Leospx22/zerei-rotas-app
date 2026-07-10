@@ -6,9 +6,6 @@ All notable product and architecture changes are recorded here. Versions follow 
 
 ### Added
 
-- Support for Shopee `Sequence` columns so package rows can show short `Seq. X` identifiers while preserving SPX TN as secondary reference.
-- Import support for spreadsheet rows with blank, dash, or invalid Stop values; these are preserved as movable `Sem parada` stops and shown before numbered stops.
-- Exact duplicate-address warnings that name the matching stop numbers, including readable copy for missing-stop rows.
 - Supabase waitlist lead/event schema, anonymous insert-only RLS boundary, safe lead helper, integration guide, and regression tests.
 
 - Closed-beta status, support and feedback actions, build label, beta tester checklist, and optional `feedback_opened` funnel tracking.
@@ -68,9 +65,6 @@ All notable product and architecture changes are recorded here. Versions follow 
 
 ### Changed
 
-- Updated occurrence reason options to the real Shopee-style reason list used in field operations.
-- Active/started route actions now say `Continuar entrega`; planned routes still say `Começar entrega`.
-- Package lists now prioritize `Seq. X` over long SPX TN identifiers when Sequence is available.
 - Reorganized Perfil into Conta, Teste grátis, Dados do motorista, and Segurança sections with clearer loading, success, and authentication errors.
 - Trial expiration is now derived correctly in the UI while server-managed status synchronization remains deferred.
 
@@ -103,8 +97,6 @@ All notable product and architecture changes are recorded here. Versions follow 
 
 ### Fixed
 
-- Prevented packages with invalid or missing Stop values from being silently pushed behind numbered stops or disguised as synthetic numbered stops.
-- Replaced generic duplicate-address warnings with exact matching-stop diagnostics based on normalized street and number.
 - Preserved the Em rota presentation and Continuar action after reloading a started route with zero deliveries.
 
 - Made every occurrence card show Registrado em, using Não informado for legacy records without a registration timestamp.

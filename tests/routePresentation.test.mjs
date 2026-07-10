@@ -2,14 +2,12 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   deriveRouteDisplayStatus,
-  routePrimaryActionLabel,
   routeDisplayStatusLabel,
 } from '../lib/routePresentation.ts';
 
 test('shows a current route without deliveries as planned', () => {
   assert.equal(deriveRouteDisplayStatus(true, 0, false), 'planning');
   assert.equal(routeDisplayStatusLabel('planning'), 'Planejada');
-  assert.equal(routePrimaryActionLabel('planning'), 'Começar entrega');
 });
 
 test('shows a started current route without deliveries as in route', () => {
@@ -17,7 +15,6 @@ test('shows a started current route without deliveries as in route', () => {
 
   assert.equal(status, 'active');
   assert.equal(routeDisplayStatusLabel(status), 'Em rota');
-  assert.equal(routePrimaryActionLabel(status), 'Continuar entrega');
 });
 
 test('shows a current route with delivered packages as in route', () => {
@@ -28,5 +25,4 @@ test('shows a current route with delivered packages as in route', () => {
 test('shows history entries as completed', () => {
   assert.equal(deriveRouteDisplayStatus(false, 0, false), 'completed');
   assert.equal(routeDisplayStatusLabel('completed'), 'Concluída');
-  assert.equal(routePrimaryActionLabel('completed'), null);
 });

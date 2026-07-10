@@ -88,11 +88,26 @@ test('duplicate database error maps to friendly Portuguese message', () => {
   );
 });
 
-test('missing Supabase client returns friendly configuration failure', async () => {
-  assert.deepEqual(await submitWaitlistLead(validLead, null), {
-    success: false,
-    error: 'Lista de teste ainda não configurada.',
-  });
+test('network failure returns friendly connection error without real Supabase access', async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () => {
+    throw new Error('network disabled in test');
+  };
+  try {
+    assert.deepEqual(await submitWaitlistLead(validLead), {
+      success: false,
+      error: 'Não foi possível conectar ao servidor. Verifique a configuração do Supabase.',
+    });
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test('unavailable waitlist configuration error maps to friendly copy', () => {
+  assert.equal(
+    getWaitlistLeadFriendlyError({ code: 'WAITLIST_NOT_CONFIGURED' }),
+    'Lista de teste ainda não configurada.'
+  );
 });
 
 test('migration grants anonymous inserts only to public form columns', () => {

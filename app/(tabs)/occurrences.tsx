@@ -32,16 +32,8 @@ import {
   type CollectedOccurrenceRecord,
   type OccurrenceResolution,
 } from '@/lib/occurrenceRecords';
+import { OCCURRENCE_REASONS } from '@/lib/occurrenceReasons';
 import { BorderRadius, Colors, FontSizes, Spacing } from '@/constants/theme';
-
-const OCCURRENCE_REASONS = [
-  'Cliente ausente',
-  'Endereço não localizado',
-  'Cliente recusou',
-  'Estabelecimento fechado',
-  'Reagendado',
-  'Outro',
-] as const;
 
 interface OccurrenceCardProps {
   record: CollectedOccurrenceRecord;

@@ -25,6 +25,7 @@ import {
 import { Colors, Spacing, FontSizes, BorderRadius } from '@/constants/theme';
 import { useRoute } from '@/contexts/RouteContext';
 import { useDashboard } from '@/hooks/useDashboard';
+import { getStopDisplayLabel } from '@/lib/packageUtils';
 
 interface RecentRouteItem {
   id: string;
@@ -295,7 +296,7 @@ export default function DashboardScreen() {
             </View>
             {largestStop && (
               <View style={styles.rotaFooter}>
-                <Text style={styles.rotaFooterLabel}>Maior: Parada {largestStop.stopNumber}</Text>
+                <Text style={styles.rotaFooterLabel}>Maior: {getStopDisplayLabel(largestStop)}</Text>
                 <Text style={styles.rotaFooterAddr} numberOfLines={1}>
                   {largestStop.normalizedAddress}
                 </Text>
@@ -353,7 +354,7 @@ export default function DashboardScreen() {
                 {delivered}/{total} pacotes · {completedStops}/{totalStops} paradas
               </Text>
             </View>
-            <Text style={styles.activeRouteAction}>Continuar</Text>
+            <Text style={styles.activeRouteAction}>Continuar entrega</Text>
           </LinearGradient>
         </TouchableOpacity>
       )}

@@ -46,10 +46,16 @@ import {
   getAddressGroupOccurrenceAction,
   type OccurrenceTarget,
 } from '@/lib/occurrenceFlow';
+import { OCCURRENCE_REASONS } from '@/lib/occurrenceReasons';
 import {
   collectRouteOccurrenceRecords,
   partitionOccurrenceRecords,
 } from '@/lib/occurrenceRecords';
+import {
+  getPackagePrimaryLabel,
+  getPackageSecondaryLabel,
+  getStopDisplayLabel,
+} from '@/lib/packageUtils';
 import {
   togglePackageGroupSelection,
   togglePackageSelection,
@@ -60,15 +66,6 @@ import {
   savePlaceInfo,
   type PlaceInfo,
 } from '@/lib/placeIntelligence';
-
-const OCCURRENCE_OPTIONS = [
-  'Cliente ausente',
-  'Endereço não localizado',
-  'Cliente recusou',
-  'Estabelecimento fechado',
-  'Reagendado',
-  'Outro',
-];
 
 const NOOP = () => {};
 
@@ -90,7 +87,7 @@ function OccurrenceSheet({ visible, onSelect, onClose }: OccurrenceSheetProps) {
       <View style={sheet.container}>
         <View style={sheet.handle} />
         <Text style={sheet.title}>Selecionar ocorrência</Text>
-        {OCCURRENCE_OPTIONS.map(option => (
+        {OCCURRENCE_REASONS.map(option => (
           <TouchableOpacity
             key={option}
             style={sheet.option}
@@ -602,7 +599,7 @@ export default function RouteExecutionScreen() {
                         stop.status !== 'pending' && styles.stopNumberTextDone,
                       ]}
                     >
-                      {stop.stopNumber}
+                      {getStopDisplayLabel(stop)}
                     </Text>
                   </View>
                   {stop.optimizedOrderIndex !== undefined &&
@@ -636,7 +633,9 @@ export default function RouteExecutionScreen() {
                     {stop.duplicateAddressWarning && stop.status === 'pending' && (
                       <View style={styles.warnBadge}>
                         <AlertTriangle size={10} color={Colors.warning} />
-                        <Text style={styles.warnBadgeText}>Endereço duplicado</Text>
+                        <Text style={styles.warnBadgeText}>
+                          {stop.duplicateAddressWarningMessage ?? 'Endereço duplicado'}
+                        </Text>
                       </View>
                     )}
                   </View>
@@ -711,9 +710,14 @@ export default function RouteExecutionScreen() {
                                     ]}
                                     numberOfLines={1}
                                   >
-                                    {pkg.trackingNumber}
+                                    {getPackagePrimaryLabel(pkg)}
                                   </Text>
                                 </View>
+                                {getPackageSecondaryLabel(pkg) ? (
+                                  <Text style={styles.packageSecondaryLabel} numberOfLines={1}>
+                                    {getPackageSecondaryLabel(pkg)}
+                                  </Text>
+                                ) : null}
                                 <Text style={styles.packageAddress} numberOfLines={1}>
                                   {pkg.destinationAddress}
                                 </Text>
@@ -972,6 +976,7 @@ const styles = StyleSheet.create({
   packageTracking: { flex: 1, fontSize: FontSizes.sm, fontWeight: '600', color: Colors.white },
   packageTrackingDelivered: { color: Colors.success, textDecorationLine: 'line-through' },
   packageTrackingOccurrence: { color: Colors.error, textDecorationLine: 'line-through' },
+  packageSecondaryLabel: { fontSize: 11, color: Colors.gray, marginLeft: 17 },
   packageAddress: { fontSize: 11, color: Colors.gray, marginLeft: 17 },
   occurrenceReason: { fontSize: 11, color: Colors.error, fontWeight: '500', marginLeft: 17 },
 

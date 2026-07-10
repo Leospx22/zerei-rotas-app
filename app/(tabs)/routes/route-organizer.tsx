@@ -15,6 +15,7 @@ import {
 } from 'lucide-react-native';
 import { Colors, Spacing, FontSizes, BorderRadius } from '@/constants/theme';
 import { useRoute } from '@/contexts/RouteContext';
+import { getStopDisplayLabel, getStopSecondaryLabel } from '@/lib/packageUtils';
 
 export default function RouteOrganizerScreen() {
   const router = useRouter();
@@ -135,9 +136,12 @@ export default function RouteOrganizerScreen() {
             <Text style={styles.stopAddress}>{stop.normalizedAddress}</Text>
             <View style={styles.stopMetaRow}>
               <Text style={styles.stopMeta}>
-                {stop.packageCount} pacote{stop.packageCount !== 1 ? 's' : ''} · Parada {stop.stopNumber}
+                {stop.packageCount} pacote{stop.packageCount !== 1 ? 's' : ''} · {getStopSecondaryLabel(stop)} {getStopDisplayLabel(stop)}
               </Text>
             </View>
+            {stop.duplicateAddressWarningMessage ? (
+              <Text style={styles.stopWarning}>{stop.duplicateAddressWarningMessage}</Text>
+            ) : null}
           </View>
           <View style={styles.stopStatus}>
             {stop.status === 'completed' ? (
@@ -281,6 +285,12 @@ const styles = StyleSheet.create({
   stopMeta: {
     fontSize: FontSizes.sm,
     color: Colors.gray,
+  },
+  stopWarning: {
+    marginTop: 4,
+    fontSize: FontSizes.xs,
+    color: Colors.warning,
+    fontWeight: '700',
   },
   stopStatus: { width: 24, alignItems: 'center' },
   pendingDot: {

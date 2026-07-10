@@ -1,5 +1,6 @@
 import type { RouteData } from '../contexts/RouteContext';
 import { normalizeAddress } from './executionPresentation.ts';
+import { getPackagePrimaryLabel } from './packageUtils.ts';
 import type { GroupedStop } from './packageUtils.ts';
 
 export const OCCURRENCE_REASON_FALLBACK = 'Motivo não informado';
@@ -82,13 +83,13 @@ export function collectRouteOccurrenceRecords(route: RouteData | null): Occurren
       )
       .map(packageItem => ({
         packageId: packageItem.id,
-        packageCode: packageItem.trackingNumber || packageItem.id,
+        packageCode: getPackagePrimaryLabel(packageItem) || packageItem.id,
         address: packageItem.destinationAddress,
         normalizedAddress: normalizeAddress(packageItem.destinationAddress).displayAddress,
         reason: packageItem.occurrenceReason,
         registeredAt: packageItem.occurrenceRegisteredAt,
         routeName: route.name,
-        stopNumber: stop.stopNumber,
+        stopNumber: stop.stopNumber ?? undefined,
         occurrenceResolution: packageItem.occurrenceResolution,
         occurrenceResolvedAt: packageItem.occurrenceResolvedAt,
         occurrenceUpdatedAt: packageItem.occurrenceUpdatedAt,

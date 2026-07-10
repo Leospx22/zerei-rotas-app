@@ -5,7 +5,13 @@ import { AlertCircle, Check, CheckCircle2, MapPin, Navigation, Package, Pencil }
 import { BorderRadius, Colors, FontSizes, Spacing } from '@/constants/theme';
 import { PlaceInfoCard } from '@/components/PlaceInfoCard';
 import type { ExecutionStep } from '@/lib/executionState';
-import type { GroupedStop, PackageItem } from '@/lib/packageUtils';
+import {
+  getPackagePrimaryLabel,
+  getPackageSecondaryLabel,
+  getStopDisplayLabel,
+  type GroupedStop,
+  type PackageItem,
+} from '@/lib/packageUtils';
 import type { PlaceInfo } from '@/lib/placeIntelligence';
 import { isPackageGroupSelected } from '@/lib/packageSelection';
 import {
@@ -91,7 +97,7 @@ export function ExecutionCard({
       <View style={styles.eyebrowRow}>
         <Text style={styles.eyebrow}>PARADA ATUAL</Text>
         <View style={styles.stopBadge}>
-          <Text style={styles.stopBadgeText}>#{currentStop.stopNumber}</Text>
+          <Text style={styles.stopBadgeText}>{getStopDisplayLabel(currentStop)}</Text>
         </View>
       </View>
 
@@ -265,15 +271,20 @@ export function ExecutionCard({
                         activeOpacity={0.78}
                         accessibilityRole="checkbox"
                         accessibilityState={{ checked: separated, disabled: selectionDisabled }}
-                        accessibilityLabel={`${pkg.trackingNumber}, ${packageStateLabel}`}
+                        accessibilityLabel={`${getPackagePrimaryLabel(pkg)}, ${packageStateLabel}`}
                       >
                         <View style={[styles.checkbox, separated && styles.checkboxSelected]}>
                           {separated ? <Check size={18} color={Colors.primary[900]} /> : null}
                         </View>
                         <View style={styles.packageRowContent}>
                           <Text style={styles.packageTracking} numberOfLines={1}>
-                            {pkg.trackingNumber}
+                            {getPackagePrimaryLabel(pkg)}
                           </Text>
+                          {getPackageSecondaryLabel(pkg) ? (
+                            <Text style={styles.packageSecondaryLabel} numberOfLines={1}>
+                              {getPackageSecondaryLabel(pkg)}
+                            </Text>
+                          ) : null}
                           <Text style={styles.packageAddress} numberOfLines={1}>
                             {pkg.destinationAddress}
                           </Text>
@@ -298,7 +309,7 @@ export function ExecutionCard({
                           disabled={pkg.status === 'delivered'}
                           activeOpacity={0.75}
                           accessibilityRole="button"
-                          accessibilityLabel={`Registrar ocorrência para ${pkg.trackingNumber}`}
+                          accessibilityLabel={`Registrar ocorrência para ${getPackagePrimaryLabel(pkg)}`}
                           accessibilityState={{ disabled: pkg.status === 'delivered' }}
                         >
                           <AlertCircle size={17} color={Colors.error} />
@@ -657,6 +668,11 @@ const styles = StyleSheet.create({
     color: Colors.white,
     fontSize: FontSizes.md,
     fontWeight: '700',
+  },
+  packageSecondaryLabel: {
+    color: Colors.gray,
+    fontSize: FontSizes.xs,
+    fontWeight: '600',
   },
   packageAddress: {
     color: Colors.gray,

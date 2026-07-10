@@ -44,7 +44,7 @@ hooks/useDashboard.ts          Derived dashboard metrics
 hooks/usePersistence.ts        React-facing persistence adapter
 hooks/useImport.ts             Import-related hook retained by the project
 hooks/useNavigation.ts         Navigation-related hook retained by the project
-lib/packageUtils.ts            Package parsing, grouping, and route construction
+lib/packageUtils.ts            Package parsing, grouping, route construction, Sequence labels, and duplicate-stop diagnostics
 lib/appLinks.ts                Closed-beta links, copy, and version configuration
 lib/mapNavigation.ts           External map URL construction from normalized addresses
 lib/occurrenceFlow.ts          Direct package occurrence target validation
@@ -201,11 +201,16 @@ RouteData
     `-- PackageItem[]
 ```
 
-Stops are grouped exclusively by the spreadsheet Stop column. Sequence/order columns must never be interpreted as stop numbers. Packages are grouped by stop first, then by normalized address within that stop.
+Valid numeric Stops are grouped exclusively by the spreadsheet Stop column. Sequence/order columns must never be interpreted as stop numbers. Packages are grouped by stop first, then by normalized address within that stop.
+
+Rows with missing or invalid Stop values are not dropped. They are grouped by normalized base address, marked with `missingStopNumber`, displayed as `Sem parada`, and sorted before numbered stops after import. Manual route reordering then treats them as normal movable stop entries.
+
+Duplicate-address diagnostics compare normalized street + number, ignoring apartment, block, floor, store, and other complements. The warning message names the exact matching stop numbers, or says `parada sem número` when one side came from a row without a valid Stop.
 
 `PackageItem` stores occurrence metadata additively:
 
 ```ts
+sequence?: string;
 occurrenceReason?: string;
 occurrenceRegisteredAt?: string;
 occurrenceResolution?: 'delivered' | 'returned_to_hub';
@@ -213,7 +218,7 @@ occurrenceResolvedAt?: string;
 occurrenceUpdatedAt?: string;
 ```
 
-These fields are optional so previously persisted routes remain valid. A package occurrence continues using the existing `skipped` status convention. Current-route AsyncStorage persistence serializes these fields with the route; skipped packages without a saved reason display `Motivo não informado`. Occurrence edits and resolutions set `occurrenceUpdatedAt`; older resolved records fall back to `occurrenceResolvedAt` when displaying their latest update.
+These fields are optional so previously persisted routes remain valid. `sequence` comes from Shopee spreadsheet columns named `Sequence`, `sequence`, `Sequência`, or `Sequencia`; it is used only as the primary driver-facing package label (`Seq. X`) while SPX TN remains stored and displayed as secondary reference. A package occurrence continues using the existing `skipped` status convention. Current-route AsyncStorage persistence serializes these fields with the route; skipped packages without a saved reason display `Motivo não informado`. Occurrence edits and resolutions set `occurrenceUpdatedAt`; older resolved records fall back to `occurrenceResolvedAt` when displaying their latest update.
 
 Occurrence resolution is also additive. `delivered` changes only the target package to the existing delivered status; `returned_to_hub` retains the skipped status. Both preserve the original reason and registration timestamp. The Ocorrências screen shows unresolved records under Pendentes and resolved records for seven days under Resolvidas recentemente.
 
@@ -327,9 +332,9 @@ Platform behavior:
 Parsing behavior:
 
 1. `spreadsheetParser.ts` converts the source into headers and rows.
-2. `detectColumns()` recognizes tracking, destination address, postal code, coordinates, and Stop columns.
-3. `parseSpreadsheetData()` produces `RawPackage` values and ignores empty rows.
-4. `groupPackagesByStop()` creates stops, address subgroups, package records, counts, and duplicate-address warnings.
+2. `detectColumns()` recognizes tracking, Sequence, destination address, postal code, coordinates, and Stop columns.
+3. `parseSpreadsheetData()` produces `RawPackage` values, preserves Sequence values, treats only safe numeric Stop values as valid, and ignores empty rows.
+4. `groupPackagesByStop()` creates numbered stops, `Sem parada` stops for invalid/missing Stop rows, address subgroups, package records, counts, and exact duplicate-address warnings.
 5. `buildPlanningRoute()` generates an opaque route ID, a default date-based name, totals, estimates, and `planning` status.
 6. `setCurrentRoute()` updates memory and persistence immediately after successful parsing, before Continue is pressed.
 7. Continue checks the imported route ID and reuses the existing route to prevent duplication.

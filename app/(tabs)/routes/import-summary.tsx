@@ -14,6 +14,7 @@ import {
 } from 'lucide-react-native';
 import { Colors, Spacing, FontSizes, BorderRadius } from '@/constants/theme';
 import { useRoute } from '@/contexts/RouteContext';
+import { getStopDisplayLabel, getStopSecondaryLabel } from '@/lib/packageUtils';
 
 export default function ImportSummaryScreen() {
   const router = useRouter();
@@ -35,9 +36,17 @@ export default function ImportSummaryScreen() {
   const duplicateStops = currentRoute.stops.filter(s => s.duplicateAddressWarning);
   const returningFromReview = from === 'delivery-preparation';
   const largestStopSequence =
-    currentRoute.stops.findIndex(stop => stop.stopNumber === summary.largestStop.stopNumber) + 1;
+    currentRoute.stops.findIndex(stop =>
+      stop.stopNumber === summary.largestStop.stopNumber &&
+      stop.normalizedAddress === summary.largestStop.address &&
+      stop.packageCount === summary.largestStop.count
+    ) + 1;
   const smallestStopSequence =
-    currentRoute.stops.findIndex(stop => stop.stopNumber === summary.smallestStop.stopNumber) + 1;
+    currentRoute.stops.findIndex(stop =>
+      stop.stopNumber === summary.smallestStop.stopNumber &&
+      stop.normalizedAddress === summary.smallestStop.address &&
+      stop.packageCount === summary.smallestStop.count
+    ) + 1;
   const openRouteReview = () => {
     router.replace({
       pathname: '/(tabs)/routes/delivery-preparation',
@@ -128,7 +137,10 @@ export default function ImportSummaryScreen() {
         <View style={styles.duplicateWarningCard}>
           <AlertTriangle size={16} color={Colors.warning} />
           <Text style={styles.duplicateWarningText}>
-            {duplicateStops.length} parada{duplicateStops.length !== 1 ? 's têm' : ' tem'} endereços que aparecem em outra parada.
+            {duplicateStops
+              .map(stop => stop.duplicateAddressWarningMessage)
+              .filter(Boolean)
+              .join(' ')}
           </Text>
         </View>
       )}
@@ -140,9 +152,9 @@ export default function ImportSummaryScreen() {
         <View key={stop.id} style={styles.stopCard}>
           <View style={styles.stopNumberWrap}>
             <View style={styles.stopNumberCircle}>
-              <Text style={styles.stopNumberText}>#{index + 1}</Text>
+              <Text style={styles.stopNumberText}>{getStopDisplayLabel(stop)}</Text>
             </View>
-            <Text style={styles.stopLabel}>Parada</Text>
+            <Text style={styles.stopLabel}>{getStopSecondaryLabel(stop)}</Text>
             {stop.optimizedOrderIndex !== undefined && stop.optimizedOrderIndex !== null && (
               <View style={styles.optimizedBadge}>
                 <Text style={styles.optimizedBadgeText}>#{stop.optimizedOrderIndex}</Text>
@@ -168,7 +180,7 @@ export default function ImportSummaryScreen() {
                 <View style={[styles.metaBadge, styles.metaBadgeWarning]}>
                   <AlertTriangle size={11} color={Colors.warning} />
                   <Text style={[styles.metaBadgeText, { color: Colors.warning }]}>
-                    Mesmo endereço em outra parada
+                    {stop.duplicateAddressWarningMessage ?? 'Mesmo endereço em outra parada'}
                   </Text>
                 </View>
               )}

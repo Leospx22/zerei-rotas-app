@@ -14,3 +14,9 @@ export function routeDisplayStatusLabel(status: RouteDisplayStatus): string {
   if (status === 'active') return 'Em rota';
   return 'Planejada';
 }
+
+export function routePrimaryActionLabel(status: RouteDisplayStatus): string | null {
+  if (status === 'completed') return null;
+  if (status === 'active') return 'Continuar entrega';
+  return 'Começar entrega';
+}

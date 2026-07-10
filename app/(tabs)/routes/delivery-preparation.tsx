@@ -42,6 +42,12 @@ import {
   moveRouteStopToIndex,
   type StopMoveDirection,
 } from '@/lib/routeOrdering';
+import {
+  getPackagePrimaryLabel,
+  getPackageSecondaryLabel,
+  getStopDisplayLabel,
+  getStopSecondaryLabel,
+} from '@/lib/packageUtils';
 
 export default function DeliveryPreparationScreen() {
   const router = useRouter();
@@ -154,6 +160,9 @@ export default function DeliveryPreparationScreen() {
     (total, stop) => total + stop.addressCount,
     0
   );
+  const startButtonLabel = currentRoute.status === 'active' || currentRoute.startTime !== null
+    ? 'Continuar entrega'
+    : 'Começar entrega';
 
   return (
     <>
@@ -298,7 +307,7 @@ export default function DeliveryPreparationScreen() {
                   isCompleted && styles.stopNumberCircleCompleted,
                 ]}>
                   <Text style={styles.stopNumberText}>
-                    {isCompleted ? '✓' : `#${index + 1}`}
+                    {isCompleted ? '✓' : getStopDisplayLabel(stop)}
                   </Text>
                 </View>
                 <Text style={[
@@ -306,7 +315,7 @@ export default function DeliveryPreparationScreen() {
                   isCurrent && styles.stopLabelCurrent,
                   isCompleted && styles.stopLabelCompleted,
                 ]}>
-                  {mapStop ? mapStopStatusLabel(mapStop.status) : 'Planejada'}
+                  {stop.missingStopNumber ? getStopSecondaryLabel(stop) : mapStop ? mapStopStatusLabel(mapStop.status) : 'Planejada'}
                 </Text>
                 {stop.optimizedOrderIndex !== undefined && stop.optimizedOrderIndex !== null && (
                   <View style={styles.optimizedBadge}>
@@ -350,7 +359,7 @@ export default function DeliveryPreparationScreen() {
                     <View style={[styles.metaBadge, styles.metaBadgeWarn]}>
                       <AlertTriangle size={11} color={Colors.warning} />
                       <Text style={[styles.metaBadgeText, { color: Colors.warning }]}>
-                        Mesmo endereço em outra parada
+                        {stop.duplicateAddressWarningMessage ?? 'Mesmo endereço em outra parada'}
                       </Text>
                     </View>
                   )}
@@ -443,7 +452,12 @@ export default function DeliveryPreparationScreen() {
                           <View style={styles.packageIcon}>
                             <Text style={styles.packageIconText}>{pkgIdx + 1}</Text>
                           </View>
-                          <Text style={styles.packageTracking}>{pkg.trackingNumber}</Text>
+                          <View style={styles.packageTextBlock}>
+                            <Text style={styles.packageTracking}>{getPackagePrimaryLabel(pkg)}</Text>
+                            {getPackageSecondaryLabel(pkg) ? (
+                              <Text style={styles.packageSecondary}>{getPackageSecondaryLabel(pkg)}</Text>
+                            ) : null}
+                          </View>
                           <Package size={13} color={Colors.gold[500]} style={{ opacity: 0.5 }} />
                         </View>
                       ))}
@@ -468,7 +482,7 @@ export default function DeliveryPreparationScreen() {
           style={styles.startGradient}
         >
           <Play size={24} color={Colors.primary[900]} />
-          <Text style={styles.startText}>Começar entrega</Text>
+          <Text style={styles.startText}>{startButtonLabel}</Text>
         </LinearGradient>
       </TouchableOpacity>
     </ScrollView>
@@ -694,7 +708,9 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: 'rgba(212,160,23,0.2)',
   },
   packageIconText: { fontSize: FontSizes.xs, fontWeight: '800', color: Colors.gold[400] },
+  packageTextBlock: { flex: 1, gap: 2 },
   packageTracking: { flex: 1, fontSize: FontSizes.md, fontWeight: '700', color: Colors.white },
+  packageSecondary: { fontSize: FontSizes.xs, fontWeight: '600', color: Colors.gray },
 
   optimizationNote: {
     flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.cardBg,

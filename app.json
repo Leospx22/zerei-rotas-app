@@ -39,9 +39,19 @@
       "display": "standalone",
       "preferRelatedApplications": true
     },
-    "plugins": ["expo-router", "expo-font", "expo-web-browser"],
+    "plugins": [
+      "expo-router",
+      "expo-font",
+      "expo-web-browser"
+    ],
     "experiments": {
       "typedRoutes": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "d1794a60-25c0-41fa-9de9-787536d806bf"
+      }
     }
   }
 }

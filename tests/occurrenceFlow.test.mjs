@@ -5,6 +5,28 @@ import {
   createDirectOccurrenceTarget,
   getAddressGroupOccurrenceAction,
 } from '../lib/occurrenceFlow.ts';
+import { SHOPEE_OCCURRENCE_REASONS } from '../lib/occurrenceReasons.ts';
+
+const APPROVED_SHOPEE_REASONS = [
+  'Endereço não encontrado',
+  'Comércio Fechado',
+  'Área de Risco',
+  'Cliente Ausente',
+  'Mudança de Endereço',
+  'Terceiro Recusou',
+  'Cliente Recusou',
+  'Palavra-Chave',
+  'Item Perdido',
+  'Item Danificado',
+  'Clima Adverso',
+  'Problemas Mecânicos',
+  'Roubo/Assalto',
+  'Desisti da Rota',
+];
+
+test('uses the exact approved Shopee occurrence reasons in order', () => {
+  assert.deepEqual([...SHOPEE_OCCURRENCE_REASONS], APPROVED_SHOPEE_REASONS);
+});
 
 test('creates a direct reason-selection target for the chosen package', () => {
   assert.deepEqual(
@@ -84,12 +106,12 @@ test('applies one occurrence reason to every package in a bulk target', () => {
 
   applyOccurrenceReasonToTarget(
     { stopId: 'stop-1', packageIds: ['pkg-a', 'pkg-b'] },
-    'Cliente ausente',
+    'Cliente Ausente',
     (stopId, packageId, reason) => updates.push({ stopId, packageId, reason })
   );
 
   assert.deepEqual(updates, [
-    { stopId: 'stop-1', packageId: 'pkg-a', reason: 'Cliente ausente' },
-    { stopId: 'stop-1', packageId: 'pkg-b', reason: 'Cliente ausente' },
+    { stopId: 'stop-1', packageId: 'pkg-a', reason: 'Cliente Ausente' },
+    { stopId: 'stop-1', packageId: 'pkg-b', reason: 'Cliente Ausente' },
   ]);
 });

@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import * as Clipboard from 'expo-clipboard';
 import {
   Alert,
   Linking,
@@ -13,6 +14,7 @@ import {
   AlertTriangle,
   ArrowLeft,
   CheckCircle2,
+  Copy,
   List,
   MapPinned,
   Navigation,
@@ -30,6 +32,10 @@ import {
   getMapCoordinateState,
   mapStopStatusLabel,
 } from '@/lib/mapOverview';
+import {
+  getBestManualAddress,
+  UNRESOLVED_COORDINATE_LABEL,
+} from '@/lib/routeStopPresentation';
 
 export default function MapOverviewScreen() {
   const router = useRouter();
@@ -61,6 +67,24 @@ export default function MapOverviewScreen() {
   const navigateToStop = async () => {
     if (!selectedStop) return;
     await navigateToAddress(selectedStop.address);
+  };
+
+  const copyStopAddress = async (stop: typeof selectedStop) => {
+    if (!stop) return;
+    const address = getBestManualAddress({
+      address: stop.address,
+      zipCode: stop.zipCode,
+    });
+    if (!address.trim()) {
+      Alert.alert('Não foi possível copiar o endereço.');
+      return;
+    }
+    try {
+      await Clipboard.setStringAsync(address);
+      Alert.alert('Endereço copiado.');
+    } catch {
+      Alert.alert('Não foi possível copiar o endereço.');
+    }
   };
 
   if (!currentRoute) {
@@ -136,7 +160,7 @@ export default function MapOverviewScreen() {
       {selectedStop ? (
         <View style={styles.detailCard}>
           <View style={styles.detailHeader}>
-            <View style={styles.stopNumber}><Text style={styles.stopNumberText}>#{selectedStop.order}</Text></View>
+            <View style={styles.stopNumber}><Text style={styles.stopNumberText}>{selectedStop.badge}</Text></View>
             <View style={styles.detailHeaderCopy}>
               <Text style={styles.detailAddress}>{selectedStop.address}</Text>
               <Text style={styles.detailStatus}>{mapStopStatusLabel(selectedStop.status)}</Text>
@@ -169,8 +193,18 @@ export default function MapOverviewScreen() {
             <View style={styles.selectedCoordinateWarning}>
               <AlertTriangle size={15} color={Colors.warning} />
               <Text style={styles.selectedCoordinateWarningText}>
-                Coordenadas indisponíveis para esta parada.
+                {UNRESOLVED_COORDINATE_LABEL}
               </Text>
+              <TouchableOpacity
+                style={styles.copyInlineButton}
+                onPress={() => copyStopAddress(selectedStop)}
+                activeOpacity={0.75}
+                accessibilityRole="button"
+                accessibilityLabel={`Copiar endereço desta parada: ${selectedStop.address}`}
+              >
+                <Copy size={15} color={Colors.warning} />
+                <Text style={styles.copyInlineButtonText}>Copiar endereço</Text>
+              </TouchableOpacity>
             </View>
           ) : null}
           <View style={styles.actions}>
@@ -206,6 +240,7 @@ export default function MapOverviewScreen() {
           selectedStopId={selectedStop?.id ?? null}
           onSelectStop={selectStopFromList}
           onNavigateStop={stop => navigateToAddress(stop.address)}
+          onCopyStop={copyStopAddress}
         />
       </View>
     </ScrollView>
@@ -288,12 +323,25 @@ const styles = StyleSheet.create({
   selectedCoordinateWarning: {
     flexDirection: 'row',
     alignItems: 'center',
+    flexWrap: 'wrap',
     gap: Spacing.xs,
     padding: Spacing.sm,
     borderRadius: BorderRadius.sm,
     backgroundColor: Colors.warningBg,
   },
   selectedCoordinateWarningText: { flex: 1, color: Colors.warning, fontSize: FontSizes.sm },
+  copyInlineButton: {
+    minHeight: 36,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: Spacing.sm,
+    borderRadius: BorderRadius.sm,
+    borderWidth: 1,
+    borderColor: Colors.warningBorder,
+    backgroundColor: Colors.warningBg,
+  },
+  copyInlineButtonText: { color: Colors.warning, fontSize: FontSizes.xs, fontWeight: '800' },
   actions: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm },
   primaryButton: {
     minHeight: 46,

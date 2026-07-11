@@ -1,14 +1,16 @@
 import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { MapPin } from 'lucide-react-native';
+import { Copy, MapPin } from 'lucide-react-native';
 import { BorderRadius, Colors, FontSizes, Spacing } from '@/constants/theme';
 import { mapStopStatusLabel, type MapStop } from '@/lib/mapOverview';
+import { UNRESOLVED_COORDINATE_LABEL } from '@/lib/routeStopPresentation';
 
 interface RouteSequenceListProps {
   stops: MapStop[];
   selectedStopId: string | null;
   onSelectStop: (stopId: string) => void;
   onNavigateStop?: (stop: MapStop) => void;
+  onCopyStop?: (stop: MapStop) => void;
 }
 
 export default function RouteSequenceList({
@@ -16,51 +18,69 @@ export default function RouteSequenceList({
   selectedStopId,
   onSelectStop,
   onNavigateStop,
+  onCopyStop,
 }: RouteSequenceListProps) {
   return (
     <View style={styles.container}>
-      {stops.map(stop => (
-        <View
-          key={stop.id}
-          style={[styles.stopRow, selectedStopId === stop.id && styles.stopRowSelected]}
-        >
-          <TouchableOpacity
-            style={styles.selectArea}
-            onPress={() => onSelectStop(stop.id)}
-            activeOpacity={0.78}
-            accessibilityRole="button"
-            accessibilityLabel={`Parada ${stop.order}: ${stop.address}`}
+      {stops.map(stop => {
+        const unresolved = stop.latitude === null || stop.longitude === null;
+
+        return (
+          <View
+            key={stop.id}
+            style={[styles.stopRow, selectedStopId === stop.id && styles.stopRowSelected]}
           >
-            <View style={[
-              styles.number,
-              stop.status === 'current' && styles.numberCurrent,
-              stop.status === 'completed' && styles.numberCompleted,
-            ]}>
-              <Text style={styles.numberText}>{stop.status === 'completed' ? '✓' : stop.order}</Text>
-            </View>
-            <View style={styles.stopCopy}>
-              <Text style={styles.address}>{stop.address}</Text>
-              <Text style={styles.meta}>
-                {stop.packageCount} {stop.packageCount === 1 ? 'pacote' : 'pacotes'} · {mapStopStatusLabel(stop.status)}
-                {stop.latitude === null || stop.longitude === null ? ' · Sem coordenadas' : ''}
-              </Text>
-            </View>
-          </TouchableOpacity>
-          {onNavigateStop ? (
             <TouchableOpacity
-              style={styles.navigateAction}
-              onPress={() => onNavigateStop(stop)}
-              activeOpacity={0.72}
+              style={styles.selectArea}
+              onPress={() => onSelectStop(stop.id)}
+              activeOpacity={0.78}
               accessibilityRole="button"
-              accessibilityLabel={`Navegar até esta parada: ${stop.address}`}
+              accessibilityLabel={`${stop.badge}: ${stop.address}`}
             >
-              <MapPin size={20} color={Colors.gold[400]} />
+              <View style={[
+                styles.number,
+                stop.status === 'current' && styles.numberCurrent,
+                stop.status === 'completed' && styles.numberCompleted,
+              ]}>
+                <Text style={styles.numberText}>
+                  {stop.status === 'completed' ? '✓' : stop.badge}
+                </Text>
+              </View>
+              <View style={styles.stopCopy}>
+                <Text style={styles.address}>{stop.address}</Text>
+                <Text style={styles.meta}>
+                  {stop.packageCount} {stop.packageCount === 1 ? 'pacote' : 'pacotes'} · {mapStopStatusLabel(stop.status)}
+                  {unresolved ? ` · ${UNRESOLVED_COORDINATE_LABEL}` : ''}
+                </Text>
+              </View>
             </TouchableOpacity>
-          ) : (
-            <MapPin size={18} color={Colors.gold[400]} />
-          )}
-        </View>
-      ))}
+            {unresolved && onCopyStop ? (
+              <TouchableOpacity
+                style={styles.iconAction}
+                onPress={() => onCopyStop(stop)}
+                activeOpacity={0.72}
+                accessibilityRole="button"
+                accessibilityLabel={`Copiar endereço desta parada: ${stop.address}`}
+              >
+                <Copy size={18} color={Colors.warning} />
+              </TouchableOpacity>
+            ) : null}
+            {onNavigateStop ? (
+              <TouchableOpacity
+                style={styles.iconAction}
+                onPress={() => onNavigateStop(stop)}
+                activeOpacity={0.72}
+                accessibilityRole="button"
+                accessibilityLabel={`Navegar até esta parada: ${stop.address}`}
+              >
+                <MapPin size={20} color={Colors.gold[400]} />
+              </TouchableOpacity>
+            ) : (
+              <MapPin size={18} color={Colors.gold[400]} />
+            )}
+          </View>
+        );
+      })}
     </View>
   );
 }
@@ -100,7 +120,7 @@ const styles = StyleSheet.create({
   stopCopy: { flex: 1, gap: 3 },
   address: { color: Colors.white, fontSize: FontSizes.md, fontWeight: '700' },
   meta: { color: Colors.gray, fontSize: FontSizes.sm },
-  navigateAction: {
+  iconAction: {
     width: 44,
     height: 44,
     alignItems: 'center',

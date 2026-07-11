@@ -6,6 +6,11 @@ All notable product and architecture changes are recorded here. Versions follow 
 
 ### Added
 
+- Canonical Shopee occurrence reason list shared by occurrence registration and edit flows.
+- `#P` compact stop badge for spreadsheet rows without a valid Stop number, while keeping the longer "Sem número de parada na planilha" explanation where context is needed.
+- Duplicate-address coordinate inheritance so stops with the same normalized street and number can reuse a valid coordinate from another stop in the same route.
+- Manual unresolved-address support with "Insira o endereço manualmente" messaging and "Copiar endereço" actions in map/review surfaces.
+
 - Supabase waitlist lead/event schema, anonymous insert-only RLS boundary, safe lead helper, integration guide, and regression tests.
 
 - Closed-beta status, support and feedback actions, build label, beta tester checklist, and optional `feedback_opened` funnel tracking.
@@ -65,6 +70,9 @@ All notable product and architecture changes are recorded here. Versions follow 
 
 ### Changed
 
+- Duplicate-address warnings now name the exact matching stop identifiers, including `#P` for missing spreadsheet Stop groups.
+- Map and route-review unresolved-coordinate wording now uses "Insira o endereço manualmente" instead of "Sem coordenadas".
+
 - Reorganized Perfil into Conta, Teste grátis, Dados do motorista, and Segurança sections with clearer loading, success, and authentication errors.
 - Trial expiration is now derived correctly in the UI while server-managed status synchronization remains deferred.
 
@@ -96,6 +104,9 @@ All notable product and architecture changes are recorded here. Versions follow 
 - Preserved occurrence timestamps while editing reasons or reversing resolved outcomes.
 
 ### Fixed
+
+- Stops sharing the same normalized street and number no longer show inconsistent map availability when one duplicate has valid coordinates and another does not.
+- Old placeholder occurrence reason lists in active UI flows were replaced with the approved Shopee reason list.
 
 - Preserved the Em rota presentation and Continuar action after reloading a started route with zero deliveries.
 

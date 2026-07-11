@@ -15,6 +15,7 @@ import {
   summarizePackageGroups,
   type ExecutionPackageGroup,
 } from '@/lib/executionPresentation';
+import { formatStopBadge } from '@/lib/routeStopPresentation';
 
 export interface ExecutionCardProps {
   currentStop: GroupedStop | null;
@@ -91,7 +92,7 @@ export function ExecutionCard({
       <View style={styles.eyebrowRow}>
         <Text style={styles.eyebrow}>PARADA ATUAL</Text>
         <View style={styles.stopBadge}>
-          <Text style={styles.stopBadgeText}>#{currentStop.stopNumber}</Text>
+          <Text style={styles.stopBadgeText}>{formatStopBadge(currentStop)}</Text>
         </View>
       </View>
 

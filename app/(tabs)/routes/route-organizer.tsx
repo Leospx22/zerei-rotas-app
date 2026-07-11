@@ -15,6 +15,7 @@ import {
 } from 'lucide-react-native';
 import { Colors, Spacing, FontSizes, BorderRadius } from '@/constants/theme';
 import { useRoute } from '@/contexts/RouteContext';
+import { formatRouteOrderBadge, formatStopBadge } from '@/lib/routeStopPresentation';
 
 export default function RouteOrganizerScreen() {
   const router = useRouter();
@@ -129,13 +130,13 @@ export default function RouteOrganizerScreen() {
       {currentRoute.stops.map((stop, index) => (
         <View key={stop.id} style={styles.stopCard}>
           <View style={styles.stopNumberCircle}>
-            <Text style={styles.stopNumberText}>{index + 1}</Text>
+            <Text style={styles.stopNumberText}>{formatRouteOrderBadge(stop, index + 1)}</Text>
           </View>
           <View style={styles.stopContent}>
             <Text style={styles.stopAddress}>{stop.normalizedAddress}</Text>
             <View style={styles.stopMetaRow}>
               <Text style={styles.stopMeta}>
-                {stop.packageCount} pacote{stop.packageCount !== 1 ? 's' : ''} · Parada {stop.stopNumber}
+                {stop.packageCount} pacote{stop.packageCount !== 1 ? 's' : ''} · Parada {formatStopBadge(stop)}
               </Text>
             </View>
           </View>

@@ -14,6 +14,10 @@ import {
 } from 'lucide-react-native';
 import { Colors, Spacing, FontSizes, BorderRadius } from '@/constants/theme';
 import { useRoute } from '@/contexts/RouteContext';
+import {
+  formatRouteOrderBadge,
+  getDuplicateAddressWarning,
+} from '@/lib/routeStopPresentation';
 
 export default function ImportSummaryScreen() {
   const router = useRouter();
@@ -38,6 +42,8 @@ export default function ImportSummaryScreen() {
     currentRoute.stops.findIndex(stop => stop.stopNumber === summary.largestStop.stopNumber) + 1;
   const smallestStopSequence =
     currentRoute.stops.findIndex(stop => stop.stopNumber === summary.smallestStop.stopNumber) + 1;
+  const largestStop = currentRoute.stops[largestStopSequence - 1];
+  const smallestStop = currentRoute.stops[smallestStopSequence - 1];
   const openRouteReview = () => {
     router.replace({
       pathname: '/(tabs)/routes/delivery-preparation',
@@ -103,7 +109,9 @@ export default function ImportSummaryScreen() {
               <TrendingUp size={13} color={Colors.success} />
               <Text style={[styles.rotaExtremeLabel, { color: Colors.success }]}>Maior Parada</Text>
             </View>
-            <Text style={styles.rotaExtremeStop}>Parada #{largestStopSequence}</Text>
+            <Text style={styles.rotaExtremeStop}>
+              Parada {largestStop ? formatRouteOrderBadge(largestStop, largestStopSequence) : `#${largestStopSequence}`}
+            </Text>
             <Text style={styles.rotaExtremeAddress} numberOfLines={1}>{summary.largestStop.address}</Text>
             <Text style={styles.rotaExtremeCount}>
               {summary.largestStop.count} pacote{summary.largestStop.count !== 1 ? 's' : ''}
@@ -114,7 +122,9 @@ export default function ImportSummaryScreen() {
               <ArrowDown size={13} color={Colors.warning} />
               <Text style={[styles.rotaExtremeLabel, { color: Colors.warning }]}>Menor Parada</Text>
             </View>
-            <Text style={styles.rotaExtremeStop}>Parada #{smallestStopSequence}</Text>
+            <Text style={styles.rotaExtremeStop}>
+              Parada {smallestStop ? formatRouteOrderBadge(smallestStop, smallestStopSequence) : `#${smallestStopSequence}`}
+            </Text>
             <Text style={styles.rotaExtremeAddress} numberOfLines={1}>{summary.smallestStop.address}</Text>
             <Text style={styles.rotaExtremeCount}>
               {summary.smallestStop.count} pacote{summary.smallestStop.count !== 1 ? 's' : ''}
@@ -136,11 +146,14 @@ export default function ImportSummaryScreen() {
       {/* All stops list */}
       <Text style={styles.sectionTitle}>Ordem atual ({currentRoute.stops.length} paradas)</Text>
 
-      {currentRoute.stops.map((stop, index) => (
+      {currentRoute.stops.map((stop, index) => {
+        const duplicateWarning = getDuplicateAddressWarning(currentRoute.stops, stop);
+        const stopBadge = formatRouteOrderBadge(stop, index + 1);
+        return (
         <View key={stop.id} style={styles.stopCard}>
           <View style={styles.stopNumberWrap}>
             <View style={styles.stopNumberCircle}>
-              <Text style={styles.stopNumberText}>#{index + 1}</Text>
+              <Text style={styles.stopNumberText}>{stopBadge}</Text>
             </View>
             <Text style={styles.stopLabel}>Parada</Text>
             {stop.optimizedOrderIndex !== undefined && stop.optimizedOrderIndex !== null && (
@@ -164,11 +177,11 @@ export default function ImportSummaryScreen() {
                   <Text style={styles.metaBadgeText}>{stop.addressCount} endereços</Text>
                 </View>
               )}
-              {stop.duplicateAddressWarning && (
+              {duplicateWarning && (
                 <View style={[styles.metaBadge, styles.metaBadgeWarning]}>
                   <AlertTriangle size={11} color={Colors.warning} />
                   <Text style={[styles.metaBadgeText, { color: Colors.warning }]}>
-                    Mesmo endereço em outra parada
+                    {duplicateWarning}
                   </Text>
                 </View>
               )}
@@ -180,7 +193,8 @@ export default function ImportSummaryScreen() {
             <Text style={styles.packageBadgeLabel}>pkg{stop.packageCount !== 1 ? 's' : ''}</Text>
           </View>
         </View>
-      ))}
+        );
+      })}
 
       <TouchableOpacity
         style={styles.nextButton}

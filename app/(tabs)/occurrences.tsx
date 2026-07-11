@@ -32,16 +32,9 @@ import {
   type CollectedOccurrenceRecord,
   type OccurrenceResolution,
 } from '@/lib/occurrenceRecords';
+import { SHOPEE_OCCURRENCE_REASONS } from '@/lib/occurrenceReasons';
+import { formatStopBadge } from '@/lib/routeStopPresentation';
 import { BorderRadius, Colors, FontSizes, Spacing } from '@/constants/theme';
-
-const OCCURRENCE_REASONS = [
-  'Cliente ausente',
-  'Endereço não localizado',
-  'Cliente recusou',
-  'Estabelecimento fechado',
-  'Reagendado',
-  'Outro',
-] as const;
 
 interface OccurrenceCardProps {
   record: CollectedOccurrenceRecord;
@@ -88,7 +81,7 @@ function OccurrenceCard({ record, onResolve, onEdit, onDelete }: OccurrenceCardP
         <Text style={styles.label}>Rota / Parada</Text>
         <Text style={styles.value}>
           {record.routeName ?? 'Rota não informada'} •{' '}
-          {record.stopNumber !== undefined ? `Parada #${record.stopNumber}` : 'Parada não informada'}
+          {record.stopNumber !== undefined ? `Parada ${formatStopBadge(record.stopNumber)}` : 'Parada não informada'}
         </Text>
       </View>
 
@@ -543,7 +536,7 @@ export default function OccurrencesScreen() {
 
             <Text style={styles.fieldLabel}>Motivo</Text>
             <View style={styles.optionGrid}>
-              {OCCURRENCE_REASONS.map(reason => (
+              {SHOPEE_OCCURRENCE_REASONS.map(reason => (
                 <TouchableOpacity
                   key={reason}
                   style={[styles.optionChip, editReason === reason && styles.optionChipSelected]}

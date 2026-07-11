@@ -1,6 +1,11 @@
 import type { RouteData } from '../contexts/RouteContext.tsx';
 import { getPrimaryExecutionAddress } from './executionPresentation.ts';
 import type { GroupedStop } from './packageUtils.ts';
+import {
+  formatRouteOrderBadge,
+  getBaseAddressKey,
+  isMissingSpreadsheetStop,
+} from './routeStopPresentation.ts';
 
 export type MapStopStatus = 'pending' | 'current' | 'completed';
 export type MapCoordinateState = 'available' | 'partial' | 'unavailable';
@@ -9,7 +14,11 @@ export type MapCoordinateStatus = 'valid' | 'corrected' | 'recovered' | 'invalid
 export interface MapStop {
   id: string;
   order: number;
+  badge: string;
   address: string;
+  zipCode: string;
+  baseAddressKey: string;
+  missingSpreadsheetStop: boolean;
   latitude: number | null;
   longitude: number | null;
   coordinateStatus: MapCoordinateStatus;
@@ -117,6 +126,37 @@ function sanitizeRouteCoordinates(stops: MapStop[]): MapStop[] {
   });
 }
 
+function inheritDuplicateAddressCoordinates(stops: MapStop[]): MapStop[] {
+  const coordinatesByAddress = new Map<string, { latitude: number; longitude: number }>();
+
+  stops.forEach(stop => {
+    if (stop.latitude === null || stop.longitude === null) return;
+    if (!stop.baseAddressKey) return;
+    if (!coordinatesByAddress.has(stop.baseAddressKey)) {
+      coordinatesByAddress.set(stop.baseAddressKey, {
+        latitude: stop.latitude,
+        longitude: stop.longitude,
+      });
+    }
+  });
+
+  if (coordinatesByAddress.size === 0) return stops;
+
+  const inherited = stops.map(stop => {
+    if (stop.latitude !== null && stop.longitude !== null) return stop;
+    const coordinate = coordinatesByAddress.get(stop.baseAddressKey);
+    if (!coordinate) return stop;
+    return {
+      ...stop,
+      latitude: coordinate.latitude,
+      longitude: coordinate.longitude,
+      coordinateStatus: 'recovered' as const,
+    };
+  });
+
+  return sanitizeRouteCoordinates(inherited);
+}
+
 export function hasCompletedStop(stop: GroupedStop): boolean {
   return (
     stop.status === 'completed' ||
@@ -140,7 +180,11 @@ export function buildMapStops(route: RouteData): MapStop[] {
     return {
       id: stop.id,
       order: index + 1,
+      badge: formatRouteOrderBadge(stop, index + 1),
       address: getPrimaryExecutionAddress(stop),
+      zipCode: stop.zipCode,
+      baseAddressKey: getBaseAddressKey(getPrimaryExecutionAddress(stop)),
+      missingSpreadsheetStop: isMissingSpreadsheetStop(stop),
       latitude: hasValidPair ? latitude : null,
       longitude: hasValidPair ? longitude : null,
       coordinateStatus: hasValidPair
@@ -159,7 +203,7 @@ export function buildMapStops(route: RouteData): MapStop[] {
     };
   });
 
-  return sanitizeRouteCoordinates(mapStops);
+  return inheritDuplicateAddressCoordinates(sanitizeRouteCoordinates(mapStops));
 }
 
 export function getMapCoordinateState(stops: readonly MapStop[]): MapCoordinateState {
@@ -205,7 +249,7 @@ export function applyRecoveredMapCoordinates(
     };
   });
 
-  return sanitizeRouteCoordinates(recovered);
+  return inheritDuplicateAddressCoordinates(sanitizeRouteCoordinates(recovered));
 }
 
 export function mapStopStatusLabel(status: MapStopStatus): string {

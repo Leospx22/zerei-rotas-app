@@ -47,13 +47,16 @@ hooks/useNavigation.ts         Navigation-related hook retained by the project
 lib/packageUtils.ts            Package parsing, grouping, and route construction
 lib/appLinks.ts                Closed-beta links, copy, and version configuration
 lib/mapNavigation.ts           External map URL construction from normalized addresses
+lib/mapOverview.ts             Ordered map stop presentation, coordinate validation, and duplicate-address coordinate reuse
 lib/occurrenceFlow.ts          Direct package occurrence target validation
+lib/occurrenceReasons.ts       Canonical approved Shopee occurrence reason list
 lib/occurrenceRecords.ts       Occurrence metadata updates and record collection
 lib/packageSelection.ts        Pure local separation selection helpers
 lib/placeIntelligence.ts       Local address intelligence model and persistence
 lib/routePersistence.ts        AsyncStorage schema and storage operations
 lib/routeOrdering.ts           Pure manual stop movement and order reindexing
 lib/routePresentation.ts       Pure route-card status and Portuguese label derivation
+lib/routeStopPresentation.ts   Stop badge, duplicate-warning, unresolved-address, and manual-copy presentation helpers
 lib/spreadsheetParser.ts       CSV, TSV, XLS, and XLSX parsing
 lib/supabase.ts                Supabase client and session storage configuration
 lib/userProfile.ts             Profile, trial, and funnel service/helpers
@@ -201,7 +204,9 @@ RouteData
     `-- PackageItem[]
 ```
 
-Stops are grouped exclusively by the spreadsheet Stop column. Sequence/order columns must never be interpreted as stop numbers. Packages are grouped by stop first, then by normalized address within that stop.
+Stops are grouped exclusively by the spreadsheet Stop column. Sequence/order columns must never be interpreted as stop numbers. Packages are grouped by stop first, then by normalized address within that stop. Packages without a valid Stop value are kept in the route and displayed with the compact `#P` badge; descriptive helper text may explain this as `Sem número de parada na planilha`.
+
+Duplicate-address warnings compare normalized base street + number and ignore complements such as apartment, floor, store, and building notes. Warnings should name the exact matching stop identifiers, including `#P` for missing-Stop groups. Duplicate stops are never merged, removed, or reordered automatically.
 
 `PackageItem` stores occurrence metadata additively:
 
@@ -218,6 +223,21 @@ These fields are optional so previously persisted routes remain valid. A package
 Occurrence resolution is also additive. `delivered` changes only the target package to the existing delivered status; `returned_to_hub` retains the skipped status. Both preserve the original reason and registration timestamp. The Ocorrências screen shows unresolved records under Pendentes and resolved records for seven days under Resolvidas recentemente.
 
 Occurrence edits target the existing package or exact completed-history summary. Pending edits may change only the reason. Resolved edits may change the reason and reverse the result; result reversal preserves both timestamps and adjusts delivered counters by exactly one without duplicating records.
+
+Occurrence reason pickers and edit flows must reuse `SHOPEE_OCCURRENCE_REASONS` from `lib/occurrenceReasons.ts`. The approved list and order mirrors the Shopee field workflow and should not be duplicated inside screen components.
+
+## Map Coordinate Presentation
+
+Map overview presentation is local-first and non-mutating:
+
+1. Use a stop's own valid spreadsheet latitude/longitude.
+2. Correct safely detected swapped outliers.
+3. Exclude unfixable invalid/outlier coordinates.
+4. Reuse a valid coordinate from another stop in the same route only when normalized street and number match.
+5. Use cached geocode recovery when available.
+6. Leave the stop unresolved when no safe coordinate exists.
+
+Unresolved stops remain visible in the ordered list and selected-card detail. User-facing copy should say `Insira o endereço manualmente`, and the UI should offer `Copiar endereço` with a normalized street/number search string plus useful postal/country context. The original imported address and route/package data are not mutated by map presentation recovery.
 
 ## History Model
 

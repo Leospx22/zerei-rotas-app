@@ -25,7 +25,11 @@ function missingMapStop(id = 'stop-1') {
   return {
     id,
     order: 1,
+    badge: '#1',
     address: 'Rua Juruá, 137',
+    zipCode: '03036-010',
+    baseAddressKey: 'rua jurua|137',
+    missingSpreadsheetStop: false,
     latitude: null,
     longitude: null,
     coordinateStatus: 'missing',

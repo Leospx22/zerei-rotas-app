@@ -185,6 +185,90 @@ test('an unfixable extreme route outlier is excluded from markers but kept in th
   });
 });
 
+test('same normalized address reuses valid coordinates for missing duplicate stops', () => {
+  const stops = groupPackagesByStop([
+    {
+      ...rawPackage('A', 1, -23.5505, -46.6333),
+      destinationAddress: 'Avenida Ipiranga, 879',
+    },
+    {
+      ...rawPackage('B', 2, null, null),
+      destinationAddress: 'Av. Ipiranga, 879, Bloco B',
+    },
+  ]);
+  const mapStops = buildMapStops(route(stops));
+
+  assert.equal(mapStops[1].latitude, -23.5505);
+  assert.equal(mapStops[1].longitude, -46.6333);
+  assert.equal(mapStops[1].coordinateStatus, 'recovered');
+  assert.deepEqual(getLocatedMapStops(mapStops).map(stop => stop.order), [1, 2]);
+});
+
+test('coordinate inheritance does not cross different street numbers', () => {
+  const stops = groupPackagesByStop([
+    {
+      ...rawPackage('A', 1, -23.5505, -46.6333),
+      destinationAddress: 'Avenida Ipiranga, 879',
+    },
+    {
+      ...rawPackage('B', 2, null, null),
+      destinationAddress: 'Avenida Ipiranga, 880',
+    },
+  ]);
+  const mapStops = buildMapStops(route(stops));
+
+  assert.equal(mapStops[1].latitude, null);
+  assert.equal(mapStops[1].longitude, null);
+  assert.equal(mapStops[1].coordinateStatus, 'missing');
+});
+
+test('invalid coordinates are not propagated to duplicate addresses', () => {
+  const stops = groupPackagesByStop([
+    {
+      ...rawPackage('A', 1, 95, -46.6333),
+      destinationAddress: 'Avenida Ipiranga, 879',
+    },
+    {
+      ...rawPackage('B', 2, null, null),
+      destinationAddress: 'Av. Ipiranga, 879, Loja',
+    },
+  ]);
+  const mapStops = buildMapStops(route(stops));
+
+  assert.equal(mapStops[0].coordinateStatus, 'invalid');
+  assert.equal(mapStops[1].coordinateStatus, 'missing');
+  assert.equal(getLocatedMapStops(mapStops).length, 0);
+});
+
+test('multiple duplicate stops reuse the valid coordinate and keep saved route order', () => {
+  const stops = groupPackagesByStop([
+    {
+      ...rawPackage('A', 1, -23.5505, -46.6333),
+      destinationAddress: 'Rua Duplicada, 20',
+    },
+    {
+      ...rawPackage('B', 2, null, null),
+      destinationAddress: 'R. Duplicada, 20, APTO 1',
+    },
+    {
+      ...rawPackage('C', 3, null, null),
+      destinationAddress: 'Rua Duplicada, 20 - Fundos',
+    },
+  ]);
+  const mapStops = buildMapStops(route([stops[2], stops[0], stops[1]]));
+
+  assert.deepEqual(mapStops.map(stop => stop.order), [1, 2, 3]);
+  assert.equal(getLocatedMapStops(mapStops).length, 3);
+  assert.deepEqual(
+    mapStops.map(stop => [stop.latitude, stop.longitude, stop.coordinateStatus]),
+    [
+      [-23.5505, -46.6333, 'recovered'],
+      [-23.5505, -46.6333, 'valid'],
+      [-23.5505, -46.6333, 'recovered'],
+    ]
+  );
+});
+
 test('selecting a stop without coordinates keeps every route item and marker candidate stable', () => {
   const mapStops = buildMapStops(route(groupPackagesByStop([
     rawPackage('A', 1, -23.5505, -46.6333),

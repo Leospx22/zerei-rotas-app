@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import * as Clipboard from 'expo-clipboard';
 import {
   Alert,
   Linking,
@@ -28,6 +29,7 @@ import {
   ArrowUp,
   ArrowDown,
   ArrowUpDown,
+  Copy,
   Navigation,
 } from 'lucide-react-native';
 import { Colors, Spacing, FontSizes, BorderRadius } from '@/constants/theme';
@@ -37,6 +39,13 @@ import { getPrimaryExecutionAddress } from '@/lib/executionPresentation';
 import { buildGoogleMapsSearchUrl } from '@/lib/mapNavigation';
 import { useMapStops } from '@/hooks/useMapStops';
 import { mapStopStatusLabel } from '@/lib/mapOverview';
+import {
+  formatRouteOrderBadge,
+  getBestManualAddress,
+  getDuplicateAddressWarning,
+  MISSING_STOP_DESCRIPTION,
+  UNRESOLVED_COORDINATE_LABEL,
+} from '@/lib/routeStopPresentation';
 import {
   moveRouteStop,
   moveRouteStopToIndex,
@@ -133,6 +142,20 @@ export default function DeliveryPreparationScreen() {
       await Linking.openURL(url);
     } catch {
       Alert.alert('Não foi possível abrir o mapa.');
+    }
+  };
+
+  const handleCopyAddress = async (address: string, zipCode?: string) => {
+    const copyText = getBestManualAddress({ address, zipCode });
+    if (!copyText.trim()) {
+      Alert.alert('Não foi possível copiar o endereço.');
+      return;
+    }
+    try {
+      await Clipboard.setStringAsync(copyText);
+      Alert.alert('Endereço copiado.');
+    } catch {
+      Alert.alert('Não foi possível copiar o endereço.');
     }
   };
 
@@ -276,6 +299,9 @@ export default function DeliveryPreparationScreen() {
         const mapStop = reviewMapStops[index];
         const isCompleted = mapStop?.status === 'completed';
         const isCurrent = mapStop?.status === 'current';
+        const unresolved = mapStop ? mapStop.latitude === null || mapStop.longitude === null : false;
+        const duplicateWarning = getDuplicateAddressWarning(currentRoute.stops, stop);
+        const stopBadge = formatRouteOrderBadge(stop, index + 1);
 
         return (
           <View
@@ -298,7 +324,7 @@ export default function DeliveryPreparationScreen() {
                   isCompleted && styles.stopNumberCircleCompleted,
                 ]}>
                   <Text style={styles.stopNumberText}>
-                    {isCompleted ? '✓' : `#${index + 1}`}
+                    {isCompleted ? '✓' : stopBadge}
                   </Text>
                 </View>
                 <Text style={[
@@ -340,20 +366,28 @@ export default function DeliveryPreparationScreen() {
                       </Text>
                     </View>
                   ) : null}
-                  {mapStop && (mapStop.latitude === null || mapStop.longitude === null) ? (
+                  {unresolved ? (
                     <View style={[styles.metaBadge, styles.metaBadgeWarn]}>
                       <AlertTriangle size={11} color={Colors.warning} />
-                      <Text style={[styles.metaBadgeText, { color: Colors.warning }]}>Sem coordenadas</Text>
+                      <Text style={[styles.metaBadgeText, { color: Colors.warning }]}>{UNRESOLVED_COORDINATE_LABEL}</Text>
                     </View>
                   ) : null}
-                  {stop.duplicateAddressWarning && (
+                  {duplicateWarning && (
                     <View style={[styles.metaBadge, styles.metaBadgeWarn]}>
                       <AlertTriangle size={11} color={Colors.warning} />
                       <Text style={[styles.metaBadgeText, { color: Colors.warning }]}>
-                        Mesmo endereço em outra parada
+                        {duplicateWarning}
                       </Text>
                     </View>
                   )}
+                  {stopBadge === '#P' ? (
+                    <View style={[styles.metaBadge, styles.metaBadgeWarn]}>
+                      <Hash size={11} color={Colors.warning} />
+                      <Text style={[styles.metaBadgeText, { color: Colors.warning }]}>
+                        {MISSING_STOP_DESCRIPTION}
+                      </Text>
+                    </View>
+                  ) : null}
                 </View>
               </View>
 
@@ -416,12 +450,26 @@ export default function DeliveryPreparationScreen() {
                 <Navigation size={16} color={Colors.gold[400]} />
                 <Text style={styles.stopOrderButtonText}>Navegar</Text>
               </TouchableOpacity>
+              {unresolved ? (
+                <TouchableOpacity
+                  style={[styles.stopOrderButton, styles.navigateButton]}
+                  onPress={() => handleCopyAddress(mainAddress, stop.zipCode)}
+                  activeOpacity={0.75}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Copiar endereço da parada ${stopBadge}`}
+                >
+                  <Copy size={16} color={Colors.warning} />
+                  <Text style={[styles.stopOrderButtonText, { color: Colors.warning }]}>
+                    Copiar endereço
+                  </Text>
+                </TouchableOpacity>
+              ) : null}
             </View>
 
             {isExpanded && (
               <View style={styles.expandedBody}>
                 <Text style={styles.expandedTitle}>
-                  Códigos SPX TN — Parada {index + 1}
+                  Códigos SPX TN — Parada {stopBadge}
                 </Text>
 
                 {stop.addressGroups.map((ag, addrIdx) => (

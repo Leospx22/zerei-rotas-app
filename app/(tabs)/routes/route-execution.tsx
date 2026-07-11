@@ -46,6 +46,7 @@ import {
   getAddressGroupOccurrenceAction,
   type OccurrenceTarget,
 } from '@/lib/occurrenceFlow';
+import { SHOPEE_OCCURRENCE_REASONS } from '@/lib/occurrenceReasons';
 import {
   collectRouteOccurrenceRecords,
   partitionOccurrenceRecords,
@@ -55,20 +56,15 @@ import {
   togglePackageSelection,
 } from '@/lib/packageSelection';
 import {
+  formatRouteOrderBadge,
+  getDuplicateAddressWarning,
+} from '@/lib/routeStopPresentation';
+import {
   deletePlaceInfo,
   loadPlaceInfo,
   savePlaceInfo,
   type PlaceInfo,
 } from '@/lib/placeIntelligence';
-
-const OCCURRENCE_OPTIONS = [
-  'Cliente ausente',
-  'Endereço não localizado',
-  'Cliente recusou',
-  'Estabelecimento fechado',
-  'Reagendado',
-  'Outro',
-];
 
 const NOOP = () => {};
 
@@ -90,7 +86,7 @@ function OccurrenceSheet({ visible, onSelect, onClose }: OccurrenceSheetProps) {
       <View style={sheet.container}>
         <View style={sheet.handle} />
         <Text style={sheet.title}>Selecionar ocorrência</Text>
-        {OCCURRENCE_OPTIONS.map(option => (
+        {SHOPEE_OCCURRENCE_REASONS.map(option => (
           <TouchableOpacity
             key={option}
             style={sheet.option}
@@ -569,12 +565,14 @@ export default function RouteExecutionScreen() {
 
         <Text style={styles.sectionTitle}>Lista de Paradas</Text>
 
-        {currentRoute.stops.map(stop => {
+        {currentRoute.stops.map((stop, stopIndex) => {
           const isExpanded = expandedStop === stop.id;
           const stopDelivered = stop.packages.filter(p => p.status === 'delivered').length;
           const stopOccurrenceCount = stop.packages.filter(p => p.status === 'skipped').length;
           const activeOccurrenceFilter =
             stop.id === currentStop?.id ? occurrencePackageFilter : null;
+          const stopBadge = formatRouteOrderBadge(stop, stopIndex + 1);
+          const duplicateWarning = getDuplicateAddressWarning(currentRoute.stops, stop);
 
           return (
             <View
@@ -602,7 +600,7 @@ export default function RouteExecutionScreen() {
                         stop.status !== 'pending' && styles.stopNumberTextDone,
                       ]}
                     >
-                      {stop.stopNumber}
+                      {stopBadge}
                     </Text>
                   </View>
                   {stop.optimizedOrderIndex !== undefined &&
@@ -633,10 +631,10 @@ export default function RouteExecutionScreen() {
                         </Text>
                       </View>
                     )}
-                    {stop.duplicateAddressWarning && stop.status === 'pending' && (
+                    {duplicateWarning && stop.status === 'pending' && (
                       <View style={styles.warnBadge}>
                         <AlertTriangle size={10} color={Colors.warning} />
-                        <Text style={styles.warnBadgeText}>Endereço duplicado</Text>
+                        <Text style={styles.warnBadgeText}>{duplicateWarning}</Text>
                       </View>
                     )}
                   </View>

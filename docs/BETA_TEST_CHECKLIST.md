@@ -16,7 +16,11 @@ Use one copy of this checklist for each closed-beta tester. Do not include passw
 - [ ] Completar Perfil
 - [ ] Importar rota real
 - [ ] Revisar Rota
+- [ ] Confirmar que paradas sem número aparecem como `#P`
+- [ ] Conferir avisos de endereço duplicado com os números das paradas correspondentes
 - [ ] Mostrar no mapa
+- [ ] Confirmar que endereços duplicados compartilham coordenadas quando uma parada equivalente já tem coordenada válida
+- [ ] Testar "Copiar endereço" quando aparecer "Insira o endereço manualmente"
 - [ ] Iniciar entrega
 - [ ] Navegar para uma parada
 - [ ] Registrar ocorrência
@@ -39,6 +43,8 @@ Use one copy of this checklist for each closed-beta tester. Do not include passw
 - Pagamento ainda não está ativo.
 - O app está em evolução e pode mudar durante o teste.
 - Algumas coordenadas podem depender da qualidade dos dados da planilha.
+- Se uma parada mostrar "Insira o endereço manualmente", use "Copiar endereço" ou "Navegar" para buscar manualmente no GPS.
+- `#P` significa que a planilha não trouxe um número de Stop válido para aquela parada.
 - O teste inicial é focado em Android.
 
 ## 5. Test Outcome

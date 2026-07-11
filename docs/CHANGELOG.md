@@ -6,6 +6,11 @@ All notable product and architecture changes are recorded here. Versions follow 
 
 ### Added
 
+- Versioned active-route storage envelope with `savedAt`, safe validation, legacy raw-route compatibility, and malformed-payload backup.
+- Immediate active-route snapshot saves for route operations plus AppState background flush and foreground restore.
+- One-time Painel restore notice: "Rota restaurada. VocÃª pode continuar a entrega."
+- Active-route restore/corruption regression tests covering planned, active, completed, malformed, optional-field, manual-order, `#P`, and SPX TN cases.
+
 - Canonical Shopee occurrence reason list shared by occurrence registration and edit flows.
 - `#P` compact stop badge for spreadsheet rows without a valid Stop number, while keeping the longer "Sem número de parada na planilha" explanation where context is needed.
 - Duplicate-address coordinate inheritance so stops with the same normalized street and number can reuse a valid coordinate from another stop in the same route.
@@ -70,6 +75,9 @@ All notable product and architecture changes are recorded here. Versions follow 
 
 ### Changed
 
+- Current-route persistence now writes a versioned envelope under the existing `zerei_current_route` key instead of relying on a debounced raw-route save.
+- Route completion now saves history before clearing the active route, preserving idempotent completed-history behavior.
+
 - Duplicate-address warnings now name the exact matching stop identifiers, including `#P` for missing spreadsheet Stop groups.
 - Map and route-review unresolved-coordinate wording now uses "Insira o endereço manualmente" instead of "Sem coordenadas".
 
@@ -104,6 +112,9 @@ All notable product and architecture changes are recorded here. Versions follow 
 - Preserved occurrence timestamps while editing reasons or reversing resolved outcomes.
 
 ### Fixed
+
+- App restart recovery no longer crashes on malformed active-route JSON or old partially shaped route data.
+- Backgrounding an active route now flushes the latest local route snapshot without requiring a screen unmount.
 
 - Stops sharing the same normalized street and number no longer show inconsistent map availability when one duplicate has valid coordinates and another does not.
 - Old placeholder occurrence reason lists in active UI flows were replaced with the approved Shopee reason list.

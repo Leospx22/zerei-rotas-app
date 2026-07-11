@@ -173,7 +173,12 @@ const cel = StyleSheet.create({
 
 export default function DashboardScreen() {
   const router = useRouter();
-  const { currentRoute, routeHistory: recentRoutes } = useRoute();
+  const {
+    currentRoute,
+    routeHistory: recentRoutes,
+    restoreNotice,
+    clearRestoreNotice,
+  } = useRoute();
   const {
     hasRoute,
     total,
@@ -249,6 +254,19 @@ export default function DashboardScreen() {
           <Text style={styles.avatarText}>M</Text>
         </View>
       </View>
+
+      {restoreNotice ? (
+        <TouchableOpacity
+          style={styles.restoreNotice}
+          onPress={clearRestoreNotice}
+          activeOpacity={0.8}
+          accessibilityRole="button"
+          accessibilityLabel="Fechar aviso de rota restaurada"
+        >
+          <CheckCircle2 size={18} color={Colors.success} />
+          <Text style={styles.restoreNoticeText}>{restoreNotice}</Text>
+        </TouchableOpacity>
+      ) : null}
 
       {/* ROTA DE HOJE hero card */}
       <LinearGradient
@@ -548,6 +566,25 @@ const styles = StyleSheet.create({
     borderWidth: 2, borderColor: Colors.gold[500],
   },
   avatarText: { fontSize: FontSizes.lg, fontWeight: '700', color: Colors.gold[400] },
+  restoreNotice: {
+    minHeight: 46,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+    marginBottom: Spacing.md,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    borderRadius: BorderRadius.md,
+    borderWidth: 1,
+    borderColor: Colors.successBorder,
+    backgroundColor: Colors.successBg,
+  },
+  restoreNoticeText: {
+    flex: 1,
+    color: Colors.success,
+    fontSize: FontSizes.sm,
+    fontWeight: '700',
+  },
 
   // Rota de Hoje
   rotaCard: {

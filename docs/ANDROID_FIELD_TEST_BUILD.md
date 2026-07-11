@@ -122,6 +122,8 @@ During the route:
 - Confirm tabs and route screens are usable.
 - Confirm occurrences can be registered.
 - Confirm the app can be closed and reopened from the launcher.
+- Confirm an active route restores after force-close, phone restart, and temporary loss of internet.
+- Confirm delivered packages, occurrence edits/resolutions/deletions, manual stop order, and `#P` stops remain intact after reopening.
 
 After the route:
 

@@ -1,6 +1,7 @@
 import { useCallback, useState } from 'react';
 import { RouteData } from '@/contexts/RouteContext';
 import {
+  clearActiveRouteFromStorage,
   deleteRouteFromStorage,
   deleteHistoryOccurrenceInStorage,
   editHistoryOccurrenceInStorage,
@@ -25,7 +26,7 @@ export function usePersistence() {
       const savedId = await saveRouteToStorage(storage, route);
       return savedId;
     } catch (err: any) {
-      setError(err.message ?? 'Erro ao salvar rota');
+      setError('Não foi possível salvar esta alteração. Tente novamente.');
       return null;
     }
   }, [storage]);
@@ -63,6 +64,16 @@ export function usePersistence() {
     try {
       return await deleteRouteFromStorage(storage, id);
     } catch {
+      return false;
+    }
+  }, [storage]);
+
+  const clearCurrentRoute = useCallback(async (): Promise<boolean> => {
+    try {
+      await clearActiveRouteFromStorage(storage);
+      return true;
+    } catch (err: any) {
+      setError(err.message ?? 'Erro ao limpar rota ativa');
       return false;
     }
   }, [storage]);
@@ -131,6 +142,7 @@ export function usePersistence() {
     error,
     saveRoute,
     loadCurrentRoute,
+    clearCurrentRoute,
     saveToHistory,
     getHistory,
     renameRoute,

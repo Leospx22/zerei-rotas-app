@@ -35,14 +35,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    const currentUser = (await supabase.auth.getUser()).data.user;
-    if (!currentUser) {
-      setProfile(null);
+    try {
+      const currentUser = (await supabase.auth.getUser()).data.user;
+      if (!currentUser) {
+        setProfile(null);
+        return;
+      }
+
+      const loadedProfile = await getCurrentProfile();
+      setProfile(loadedProfile ?? (await createProfileForUser(currentUser)));
+    } catch {
+      // Temporary network/auth refresh failures must not destabilize local route work.
       return;
     }
-
-    const loadedProfile = await getCurrentProfile();
-    setProfile(loadedProfile ?? (await createProfileForUser(currentUser)));
   }, []);
 
   useEffect(() => {
@@ -61,7 +66,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       })
       .catch(() => {
         if (mounted) {
-          setSession(null);
           setProfile(null);
         }
       })

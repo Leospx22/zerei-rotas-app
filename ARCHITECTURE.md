@@ -155,7 +155,8 @@ Use `replace()` between sequential wizard screens to avoid accumulating hidden l
 - Duplicate-stop removal and stop reordering
 - Import summary calculation
 - Initial hydration of current route and history
-- Debounced persistence of planning and active route changes
+- Immediate persistence of planning and active route changes
+- Background flush and foreground recovery of the latest active route
 - Completion persistence and history reload
 
 Important ownership rules:
@@ -165,7 +166,7 @@ Important ownership rules:
 3. Screens must not maintain an independent authoritative history collection.
 4. Current-route rename must go through `renameCurrentRoute` so memory and storage change together.
 5. Completed-route rename may use the persistence operation, but must call `reloadHistory()` afterward.
-6. Completed routes are not written by the debounced current-route auto-save.
+6. Completed routes are not restored as active routes.
 7. Parsing, navigation, and raw AsyncStorage serialization do not belong in RouteContext.
 
 ## CurrentRoute Model
@@ -194,6 +195,18 @@ Status meanings:
 - `completed`: every stop is completed or skipped; the route is moving into history
 
 There is at most one persisted current route. `loadCurrentRouteFromStorage()` intentionally returns only planning or active routes; completed routes belong to history.
+
+The active-route storage value is a versioned envelope:
+
+```ts
+{
+  version: 1;
+  savedAt: string;
+  route: RouteData;
+}
+```
+
+Older raw `RouteData` payloads under the same key remain readable for migration compatibility. Malformed JSON or malformed route shapes do not crash startup; invalid payloads are left out of active restore and copied to `zerei_current_route_corrupted` when possible for debugging. Essential restore requirements are a route id and a non-empty stops array. Optional missing fields are repaired conservatively.
 
 The route hierarchy is:
 
@@ -285,11 +298,25 @@ Storage keys:
 
 | Key | Value | Purpose |
 | --- | --- | --- |
-| `zerei_current_route` | `RouteData` | The single planning or active route |
+| `zerei_current_route` | Versioned active-route envelope | The single planning or active route |
+| `zerei_current_route_corrupted` | Raw string backup | Last malformed active-route payload, when backup is possible |
 | `zerei_route_history` | `HistoryEntry[]` | Completed-route summaries |
 | `ZR_PLACE_INTELLIGENCE` | Address-keyed `PlaceInfo` collection | Local delivery knowledge |
+| `ZR_GEOCODE_CACHE` | Address-keyed geocode cache | Local map coordinate recovery |
 
-The module owns JSON serialization, loading, saving, completion history, rename, and delete behavior.
+The module owns JSON serialization, envelope loading, shape validation, recovery, active-route saving/clearing, completion history, rename, and delete behavior.
+
+Active-route operations are local-first:
+
+- Import, route rename, stop reordering, route start, package delivery/undo, stop status changes, occurrence registration/edit/resolution/deletion, and current-route clearing write the current route snapshot immediately.
+- AppState `inactive` and `background` transitions flush the latest non-completed route snapshot.
+- AppState `active` reloads the persisted route and restores it if it is valid, newer/different than memory, and not completed.
+- A restored active route can show the one-time Painel notice `Rota restaurada. Você pode continuar a entrega.`
+- Place Intelligence and geocode cache remain separate local stores and do not mutate route/package data.
+
+Route completion is sequenced for durability: save or update the completed history entry first, then clear the active-route key. History writes are idempotent by route id and preserve an existing `completedAt` and renamed title for repeated completion attempts.
+
+Offline route execution is expected to work from local storage once a usable local app/session is available. Supabase profile/funnel actions may fail while offline, but they must not erase local active-route data. Cloud synchronization of route progress is not implemented yet.
 
 ### `lib/placeIntelligence.ts`
 
@@ -301,6 +328,7 @@ This hook adapts storage operations for React consumers. It catches storage fail
 
 - `saveRoute`
 - `loadCurrentRoute`
+- `clearCurrentRoute`
 - `saveToHistory`
 - `getHistory`
 - `renameRoute`

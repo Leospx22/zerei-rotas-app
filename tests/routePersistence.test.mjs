@@ -3,12 +3,15 @@ import test from 'node:test';
 import {
   deleteRouteFromStorage,
   KEY_CURRENT,
+  KEY_CURRENT_CORRUPTED,
   KEY_HISTORY,
+  loadActiveRouteEnvelopeFromStorage,
   loadCurrentRouteFromStorage,
   loadHistoryFromStorage,
   renameRouteInStorage,
   saveCompletedRouteToHistory,
   saveRouteToStorage,
+  validatePersistedRoute,
 } from '../lib/routePersistence.ts';
 import { buildPlanningRoute } from '../lib/packageUtils.ts';
 
@@ -20,16 +23,60 @@ class MemoryStorage {
   async removeItem(key) { this.values.delete(key); }
 }
 
+class FailingHistoryStorage extends MemoryStorage {
+  failHistoryWrite = false;
+
+  async setItem(key, value) {
+    if (this.failHistoryWrite && key === KEY_HISTORY) {
+      throw new Error('history write failed');
+    }
+    return super.setItem(key, value);
+  }
+}
+
 function route(status) {
+  const packageStatus = status === 'completed' ? 'delivered' : 'pending';
+  const stopStatus = status === 'completed' ? 'completed' : 'pending';
   return {
     id: 'route-1',
     name: 'Rota importada',
-    stops: [],
+    stops: [{
+      id: 'stop-1',
+      stopNumber: 1,
+      normalizedAddress: 'Rua A, 10',
+      originalAddress: 'Rua A, 10',
+      zipCode: '01000-000',
+      latitude: null,
+      longitude: null,
+      packages: [{
+        id: 'pkg-1',
+        trackingNumber: 'SPX1',
+        destinationAddress: 'Rua A, 10',
+        zipCode: '01000-000',
+        latitude: null,
+        longitude: null,
+        stopNumber: status === 'planning' ? null : 1,
+        status: packageStatus,
+      }],
+      packageCount: 1,
+      addressGroups: [{
+        normalizedAddress: 'Rua A, 10',
+        originalAddress: 'Rua A, 10',
+        zipCode: '01000-000',
+        packageIds: ['pkg-1'],
+        packageCount: 1,
+      }],
+      addressCount: 1,
+      orderIndex: 0,
+      status: stopStatus,
+      houseNumber: '10',
+      duplicateAddressWarning: false,
+    }],
     status,
     estimatedDistanceKm: 0,
-    completedStops: 0,
-    totalPackages: 3,
-    deliveredPackages: status === 'completed' ? 3 : 0,
+    completedStops: status === 'completed' ? 1 : 0,
+    totalPackages: 1,
+    deliveredPackages: status === 'completed' ? 1 : 0,
     startTime: status === 'planning' ? null : 1,
     durationMinutes: status === 'completed' ? 10 : 0,
   };
@@ -65,8 +112,31 @@ test('planning to active overwrites the current route without duplication', asyn
   const reloaded = await loadCurrentRouteFromStorage(storage);
   assert.equal(reloaded?.status, 'active');
   assert.equal(reloaded?.startTime, 1);
-  assert.equal(JSON.parse(await storage.getItem(KEY_CURRENT)).id, 'route-1');
+  const envelope = JSON.parse(await storage.getItem(KEY_CURRENT));
+  assert.equal(envelope.version, 1);
+  assert.equal(envelope.route.id, 'route-1');
+  assert.match(envelope.savedAt, /^\d{4}-\d{2}-\d{2}T/);
   assert.equal((await loadHistoryFromStorage(storage)).length, 0);
+});
+
+test('active route serializes with an envelope and restores metadata safely', async () => {
+  const storage = new MemoryStorage();
+  await saveRouteToStorage(storage, route('active'));
+
+  const restored = await loadActiveRouteEnvelopeFromStorage(storage);
+  assert.equal(restored.route?.id, 'route-1');
+  assert.equal(restored.route?.status, 'active');
+  assert.equal(restored.recovered, true);
+  assert.match(restored.savedAt, /^\d{4}-\d{2}-\d{2}T/);
+});
+
+test('legacy raw current route storage still restores for migration compatibility', async () => {
+  const storage = new MemoryStorage();
+  await storage.setItem(KEY_CURRENT, JSON.stringify(route('planning')));
+
+  const restored = await loadActiveRouteEnvelopeFromStorage(storage);
+  assert.equal(restored.route?.status, 'planning');
+  assert.equal(restored.savedAt, null);
 });
 
 test('active to completed keeps history behavior and removes the current route', async () => {
@@ -228,4 +298,107 @@ test('later stale completion save does not revert newest history rename', async 
   assert.equal(history[0].name, 'Rota final renomeada');
   assert.equal(history[0].completedAt, savedEntry.completedAt);
   assert.equal(await storage.getItem(KEY_CURRENT), null);
+});
+
+test('active route clear happens only after completed history save succeeds', async () => {
+  const storage = new FailingHistoryStorage();
+  await saveRouteToStorage(storage, route('active'));
+  storage.failHistoryWrite = true;
+
+  await assert.rejects(
+    () => saveCompletedRouteToHistory(storage, route('completed')),
+    /history write failed/
+  );
+
+  assert.equal((await loadCurrentRouteFromStorage(storage))?.status, 'active');
+  assert.equal(await storage.getItem(KEY_HISTORY), null);
+});
+
+test('completed route is not restored as an active route', async () => {
+  const storage = new MemoryStorage();
+  await saveRouteToStorage(storage, route('completed'));
+
+  assert.equal(await loadCurrentRouteFromStorage(storage), null);
+});
+
+test('invalid JSON does not crash and preserves a debug backup', async () => {
+  const storage = new MemoryStorage();
+  await storage.setItem(KEY_CURRENT, '{invalid json');
+
+  assert.equal(await loadCurrentRouteFromStorage(storage), null);
+  assert.equal(await storage.getItem(KEY_CURRENT_CORRUPTED), '{invalid json');
+});
+
+test('malformed route data falls back safely without deleting history', async () => {
+  const storage = new MemoryStorage();
+  await storage.setItem(KEY_CURRENT, JSON.stringify({ version: 1, savedAt: '2026-07-11T10:00:00.000Z', route: { id: 'bad' } }));
+  await storage.setItem(KEY_HISTORY, JSON.stringify([historyEntry('done', 'Rota feita', '2026-07-11T11:00:00.000Z')]));
+
+  assert.equal(await loadCurrentRouteFromStorage(storage), null);
+  assert.equal((await loadHistoryFromStorage(storage)).length, 1);
+  assert.ok(await storage.getItem(KEY_CURRENT_CORRUPTED));
+});
+
+test('missing optional route fields are repaired during restore', () => {
+  const recovered = validatePersistedRoute({
+    id: 'route-repair',
+    stops: [{
+      packages: [{
+        destinationAddress: 'Rua B, 20',
+      }],
+    }],
+  });
+
+  assert.equal(recovered?.name, 'Rota atual');
+  assert.equal(recovered?.status, 'planning');
+  assert.equal(recovered?.stops[0].packages[0].status, 'pending');
+  assert.equal(recovered?.stops[0].packageCount, 1);
+});
+
+test('manual order, #P groups, SPX TN and delivered package survive restore', async () => {
+  const storage = new MemoryStorage();
+  const active = route('active');
+  active.name = 'Rota recuperavel';
+  active.stops = [
+    {
+      ...active.stops[0],
+      id: 'stop-p',
+      stopNumber: 99,
+      orderIndex: 0,
+      packages: [{
+        ...active.stops[0].packages[0],
+        id: 'pkg-p',
+        trackingNumber: 'SPX-P',
+        stopNumber: null,
+        status: 'delivered',
+      }],
+      completedStops: undefined,
+      status: 'completed',
+    },
+    {
+      ...active.stops[0],
+      id: 'stop-2',
+      stopNumber: 2,
+      orderIndex: 1,
+      packages: [{
+        ...active.stops[0].packages[0],
+        id: 'pkg-2',
+        trackingNumber: 'SPX-2',
+        status: 'pending',
+      }],
+      status: 'pending',
+    },
+  ];
+  active.deliveredPackages = 1;
+  active.completedStops = 1;
+  active.totalPackages = 2;
+
+  await saveRouteToStorage(storage, active);
+  const restored = await loadCurrentRouteFromStorage(storage);
+
+  assert.equal(restored?.name, 'Rota recuperavel');
+  assert.deepEqual(restored?.stops.map(stop => stop.id), ['stop-p', 'stop-2']);
+  assert.equal(restored?.stops[0].packages[0].trackingNumber, 'SPX-P');
+  assert.equal(restored?.stops[0].packages[0].stopNumber, null);
+  assert.equal(restored?.stops[0].packages[0].status, 'delivered');
 });

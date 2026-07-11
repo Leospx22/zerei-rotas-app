@@ -31,11 +31,17 @@ Complete this checklist for every production candidate. Record device models, OS
 
 ## Persistence
 
-- [ ] Import a route and confirm `zerei_current_route` contains the planning route.
+- [ ] Import a route and confirm `zerei_current_route` contains a version `1` envelope with `savedAt` and the planning route.
 - [ ] Restart the application and confirm the planning route is restored.
 - [ ] Start the route and confirm active progress persists after restart.
+- [ ] Confirm the one-time restored-route notice appears after active-route recovery and does not repeat on every tab change.
+- [ ] Deliver one package, force-close, reopen, and confirm the delivered status remains.
+- [ ] Register, edit, resolve, and delete an occurrence, force-close after each action, and confirm the latest state remains.
+- [ ] Reorder stops, force-close, and confirm the saved order remains in review, map overview, and execution.
 - [ ] Complete the route and confirm `zerei_current_route` is removed.
 - [ ] Confirm one entry is added to `zerei_route_history`.
+- [ ] Retry completion and confirm no duplicate history entry is created.
+- [ ] Corrupt active-route storage in a test build and confirm startup does not crash or delete history.
 - [ ] Rename current and completed routes, restart, and verify the names remain.
 - [ ] Delete current and completed routes and verify every tab refreshes.
 - [ ] Confirm repeated completion writes do not revert a renamed history title.
@@ -87,6 +93,8 @@ Complete this checklist for every production candidate. Record device models, OS
 - [ ] Select XLSX, XLS, CSV, and invalid files.
 - [ ] Background and foreground the application during an active route.
 - [ ] Force-close and reopen during planning and active states.
+- [ ] Restart the phone during an active route and confirm local route recovery.
+- [ ] Put the phone offline, continue deliveries/occurrences locally, force-close, reopen, and confirm local progress remains.
 - [ ] Verify Supabase session persistence after force-close.
 - [ ] Record device model, Android version, and Expo/native build version.
 

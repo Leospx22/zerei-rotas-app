@@ -4,8 +4,10 @@ import React, {
   useState,
   useCallback,
   useEffect,
+  useRef,
   ReactNode,
 } from 'react';
+import { AppState } from 'react-native';
 import {
   GroupedStop,
   PackageItem,
@@ -40,9 +42,11 @@ interface RouteContextType {
   isLoading: boolean;
   persistenceError: string | null;
   routeHistory: HistoryEntry[];
+  restoreNotice: string | null;
   // Compatibility lookup for occurrence reasons also persisted on PackageItem.
   occurrences: Record<string, string>;
   setCurrentRoute: (route: RouteData | null) => void;
+  clearRestoreNotice: () => void;
   reloadHistory: () => Promise<void>;
   renameCurrentRoute: (name: string) => Promise<boolean>;
   updateStopStatus: (stopId: string, status: GroupedStop['status']) => void;
@@ -80,9 +84,24 @@ function checkCompletion(route: RouteData): RouteData {
 export function RouteProvider({ children }: { children: ReactNode }) {
   const [currentRoute, setCurrentRouteState] = useState<RouteData | null>(null);
   const [routeHistory, setRouteHistory] = useState<HistoryEntry[]>([]);
+  const [restoreNotice, setRestoreNotice] = useState<string | null>(null);
   // Immediate UI lookup; PackageItem remains the persisted source.
   const [occurrences, setOccurrences] = useState<Record<string, string>>({});
-  const { isLoading, error: persistenceError, saveRoute, loadCurrentRoute, saveToHistory, getHistory } = usePersistence();
+  const {
+    isLoading,
+    error: persistenceError,
+    saveRoute,
+    loadCurrentRoute,
+    clearCurrentRoute,
+    saveToHistory,
+    getHistory,
+  } = usePersistence();
+  const currentRouteRef = useRef<RouteData | null>(null);
+  const restoreNoticeShownRef = useRef(false);
+
+  useEffect(() => {
+    currentRouteRef.current = currentRoute;
+  }, [currentRoute]);
 
   const reloadHistory = useCallback(async () => {
     const history = await getHistory();
@@ -98,6 +117,10 @@ export function RouteProvider({ children }: { children: ReactNode }) {
       const route = await loadCurrentRoute();
       if (mounted && route) {
         setCurrentRouteState(route);
+        if (route.status === 'active' && !restoreNoticeShownRef.current) {
+          restoreNoticeShownRef.current = true;
+          setRestoreNotice('Rota restaurada. Você pode continuar a entrega.');
+        }
       }
     };
     loadRoute().catch(() => {});
@@ -105,14 +128,51 @@ export function RouteProvider({ children }: { children: ReactNode }) {
     return () => { mounted = false; };
   }, [loadCurrentRoute, reloadHistory]);
 
-  // Auto-save on state changes (debounced)
+  const persistActiveRouteSnapshot = useCallback((route: RouteData | null) => {
+    if (!route) {
+      clearCurrentRoute().catch(() => {});
+      return;
+    }
+    if (route.status === 'completed') return;
+    saveRoute(route).catch(() => {});
+  }, [clearCurrentRoute, saveRoute]);
+
+  const commitRouteUpdate = useCallback((
+    updater: (route: RouteData) => RouteData | null
+  ) => {
+    setCurrentRouteState(prev => {
+      if (!prev) return prev;
+      const next = updater(prev);
+      persistActiveRouteSnapshot(next);
+      return next;
+    });
+  }, [persistActiveRouteSnapshot]);
+
   useEffect(() => {
-    if (!currentRoute || currentRoute.status === 'completed') return;
-    const timer = setTimeout(() => {
-      saveRoute(currentRoute).catch(() => {});
-    }, 1000);
-    return () => clearTimeout(timer);
-  }, [currentRoute, saveRoute]);
+    const subscription = AppState.addEventListener('change', nextState => {
+      if (nextState === 'inactive' || nextState === 'background') {
+        const route = currentRouteRef.current;
+        if (route && route.status !== 'completed') {
+          saveRoute(route).catch(() => {});
+        }
+      }
+
+      if (nextState === 'active') {
+        loadCurrentRoute()
+          .then(route => {
+            if (!route) return;
+            const current = currentRouteRef.current;
+            if (current?.status === 'completed') return;
+            if (!current) {
+              setCurrentRouteState(route);
+            }
+          })
+          .catch(() => {});
+      }
+    });
+
+    return () => subscription.remove();
+  }, [loadCurrentRoute, saveRoute]);
 
   // Save to history when route auto-completes via checkCompletion
   useEffect(() => {
@@ -125,10 +185,12 @@ export function RouteProvider({ children }: { children: ReactNode }) {
 
   const setCurrentRoute = useCallback((route: RouteData | null) => {
     setCurrentRouteState(route);
-    if (route) {
-      saveRoute(route).catch(() => {});
-    }
-  }, [saveRoute]);
+    persistActiveRouteSnapshot(route);
+  }, [persistActiveRouteSnapshot]);
+
+  const clearRestoreNotice = useCallback(() => {
+    setRestoreNotice(null);
+  }, []);
 
   const renameCurrentRoute = useCallback(async (name: string): Promise<boolean> => {
     const trimmed = name.trim();
@@ -144,8 +206,7 @@ export function RouteProvider({ children }: { children: ReactNode }) {
   }, [currentRoute, loadCurrentRoute, saveRoute]);
 
   const updateStopStatus = useCallback((stopId: string, status: GroupedStop['status']) => {
-    setCurrentRouteState(prev => {
-      if (!prev) return prev;
+    commitRouteUpdate(prev => {
       const stops = prev.stops.map(s => {
         if (s.id !== stopId) return s;
         const packages = s.packages.map(p => ({
@@ -161,11 +222,10 @@ export function RouteProvider({ children }: { children: ReactNode }) {
       const updated = { ...prev, stops, completedStops, deliveredPackages };
       return checkCompletion(updated);
     });
-  }, []);
+  }, [commitRouteUpdate]);
 
   const updatePackageStatus = useCallback((stopId: string, packageId: string, status: PackageItem['status']) => {
-    setCurrentRouteState(prev => {
-      if (!prev) return prev;
+    commitRouteUpdate(prev => {
       const stops = prev.stops.map(s => {
         if (s.id !== stopId) return s;
         const packages = s.packages.map(p => p.id === packageId ? { ...p, status } : p);
@@ -180,14 +240,13 @@ export function RouteProvider({ children }: { children: ReactNode }) {
       const updated = { ...prev, stops, completedStops, deliveredPackages };
       return checkCompletion(updated);
     });
-  }, []);
+  }, [commitRouteUpdate]);
 
   // Persist occurrence metadata in the route while retaining the UI lookup map.
   const updatePackageOccurrence = useCallback((stopId: string, packageId: string, reason: string) => {
     const registeredAt = new Date().toISOString();
     setOccurrences(prev => ({ ...prev, [packageId]: reason }));
-    setCurrentRouteState(prev => {
-      if (!prev) return prev;
+    commitRouteUpdate(prev => {
       const stops = applyPackageOccurrenceToStops(
         prev.stops,
         stopId,
@@ -203,15 +262,14 @@ export function RouteProvider({ children }: { children: ReactNode }) {
       );
       return checkCompletion({ ...prev, stops, completedStops, deliveredPackages });
     });
-  }, []);
+  }, [commitRouteUpdate]);
 
   const resolvePackageOccurrence = useCallback((
     packageId: string,
     resolution: OccurrenceResolution
   ) => {
     const resolvedAt = new Date().toISOString();
-    setCurrentRouteState(prev => {
-      if (!prev) return prev;
+    commitRouteUpdate(prev => {
       const stops = resolvePackageOccurrenceInStops(
         prev.stops,
         packageId,
@@ -226,7 +284,7 @@ export function RouteProvider({ children }: { children: ReactNode }) {
       );
       return checkCompletion({ ...prev, stops, completedStops, deliveredPackages });
     });
-  }, []);
+  }, [commitRouteUpdate]);
 
   const editPackageOccurrence = useCallback((
     packageId: string,
@@ -235,8 +293,7 @@ export function RouteProvider({ children }: { children: ReactNode }) {
   ) => {
     const updatedAt = new Date().toISOString();
     setOccurrences(prev => ({ ...prev, [packageId]: reason }));
-    setCurrentRouteState(prev => {
-      if (!prev) return prev;
+    commitRouteUpdate(prev => {
       const stops = editPackageOccurrenceInStops(
         prev.stops,
         packageId,
@@ -252,7 +309,7 @@ export function RouteProvider({ children }: { children: ReactNode }) {
       );
       return checkCompletion({ ...prev, stops, completedStops, deliveredPackages });
     });
-  }, []);
+  }, [commitRouteUpdate]);
 
   const deletePackageOccurrence = useCallback((packageId: string) => {
     setOccurrences(prev => {
@@ -260,8 +317,7 @@ export function RouteProvider({ children }: { children: ReactNode }) {
       delete next[packageId];
       return next;
     });
-    setCurrentRouteState(prev => {
-      if (!prev) return prev;
+    commitRouteUpdate(prev => {
       const stops = deletePackageOccurrenceInStops(prev.stops, packageId);
       const completedStops = stops.filter(stop => stop.status === 'completed').length;
       const deliveredPackages = stops.reduce(
@@ -271,11 +327,10 @@ export function RouteProvider({ children }: { children: ReactNode }) {
       );
       return checkCompletion({ ...prev, stops, completedStops, deliveredPackages });
     });
-  }, []);
+  }, [commitRouteUpdate]);
 
   const removeDuplicates = useCallback(() => {
-    setCurrentRouteState(prev => {
-      if (!prev) return prev;
+    commitRouteUpdate(prev => {
       const seen = new Set<string>();
       const unique = prev.stops.filter(s => {
         const key = s.normalizedAddress.toLowerCase().trim();
@@ -286,11 +341,10 @@ export function RouteProvider({ children }: { children: ReactNode }) {
       const reindexed = unique.map((s, i) => ({ ...s, orderIndex: i }));
       return { ...prev, stops: reindexed };
     });
-  }, []);
+  }, [commitRouteUpdate]);
 
   const reorderStops = useCallback(() => {
-    setCurrentRouteState(prev => {
-      if (!prev) return prev;
+    commitRouteUpdate(prev => {
       const pending = prev.stops.filter(s => s.status === 'pending');
       const completed = prev.stops.filter(s => s.status === 'completed');
       const skipped = prev.stops.filter(s => s.status === 'skipped');
@@ -298,7 +352,7 @@ export function RouteProvider({ children }: { children: ReactNode }) {
       const reindexed = reordered.map((s, i) => ({ ...s, orderIndex: i }));
       return { ...prev, stops: reindexed };
     });
-  }, []);
+  }, [commitRouteUpdate]);
 
   const getSummary = useCallback((): ImportSummary => {
     return calculateImportSummary(currentRoute?.stops ?? []);
@@ -321,11 +375,11 @@ export function RouteProvider({ children }: { children: ReactNode }) {
       ? Math.round((Date.now() - currentRoute.startTime) / 60000)
       : 0;
     const completedRoute = { ...currentRoute, status: 'completed' as const, durationMinutes: elapsed };
-    await saveRoute(completedRoute);
-    await saveToHistory(completedRoute);
+    const saved = await saveToHistory(completedRoute);
+    if (!saved) return;
     setCurrentRouteState(completedRoute);
     await reloadHistory();
-  }, [currentRoute, saveRoute, saveToHistory, reloadHistory]);
+  }, [currentRoute, saveToHistory, reloadHistory]);
 
   return (
     <RouteContext.Provider value={{
@@ -333,8 +387,10 @@ export function RouteProvider({ children }: { children: ReactNode }) {
       isLoading,
       persistenceError,
       routeHistory,
+      restoreNotice,
       occurrences,
       setCurrentRoute,
+      clearRestoreNotice,
       reloadHistory,
       renameCurrentRoute,
       updateStopStatus,

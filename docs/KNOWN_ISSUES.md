@@ -1,18 +1,50 @@
 # Known Issues
 
-This register contains confirmed open limitations and risks in the current project. Update the Status and Notes columns when an issue changes.
-
-| ID | Description | Priority | Status | Owner | Notes |
-| --- | --- | --- | --- | --- | --- |
-| ZR-001 | Live geocoding provider is not configured. Stops without valid spreadsheet coordinates, duplicate-address coordinate reuse, or cached coordinates still require manual address entry/copy. | P1 | Open | Unassigned | This is intentional for now: no paid/geocoding provider should be added without approval. |
-| ZR-002 | Route progress is local-only and not cloud-synced. Reinstalling the app, clearing app storage, or switching phones can still lose local route progress. | P1 | Open | Unassigned | Sprint 4.8 improves local crash/restart reliability only. Cloud backup/restore requires an approved sync architecture. |
-| ZR-003 | Android tab interaction currently depends on fixed tab bar dimensions (`height: 100`, `paddingBottom: 24`). Behavior has not been verified across the supported Android device and navigation-mode matrix. | P1 | Open | Unassigned | Do not reduce these values without physical-device testing. Future work should validate gesture and three-button navigation with safe-area variations. |
-| ZR-004 | Native iOS document picking, spreadsheet parsing, navigation, persistence, and safe-area behavior have not been validated on a physical iOS device. | P1 | Open | Unassigned | TypeScript compatibility is not equivalent to runtime validation. Complete the iOS section of the release checklist before an iOS release. |
-| ZR-005 | Automated tests focus on persistence and route-state transitions; navigation touch handling, native file selection, screen rendering, and full lifecycle behavior remain manually tested. | P1 | Open | Unassigned | Add integration or end-to-end coverage as the MVP stabilizes. Physical-device smoke tests remain mandatory. |
-| ZR-006 | `npm test` emits a Node `MODULE_TYPELESS_PACKAGE_JSON` warning while loading TypeScript modules. | P2 | Open | Unassigned | Tests pass. Resolve only after checking the impact of setting package module type or adjusting the test loader. |
+This register contains confirmed open limitations and risks for the closed beta. Update Status and Notes when an issue changes.
 
 Priority meanings:
 
-- **P0:** Release blocker or active data-loss issue.
-- **P1:** Important reliability or product gap that should be addressed in the current milestone.
-- **P2:** Non-blocking maintenance or quality improvement.
+- **Critical:** Blocks closed beta or can cause active delivery data loss.
+- **High:** Important reliability, field-test, or driver-trust gap.
+- **Medium:** Non-blocking quality, maintainability, or coverage gap.
+- **Low:** Cosmetic or deferred cleanup.
+- **Future Improvements:** Product enhancements intentionally deferred.
+
+## Critical
+
+| ID | Description | Status | Owner | Notes |
+| --- | --- | --- | --- | --- |
+| None | No confirmed Critical beta blockers at this checkpoint. | N/A | N/A | Keep this section updated during field testing. |
+
+## High
+
+| ID | Description | Status | Owner | Notes |
+| --- | --- | --- | --- | --- |
+| ZR-001 | Live geocoding provider is not configured. Stops without valid spreadsheet coordinates, duplicate-address coordinate reuse, or cached coordinates still require manual address entry/copy. | Open | Unassigned | Intentional for beta. Do not add a paid/geocoding provider without approval. |
+| ZR-002 | Route progress is local-only and not cloud-synced. Reinstalling the app, clearing app storage, or switching phones can still lose local route progress. | Open | Unassigned | Sprint 4.8 improves local crash/restart reliability only. Cloud backup/restore needs an approved sync architecture. |
+| ZR-003 | Android tab interaction depends on fixed tab bar dimensions (`height: 100`, `paddingBottom: 24`). Behavior needs validation across tester devices and Android navigation modes. | Open | Unassigned | Do not reduce these values without physical-device testing. |
+| ZR-004 | Native iOS document picking, spreadsheet parsing, navigation, persistence, and safe-area behavior have not been validated on a physical iOS device. | Open | Unassigned | Closed beta is Android-first. Complete iOS release checklist before iOS distribution. |
+| ZR-005 | Automated tests do not cover native touch handling, native file selection, screen rendering, or full route lifecycle E2E behavior. | Open | Unassigned | Physical-device smoke testing remains mandatory for beta. |
+
+## Medium
+
+| ID | Description | Status | Owner | Notes |
+| --- | --- | --- | --- | --- |
+| ZR-006 | `npm test` emits Node `MODULE_TYPELESS_PACKAGE_JSON` warnings while loading TypeScript modules. | Open | Unassigned | Tests pass. Resolve only after checking the impact of setting package module type or adjusting the test loader. |
+| ZR-007 | Some older strings and generated docs may still need accent/encoding review in terminal output or copied logs. | Open | Unassigned | App-facing text should be validated on device during beta QA. |
+| ZR-008 | Long routes with 100+ stops rely on manual field validation for scroll responsiveness and map/list usability. | Open | Unassigned | Helper tests pass, but real-device performance should be observed with real Shopee spreadsheets. |
+
+## Low
+
+| ID | Description | Status | Owner | Notes |
+| --- | --- | --- | --- | --- |
+| ZR-009 | Some legacy styles remain unused after official branding replacement. | Open | Unassigned | Low-risk cleanup only; avoid churn before beta unless it affects build output. |
+
+## Future Improvements
+
+| ID | Description | Status | Owner | Notes |
+| --- | --- | --- | --- | --- |
+| ZR-F001 | Cloud backup and restore for routes, history, occurrences, and PlaceInfo. | Deferred | Unassigned | Needed before multi-device or reinstall-safe production use. |
+| ZR-F002 | Live geocoding provider and coordinate confidence review. | Deferred | Unassigned | Requires provider choice, API key strategy, cost review, and privacy review. |
+| ZR-F003 | Payment, subscription enforcement, and server-managed trial expiration. | Deferred | Unassigned | Do not implement before payment architecture approval. |
+| ZR-F004 | Automated E2E tests for import, execution, occurrence, recovery, and completion flows. | Deferred | Unassigned | Consider after beta workflows stabilize. |

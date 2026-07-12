@@ -6,6 +6,9 @@ All notable product and architecture changes are recorded here. Versions follow 
 
 ### Added
 
+- Closed-beta v1 release notes and an expanded Android field-test checklist for installation, import, route review, map, execution, occurrences, offline recovery, history, and performance validation.
+- Severity-grouped known-issues register for Critical, High, Medium, Low, and Future Improvements beta tracking.
+
 - Versioned active-route storage envelope with `savedAt`, safe validation, legacy raw-route compatibility, and malformed-payload backup.
 - Immediate active-route snapshot saves for route operations plus AppState background flush and foreground restore.
 - One-time Painel restore notice: "Rota restaurada. VocÃª pode continuar a entrega."
@@ -74,6 +77,8 @@ All notable product and architecture changes are recorded here. Versions follow 
 - Occurrence reason editing and safe Entregue/Devolvido ao Hub result correction.
 
 ### Changed
+
+- Root crash fallback now shows a friendly Portuguese recovery message and retry action instead of exposing raw exception text to drivers.
 
 - Current-route persistence now writes a versioned envelope under the existing `zerei_current_route` key instead of relying on a debounced raw-route save.
 - Route completion now saves history before clearing the active route, preserving idempotent completed-history behavior.

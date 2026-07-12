@@ -16,13 +16,13 @@ import {
   MapPin,
   TrendingUp,
   FileSpreadsheet,
-  Crown,
   Trophy,
   Clock,
   Truck,
   Star,
 } from 'lucide-react-native';
 import { Colors, Spacing, FontSizes, BorderRadius } from '@/constants/theme';
+import { BrandIcon } from '@/components/BrandIcon';
 import { useRoute } from '@/contexts/RouteContext';
 import { useDashboard } from '@/hooks/useDashboard';
 
@@ -243,7 +243,7 @@ export default function DashboardScreen() {
       <View style={styles.header}>
         <View style={styles.brandRow}>
           <View style={styles.logoCircle}>
-            <Crown size={24} color={Colors.primary[900]} />
+            <BrandIcon size={44} />
           </View>
           <View>
             <Text style={styles.brandName}>Zerei Rotas</Text>

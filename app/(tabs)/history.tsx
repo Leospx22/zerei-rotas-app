@@ -6,10 +6,10 @@ import {
   MapPin,
   Clock,
   TrendingUp,
-  Crown,
   Package,
 } from 'lucide-react-native';
 import { Colors, Spacing, FontSizes, BorderRadius } from '@/constants/theme';
+import { BrandIcon } from '@/components/BrandIcon';
 import { useRoute } from '@/contexts/RouteContext';
 
 export default function HistoryScreen() {
@@ -28,7 +28,7 @@ export default function HistoryScreen() {
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <View style={styles.headerRow}>
-        <Crown size={22} color={Colors.gold[400]} />
+        <BrandIcon size={28} />
         <Text style={styles.pageTitle}>Histórico</Text>
       </View>
 

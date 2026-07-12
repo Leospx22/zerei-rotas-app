@@ -9,8 +9,8 @@
     "userInterfaceStyle": "dark",
     "newArchEnabled": true,
     "splash": {
-      "backgroundColor": "#0A1628",
-      "image": "./assets/images/icon.png",
+      "backgroundColor": "#0B1F3A",
+      "image": "./assets/images/splash-icon.png",
       "resizeMode": "contain"
     },
     "ios": {
@@ -19,8 +19,8 @@
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#0A1628",
-        "foregroundImage": "./assets/images/icon.png"
+        "backgroundColor": "#0B1F3A",
+        "foregroundImage": "./assets/images/adaptive-icon.png"
       },
       "package": "com.zereirotas.app",
       "versionCode": 1
@@ -32,8 +32,8 @@
       "name": "Zerei Rotas",
       "shortName": "Zerei Rotas",
       "description": "Organize, otimize e conclua suas rotas de entrega mais rápido",
-      "backgroundColor": "#0A1628",
-      "themeColor": "#0A2572",
+      "backgroundColor": "#0B1F3A",
+      "themeColor": "#102A4D",
       "orientation": "portrait",
       "startUrl": "/",
       "display": "standalone",

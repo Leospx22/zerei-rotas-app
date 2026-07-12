@@ -11,7 +11,8 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { User, Phone, Mail, MapPin, Package, CheckCircle, Crown } from 'lucide-react-native';
+import { User, Phone, Mail, MapPin, Package, CheckCircle } from 'lucide-react-native';
+import { BrandIcon } from '@/components/BrandIcon';
 import { Colors, Spacing, FontSizes, BorderRadius } from '@/constants/theme';
 import {
   WAITLIST_PLATFORMS,
@@ -87,9 +88,7 @@ export default function LandingScreen() {
           showsVerticalScrollIndicator={false}
         >
           <View style={styles.header}>
-            <View style={styles.logoCircle}>
-              <Crown size={32} color={Colors.primary[900]} />
-            </View>
+            <BrandIcon size={68} />
             <Text style={styles.title}>Zerei Rotas</Text>
             <Text style={styles.subtitle}>
               Organize e conclua suas rotas de entrega mais rapido

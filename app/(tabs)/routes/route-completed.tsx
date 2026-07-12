@@ -2,8 +2,9 @@ import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Trophy, MapPin, Clock, CheckCircle2, Home, Crown, Package } from 'lucide-react-native';
+import { Trophy, MapPin, Clock, CheckCircle2, Home, Package } from 'lucide-react-native';
 import { Colors, Spacing, FontSizes, BorderRadius } from '@/constants/theme';
+import { BrandIcon } from '@/components/BrandIcon';
 import { useRoute } from '@/contexts/RouteContext';
 
 export default function RouteCompletedScreen() {
@@ -29,7 +30,7 @@ export default function RouteCompletedScreen() {
     >
       <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.brandHeader}>
-          <Crown size={28} color={Colors.gold[400]} />
+          <BrandIcon size={32} />
           <Text style={styles.brandText}>Zerei Rotas</Text>
         </View>
 

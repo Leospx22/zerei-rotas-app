@@ -11,7 +11,8 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Mail, Lock, Eye, EyeOff, Crown } from 'lucide-react-native';
+import { Mail, Lock, Eye, EyeOff } from 'lucide-react-native';
+import { BrandIcon } from '@/components/BrandIcon';
 import { Colors, Spacing, FontSizes, BorderRadius } from '@/constants/theme';
 import { useAuth } from '@/contexts/AuthContext';
 import { getAuthErrorMessage } from '@/lib/userProfile';
@@ -68,9 +69,7 @@ export default function LoginScreen() {
         style={styles.inner}
       >
         <View style={styles.header}>
-          <View style={styles.logoCircle}>
-            <Crown size={32} color={Colors.primary[900]} />
-          </View>
+          <BrandIcon size={68} />
           <Text style={styles.title}>Zerei Rotas</Text>
           <Text style={styles.subtitle}>
             Organize, otimize e conclua suas rotas de entrega mais rápido

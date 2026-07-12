@@ -13,7 +13,6 @@ import {
 import {
   CalendarDays,
   CheckCircle2,
-  Crown,
   FlaskConical,
   Headphones,
   LogOut,
@@ -23,6 +22,7 @@ import {
   UserRound,
 } from 'lucide-react-native';
 import { Colors, Spacing, FontSizes, BorderRadius } from '@/constants/theme';
+import { BrandIcon } from '@/components/BrandIcon';
 import { useAuth } from '@/contexts/AuthContext';
 import {
   formatProfileDate,
@@ -207,7 +207,7 @@ export default function ProfileScreen() {
       <View style={styles.header}>
         <View style={styles.avatar}>
           {session
-            ? <Crown size={30} color={Colors.primary[900]} />
+            ? <BrandIcon size={44} />
             : <UserRound size={30} color={Colors.primary[900]} />}
         </View>
         <Text style={styles.title}>Perfil</Text>

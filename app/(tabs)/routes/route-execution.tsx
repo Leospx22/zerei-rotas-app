@@ -20,12 +20,12 @@ import {
   Package,
   ChevronDown,
   ChevronUp,
-  Crown,
   AlertTriangle,
   AlertCircle,
   SkipForward,
 } from 'lucide-react-native';
 import { Colors, Spacing, FontSizes, BorderRadius } from '@/constants/theme';
+import { BrandIcon } from '@/components/BrandIcon';
 import { ExecutionCard } from '@/components/ExecutionCard';
 import {
   PlaceInfoEditorModal,
@@ -458,7 +458,7 @@ export default function RouteExecutionScreen() {
             <ArrowLeft size={24} color={Colors.white} />
           </TouchableOpacity>
           <View style={styles.headerTitleRow}>
-            <Crown size={20} color={Colors.gold[400]} />
+            <BrandIcon size={24} />
             <Text style={styles.headerTitle}>Executar Rota</Text>
           </View>
           <View style={{ width: 40 }} />

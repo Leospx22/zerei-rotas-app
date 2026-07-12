@@ -18,12 +18,12 @@ import {
   ArrowLeft,
   FileSpreadsheet,
   Upload,
-  Crown,
   CheckCircle2,
   AlertCircle,
   ClipboardPaste,
 } from 'lucide-react-native';
 import { Colors, Spacing, FontSizes, BorderRadius } from '@/constants/theme';
+import { BrandIcon } from '@/components/BrandIcon';
 import { useRoute } from '@/contexts/RouteContext';
 import {
   RawPackage,
@@ -287,7 +287,7 @@ export default function ImportScreen() {
           <ArrowLeft size={24} color={Colors.white} />
         </TouchableOpacity>
         <View style={styles.headerTitleRow}>
-          <Crown size={20} color={Colors.gold[400]} />
+          <BrandIcon size={24} />
           <Text style={styles.headerTitle}>Importar Planilha</Text>
         </View>
         <View style={{ width: 40 }} />

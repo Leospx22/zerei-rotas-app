@@ -21,7 +21,6 @@ import {
   Package,
   MapPin,
   Play,
-  Crown,
   Hash,
   CheckCircle2,
   AlertTriangle,
@@ -34,6 +33,7 @@ import {
 } from 'lucide-react-native';
 import { Colors, Spacing, FontSizes, BorderRadius } from '@/constants/theme';
 import { AppButton, AppCard, AppText } from '@/components/ui';
+import { BrandIcon } from '@/components/BrandIcon';
 import { useRoute } from '@/contexts/RouteContext';
 import { getPrimaryExecutionAddress } from '@/lib/executionPresentation';
 import { buildGoogleMapsSearchUrl } from '@/lib/mapNavigation';
@@ -198,7 +198,7 @@ export default function DeliveryPreparationScreen() {
           <ArrowLeft size={24} color={Colors.white} />
         </TouchableOpacity>
         <View style={styles.headerTitleRow}>
-          <Crown size={20} color={Colors.gold[400]} />
+          <BrandIcon size={24} />
           <Text style={styles.headerTitle}>Revisar Rota</Text>
         </View>
         <View style={{ width: 40 }} />

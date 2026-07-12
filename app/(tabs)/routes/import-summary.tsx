@@ -8,11 +8,11 @@ import {
   MapPin,
   TrendingUp,
   ArrowDown,
-  Crown,
   ChevronRight,
   AlertTriangle,
 } from 'lucide-react-native';
 import { Colors, Spacing, FontSizes, BorderRadius } from '@/constants/theme';
+import { BrandIcon } from '@/components/BrandIcon';
 import { useRoute } from '@/contexts/RouteContext';
 import {
   formatRouteOrderBadge,
@@ -58,7 +58,7 @@ export default function ImportSummaryScreen() {
           <ArrowLeft size={24} color={Colors.white} />
         </TouchableOpacity>
         <View style={styles.headerTitleRow}>
-          <Crown size={20} color={Colors.gold[400]} />
+          <BrandIcon size={24} />
           <Text style={styles.headerTitle}>Resumo da Importação</Text>
         </View>
         <View style={{ width: 40 }} />

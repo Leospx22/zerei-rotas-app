@@ -10,10 +10,10 @@ import {
   Play,
   Trash2,
   CheckCircle2,
-  Crown,
   Package,
 } from 'lucide-react-native';
 import { Colors, Spacing, FontSizes, BorderRadius } from '@/constants/theme';
+import { BrandIcon } from '@/components/BrandIcon';
 import { useRoute } from '@/contexts/RouteContext';
 import { formatRouteOrderBadge, formatStopBadge } from '@/lib/routeStopPresentation';
 
@@ -51,7 +51,7 @@ export default function RouteOrganizerScreen() {
           <ArrowLeft size={24} color={Colors.white} />
         </TouchableOpacity>
         <View style={styles.headerTitleRow}>
-          <Crown size={20} color={Colors.gold[400]} />
+          <BrandIcon size={24} />
           <Text style={styles.headerTitle}>Organizar Rota</Text>
         </View>
         <View style={{ width: 40 }} />

@@ -12,7 +12,6 @@ import {
 import { useRouter, useFocusEffect, type Href } from 'expo-router';
 import {
   MapPin,
-  Crown,
   Package,
   Pencil,
   Trash2,
@@ -22,6 +21,7 @@ import {
   AlertCircle,
 } from 'lucide-react-native';
 import { Colors, Spacing, FontSizes, BorderRadius } from '@/constants/theme';
+import { BrandIcon } from '@/components/BrandIcon';
 import { StatusBadge } from '@/components/ui';
 import { usePersistence } from '@/hooks/usePersistence';
 import { useRoute } from '@/contexts/RouteContext';
@@ -173,7 +173,7 @@ export default function RoutesScreen() {
     <>
       <ScrollView style={styles.container} contentContainerStyle={styles.content}>
         <View style={styles.headerRow}>
-          <Crown size={22} color={Colors.gold[400]} />
+          <BrandIcon size={28} />
           <Text style={styles.pageTitle}>Minhas Rotas</Text>
         </View>
 

@@ -95,17 +95,23 @@ export function validatePersistedRoute(data: unknown): RouteData | null {
     .filter(isObject)
     .map((stop, stopIndex) => {
       const rawPackages = Array.isArray(stop.packages) ? stop.packages.filter(isObject) : [];
-      const packages = rawPackages.map((pkg, packageIndex) => ({
-        ...pkg,
-        id: stringOrFallback(pkg.id, `pkg-${stopIndex + 1}-${packageIndex + 1}`),
-        trackingNumber: stringOrFallback(pkg.trackingNumber, `PKG-${stopIndex + 1}-${packageIndex + 1}`),
-        destinationAddress: stringOrFallback(pkg.destinationAddress, stringOrFallback(stop.normalizedAddress, '')),
-        zipCode: stringOrFallback(pkg.zipCode, stringOrFallback(stop.zipCode, '')),
-        latitude: typeof pkg.latitude === 'number' ? pkg.latitude : null,
-        longitude: typeof pkg.longitude === 'number' ? pkg.longitude : null,
-        stopNumber: typeof pkg.stopNumber === 'number' ? pkg.stopNumber : null,
-        status: isPackageStatus(pkg.status) ? pkg.status : 'pending',
-      }));
+      const packages: RouteData['stops'][number]['packages'] = rawPackages.map((pkg, packageIndex) => {
+        const sequence = typeof pkg.sequence === 'string' && pkg.sequence.trim() ? pkg.sequence : undefined;
+        return {
+          ...pkg,
+          id: stringOrFallback(pkg.id, `pkg-${stopIndex + 1}-${packageIndex + 1}`),
+          trackingNumber: stringOrFallback(pkg.trackingNumber, `PKG-${stopIndex + 1}-${packageIndex + 1}`),
+          ...(sequence ? { sequence } : {}),
+          destinationAddress: stringOrFallback(pkg.destinationAddress, stringOrFallback(stop.normalizedAddress, '')),
+          zipCode: stringOrFallback(pkg.zipCode, stringOrFallback(stop.zipCode, '')),
+          city: typeof pkg.city === 'string' && pkg.city.trim() ? pkg.city : undefined,
+          state: typeof pkg.state === 'string' && pkg.state.trim() ? pkg.state : undefined,
+          latitude: typeof pkg.latitude === 'number' ? pkg.latitude : null,
+          longitude: typeof pkg.longitude === 'number' ? pkg.longitude : null,
+          stopNumber: typeof pkg.stopNumber === 'number' ? pkg.stopNumber : null,
+          status: isPackageStatus(pkg.status) ? pkg.status : 'pending',
+        };
+      });
       if (packages.length === 0) return null;
 
       const stopStatus = isStopStatus(stop.status)
@@ -119,6 +125,11 @@ export function validatePersistedRoute(data: unknown): RouteData | null {
         ...stop,
         id: stringOrFallback(stop.id, `stop-${stopIndex + 1}`),
         stopNumber: numberOrFallback(stop.stopNumber, stopIndex + 1),
+        originalStopNumber: typeof stop.originalStopNumber === 'number'
+          ? stop.originalStopNumber
+          : packages.every(pkg => pkg.stopNumber === null)
+            ? null
+            : numberOrFallback(stop.stopNumber, stopIndex + 1),
         normalizedAddress: stringOrFallback(stop.normalizedAddress, firstPackage.destinationAddress),
         originalAddress: stringOrFallback(stop.originalAddress, firstPackage.destinationAddress),
         zipCode: stringOrFallback(stop.zipCode, firstPackage.zipCode),

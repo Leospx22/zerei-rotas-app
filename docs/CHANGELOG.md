@@ -6,6 +6,11 @@ All notable product and architecture changes are recorded here. Versions follow 
 
 ### Added
 
+- `Prioridade Shopee` semantics for `#P` groups: missing Stop + missing Sequence appears first after import, remains manually movable, and no longer consumes regular display numbering.
+- Canonical map/navigation address construction from street + number with optional city/state/CEP, plus unresolved-stop retry action (`Tentar localizar novamente`) that uses cache/provider recovery without fabricating coordinates after Google Maps navigation.
+- Route-level duplicate-address summary banners in import summary and route review, backed by the same indexed duplicate-address warnings as each stop card.
+- Regression coverage for a physical-route-sized import with 48 stops, 114 packages, duplicate addresses, Sequence labels, and multiple `#P` groups.
+
 - Closed-beta v1 release notes and an expanded Android field-test checklist for installation, import, route review, map, execution, occurrences, offline recovery, history, and performance validation.
 - Severity-grouped known-issues register for Critical, High, Medium, Low, and Future Improvements beta tracking.
 
@@ -15,7 +20,7 @@ All notable product and architecture changes are recorded here. Versions follow 
 - Active-route restore/corruption regression tests covering planned, active, completed, malformed, optional-field, manual-order, `#P`, and SPX TN cases.
 
 - Canonical Shopee occurrence reason list shared by occurrence registration and edit flows.
-- `#P` compact stop badge for spreadsheet rows without a valid Stop number, while keeping the longer "Sem número de parada na planilha" explanation where context is needed.
+- `#P` compact stop badge for Prioridade Shopee rows with concise driver-facing copy.
 - Duplicate-address coordinate inheritance so stops with the same normalized street and number can reuse a valid coordinate from another stop in the same route.
 - Manual unresolved-address support with "Insira o endereço manualmente" messaging and "Copiar endereço" actions in map/review surfaces.
 
@@ -79,6 +84,10 @@ All notable product and architecture changes are recorded here. Versions follow 
 ### Changed
 
 - Root crash fallback now shows a friendly Portuguese recovery message and retry action instead of exposing raw exception text to drivers.
+- Import Continue now reuses the already-built planning route snapshot instead of regrouping the spreadsheet on button press when RouteContext state is still catching up.
+- Android map overview now isolates native map rendering behind a safe fallback while keeping the ordered route list and actions usable.
+- Android preview builds can now explicitly enable the native overview map with `EXPO_PUBLIC_ENABLE_NATIVE_ROUTE_MAP=true`, while missing/false values keep the safe ordered-list fallback.
+- Native map rendering now stages MapView mount, marker rendering, polyline rendering, and camera fitting to reduce Android crash risk during closed-beta testing.
 
 - Current-route persistence now writes a versioned envelope under the existing `zerei_current_route` key instead of relying on a debounced raw-route save.
 - Route completion now saves history before clearing the active route, preserving idempotent completed-history behavior.
@@ -120,6 +129,9 @@ All notable product and architecture changes are recorded here. Versions follow 
 
 - App restart recovery no longer crashes on malformed active-route JSON or old partially shaped route data.
 - Backgrounding an active route now flushes the latest local route snapshot without requiring a screen unmount.
+- Restored strict `#P` detection so only packages with both invalid Stop and invalid Sequence become `Prioridade Shopee`.
+- Native map rendering is now guarded against zero, one, missing, malformed, duplicate-key, and unresolved coordinate cases so the ordered list remains usable instead of crashing Android.
+- Prioridade duplicate warnings now use concise `#Prioridade` copy and no longer mention Shopee in warning sentences.
 
 - Stops sharing the same normalized street and number no longer show inconsistent map availability when one duplicate has valid coordinates and another does not.
 - Old placeholder occurrence reason lists in active UI flows were replaced with the approved Shopee reason list.

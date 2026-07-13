@@ -12,10 +12,12 @@ import {
   AlertTriangle,
 } from 'lucide-react-native';
 import { Colors, Spacing, FontSizes, BorderRadius } from '@/constants/theme';
-import { BrandIcon } from '@/components/BrandIcon';
+import { HeaderBrandIcon } from '@/components/HeaderBrandIcon';
 import { useRoute } from '@/contexts/RouteContext';
 import {
+  buildDisplayedRoutePositionMap,
   formatRouteOrderBadge,
+  getDuplicateAddressSummaryCount,
   getDuplicateAddressWarning,
 } from '@/lib/routeStopPresentation';
 
@@ -36,7 +38,7 @@ export default function ImportSummaryScreen() {
   }
 
   const summary = getSummary();
-  const duplicateStops = currentRoute.stops.filter(s => s.duplicateAddressWarning);
+  const duplicateStopCount = getDuplicateAddressSummaryCount(currentRoute.stops);
   const returningFromReview = from === 'delivery-preparation';
   const largestStopSequence =
     currentRoute.stops.findIndex(stop => stop.stopNumber === summary.largestStop.stopNumber) + 1;
@@ -44,6 +46,7 @@ export default function ImportSummaryScreen() {
     currentRoute.stops.findIndex(stop => stop.stopNumber === summary.smallestStop.stopNumber) + 1;
   const largestStop = currentRoute.stops[largestStopSequence - 1];
   const smallestStop = currentRoute.stops[smallestStopSequence - 1];
+  const displayedPositions = buildDisplayedRoutePositionMap(currentRoute.stops);
   const openRouteReview = () => {
     router.replace({
       pathname: '/(tabs)/routes/delivery-preparation',
@@ -58,7 +61,7 @@ export default function ImportSummaryScreen() {
           <ArrowLeft size={24} color={Colors.white} />
         </TouchableOpacity>
         <View style={styles.headerTitleRow}>
-          <BrandIcon size={24} />
+          <HeaderBrandIcon size={20} />
           <Text style={styles.headerTitle}>Resumo da Importação</Text>
         </View>
         <View style={{ width: 40 }} />
@@ -110,7 +113,7 @@ export default function ImportSummaryScreen() {
               <Text style={[styles.rotaExtremeLabel, { color: Colors.success }]}>Maior Parada</Text>
             </View>
             <Text style={styles.rotaExtremeStop}>
-              Parada {largestStop ? formatRouteOrderBadge(largestStop, largestStopSequence) : `#${largestStopSequence}`}
+              Parada {largestStop ? displayedPositions[largestStop.id]?.badge ?? formatRouteOrderBadge(largestStop, largestStopSequence) : `#${largestStopSequence}`}
             </Text>
             <Text style={styles.rotaExtremeAddress} numberOfLines={1}>{summary.largestStop.address}</Text>
             <Text style={styles.rotaExtremeCount}>
@@ -123,7 +126,7 @@ export default function ImportSummaryScreen() {
               <Text style={[styles.rotaExtremeLabel, { color: Colors.warning }]}>Menor Parada</Text>
             </View>
             <Text style={styles.rotaExtremeStop}>
-              Parada {smallestStop ? formatRouteOrderBadge(smallestStop, smallestStopSequence) : `#${smallestStopSequence}`}
+              Parada {smallestStop ? displayedPositions[smallestStop.id]?.badge ?? formatRouteOrderBadge(smallestStop, smallestStopSequence) : `#${smallestStopSequence}`}
             </Text>
             <Text style={styles.rotaExtremeAddress} numberOfLines={1}>{summary.smallestStop.address}</Text>
             <Text style={styles.rotaExtremeCount}>
@@ -134,11 +137,11 @@ export default function ImportSummaryScreen() {
       </LinearGradient>
 
       {/* Duplicate address warning */}
-      {duplicateStops.length > 0 && (
+      {duplicateStopCount > 0 && (
         <View style={styles.duplicateWarningCard}>
           <AlertTriangle size={16} color={Colors.warning} />
           <Text style={styles.duplicateWarningText}>
-            {duplicateStops.length} parada{duplicateStops.length !== 1 ? 's têm' : ' tem'} endereços que aparecem em outra parada.
+            {duplicateStopCount} parada{duplicateStopCount !== 1 ? 's têm' : ' tem'} endereços que aparecem em outra parada.
           </Text>
         </View>
       )}
@@ -148,7 +151,7 @@ export default function ImportSummaryScreen() {
 
       {currentRoute.stops.map((stop, index) => {
         const duplicateWarning = getDuplicateAddressWarning(currentRoute.stops, stop);
-        const stopBadge = formatRouteOrderBadge(stop, index + 1);
+        const stopBadge = displayedPositions[stop.id]?.badge ?? formatRouteOrderBadge(stop, index + 1);
         return (
         <View key={stop.id} style={styles.stopCard}>
           <View style={styles.stopNumberWrap}>

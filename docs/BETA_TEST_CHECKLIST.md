@@ -1,4 +1,4 @@
-# Zerei Rotas Closed Beta Checklist
+﻿# Zerei Rotas Closed Beta Checklist
 
 Use one copy of this checklist for each closed-beta tester. Do not store passwords, authentication tokens, or private delivery data in the completed document.
 
@@ -9,8 +9,8 @@ Use one copy of this checklist for each closed-beta tester. Do not store passwor
 - Cidade:
 - Plataforma principal:
 - Modelo do celular:
-- Versão do Android:
-- Data de início do teste:
+- VersÃ£o do Android:
+- Data de inÃ­cio do teste:
 
 ## Installation
 
@@ -25,7 +25,7 @@ Use one copy of this checklist for each closed-beta tester. Do not store passwor
 - [ ] Confirm e-mail if Supabase requires confirmation.
 - [ ] Sign in successfully.
 - [ ] Open Perfil.
-- [ ] Complete Nome, WhatsApp, Cidade, Estado, Tipo de veículo, and Plataforma principal.
+- [ ] Complete Nome, WhatsApp, Cidade, Estado, Tipo de veÃ­culo, and Plataforma principal.
 - [ ] Sign out and sign back in.
 - [ ] Confirm profile data persists.
 
@@ -40,32 +40,42 @@ Use one copy of this checklist for each closed-beta tester. Do not store passwor
 
 ## Optimization And Review
 
-- [ ] Open Resumo da Importação.
+- [ ] Open Resumo da ImportaÃ§Ã£o.
 - [ ] Open Revisar Rota.
-- [ ] Confirm stop order numbers follow the spreadsheet/imported order.
-- [ ] Confirm stops without a valid spreadsheet stop number appear as `#P`.
+- [ ] Confirm packages without valid Stop and Sequence appear as `#P` / Prioridade Shopee.
+- [ ] Confirm `#P` cards do not show "Sem número de parada e sequência na planilha".
+- [ ] Confirm `#P` groups appear first after fresh import.
+- [ ] Confirm regular displayed route numbers skip `#P` groups (`#P`, `#P`, `#1`, `#2`).
+- [ ] Confirm the duplicate-address summary banner appears when multiple stops share the same street and number.
 - [ ] Confirm duplicate-address warnings name the matching stop numbers.
+- [ ] Confirm Prioridade duplicate warnings use `#Prioridade` wording, for example "Há outra entrega #Prioridade neste endereço."
 - [ ] Use Subir and Descer on at least one stop.
 - [ ] Use Mover with an invalid position and confirm the validation message.
 - [ ] Use Mover with a valid position and confirm the order updates.
-- [ ] Leave Revisar Rota and return.
+- [ ] Move one `#P` after a regular stop and confirm it stays `#P` while regular stops remain sequential.
 - [ ] Confirm the customized order remains.
 
 ## Map And Navigation
 
+- [ ] Confirm the APK was built with `EXPO_PUBLIC_ENABLE_NATIVE_ROUTE_MAP=true` for native map testing.
 - [ ] Tap Mostrar no mapa.
+- [ ] Confirm the app does not close or show an Android crash dialog.
+- [ ] If the native map loads, confirm markers appear in the saved route order.
+- [ ] If the native map does not load, confirm the in-app fallback appears and the ordered list remains usable.
 - [ ] Confirm valid stops appear as markers or ordered list items.
 - [ ] Confirm there is no ocean/outlier marker.
 - [ ] Confirm unresolved stops stay visible in the ordered route list.
 - [ ] Confirm unresolved stops show Insira o endereço manualmente where appropriate.
 - [ ] Tap Copiar endereço for an unresolved stop.
+- [ ] Tap Tentar localizar novamente for an unresolved stop and confirm it either recovers a valid marker or shows the Portuguese failure message.
 - [ ] Tap Navegar or the map/pin action for a stop.
 - [ ] Confirm Google Maps opens with street and number only, without apartment/floor/complement.
+- [ ] Confirm tapping Navegar alone does not create a fake marker inside Zerei Rotas.
 - [ ] Return to Revisar Rota.
 
 ## Deliveries
 
-- [ ] Tap Começar entrega.
+- [ ] Tap ComeÃ§ar entrega.
 - [ ] Confirm tabs are hidden during execution.
 - [ ] Confirm the route name appears near the top.
 - [ ] Confirm the current stop shows street and number as the hero address.
@@ -74,30 +84,30 @@ Use one copy of this checklist for each closed-beta tester. Do not store passwor
 - [ ] Clear that package individually.
 - [ ] Use Selecionar tudo for one address group.
 - [ ] Confirm other address groups are not selected.
-- [ ] Use Limpar seleção for that address group.
+- [ ] Use Limpar seleÃ§Ã£o for that address group.
 - [ ] Select all required packages.
 - [ ] Confirm PEGUEI OS X PACOTES enables only when all required packages are selected.
 - [ ] Confirm separation does not mark packages as delivered.
 - [ ] Move to delivery phase.
-- [ ] Tap Entregue neste endereço for one address group.
+- [ ] Tap Entregue neste endereÃ§o for one address group.
 - [ ] Confirm only that address group is completed.
 - [ ] Confirm final address group advances to the next stop.
 
 ## Occurrences
 
-- [ ] Tap Ocorrência on a specific package.
-- [ ] Confirm Selecionar ocorrência opens directly.
+- [ ] Tap OcorrÃªncia on a specific package.
+- [ ] Confirm Selecionar ocorrÃªncia opens directly.
 - [ ] Register a reason.
 - [ ] Confirm the package is not overwritten as delivered.
-- [ ] Use Registrar ocorrência under an address group with one pending package.
+- [ ] Use Registrar ocorrÃªncia under an address group with one pending package.
 - [ ] Confirm it opens reason selection directly.
-- [ ] Use Registrar ocorrência under an address group with multiple pending packages.
+- [ ] Use Registrar ocorrÃªncia under an address group with multiple pending packages.
 - [ ] Confirm it shows only packages from that address group.
 - [ ] Resolve one occurrence as Entregue.
 - [ ] Resolve one occurrence as Devolvido ao Hub.
 - [ ] Edit an occurrence reason or result.
 - [ ] Delete an occurrence after confirmation.
-- [ ] Open the Ocorrências tab and confirm pending/resolved sections make sense.
+- [ ] Open the OcorrÃªncias tab and confirm pending/resolved sections make sense.
 
 ## Offline
 
@@ -123,12 +133,12 @@ Use one copy of this checklist for each closed-beta tester. Do not store passwor
 - [ ] Confirm the active route appears as Em rota.
 - [ ] Confirm Continuar appears.
 - [ ] Confirm delivered package, occurrence, route name, current stop, and route order persisted.
-- [ ] Confirm "Rota restaurada. Você pode continuar a entrega." appears only once.
+- [ ] Confirm "Rota restaurada. VocÃª pode continuar a entrega." appears only once.
 
 ## History And Completion
 
 - [ ] Complete the route if practical.
-- [ ] Confirm the completed route appears in Histórico.
+- [ ] Confirm the completed route appears in HistÃ³rico.
 - [ ] Confirm it does not restore as active after reopening.
 - [ ] Rename the completed route.
 - [ ] Confirm the new name persists after tab changes and reload.
@@ -157,19 +167,19 @@ Use one copy of this checklist for each closed-beta tester. Do not store passwor
 
 1. O import funcionou com sua planilha real?
 2. A Revisar Rota ajudou antes de sair para entrega?
-3. O mapa e o botão Navegar ajudaram?
-4. As ocorrências ficaram fáceis de registrar e resolver?
-5. A recuperação da rota depois de fechar o app funcionou?
+3. O mapa e o botÃ£o Navegar ajudaram?
+4. As ocorrÃªncias ficaram fÃ¡ceis de registrar e resolver?
+5. A recuperaÃ§Ã£o da rota depois de fechar o app funcionou?
 6. O que confundiu durante a entrega?
-7. O que ficou lento ou difícil com uma mão?
-8. O que faria você pagar R$9,90/mês?
-9. Qual função está faltando?
-10. Você usaria de novo amanhã?
+7. O que ficou lento ou difÃ­cil com uma mÃ£o?
+8. O que faria vocÃª pagar R$9,90/mÃªs?
+9. Qual funÃ§Ã£o estÃ¡ faltando?
+10. VocÃª usaria de novo amanhÃ£?
 
 ## Test Outcome
 
-- Data de conclusão:
-- Fluxo concluído: Sim / Não / Parcial
+- Data de conclusÃ£o:
+- Fluxo concluÃ­do: Sim / NÃ£o / Parcial
 - Problema bloqueador encontrado:
-- Observações principais:
-- Autorização para contato de acompanhamento: Sim / Não
+- ObservaÃ§Ãµes principais:
+- AutorizaÃ§Ã£o para contato de acompanhamento: Sim / NÃ£o

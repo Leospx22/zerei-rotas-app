@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import * as Clipboard from 'expo-clipboard';
 import {
   Alert,
@@ -9,7 +9,7 @@ import {
   Text,
   TouchableOpacity,
   StyleSheet,
-  ScrollView,
+  FlatList,
   TextInput,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -33,17 +33,19 @@ import {
 } from 'lucide-react-native';
 import { Colors, Spacing, FontSizes, BorderRadius } from '@/constants/theme';
 import { AppButton, AppCard, AppText } from '@/components/ui';
-import { BrandIcon } from '@/components/BrandIcon';
+import { HeaderBrandIcon } from '@/components/HeaderBrandIcon';
 import { useRoute } from '@/contexts/RouteContext';
 import { getPrimaryExecutionAddress } from '@/lib/executionPresentation';
+import { buildCanonicalNavigationAddress, buildStopGeocodingInput } from '@/lib/geocoding';
 import { buildGoogleMapsSearchUrl } from '@/lib/mapNavigation';
-import { useMapStops } from '@/hooks/useMapStops';
-import { mapStopStatusLabel } from '@/lib/mapOverview';
+import { buildMapStops, mapStopStatusLabel } from '@/lib/mapOverview';
 import {
+  buildDuplicateAddressWarnings,
+  buildDisplayedRoutePositionMap,
   formatRouteOrderBadge,
+  getDuplicateAddressSummaryCount,
   getBestManualAddress,
-  getDuplicateAddressWarning,
-  MISSING_STOP_DESCRIPTION,
+  SHOPEE_PRIORITY_LABEL,
   UNRESOLVED_COORDINATE_LABEL,
 } from '@/lib/routeStopPresentation';
 import {
@@ -51,6 +53,10 @@ import {
   moveRouteStopToIndex,
   type StopMoveDirection,
 } from '@/lib/routeOrdering';
+import {
+  getPackagePrimaryLabel,
+  getPackageSecondaryLabel,
+} from '@/lib/packageUtils';
 
 export default function DeliveryPreparationScreen() {
   const router = useRouter();
@@ -68,7 +74,27 @@ export default function DeliveryPreparationScreen() {
   const [targetPosition, setTargetPosition] = useState('');
   const [moveError, setMoveError] = useState<string | null>(null);
   const cameFromImportSummary = from === 'import-summary';
-  const reviewMapStops = useMapStops(currentRoute);
+  const routeStops = currentRoute?.stops ?? [];
+  const reviewMapStops = useMemo(
+    () => currentRoute ? buildMapStops(currentRoute) : [],
+    [currentRoute]
+  );
+  const duplicateWarnings = useMemo(
+    () => buildDuplicateAddressWarnings(routeStops),
+    [routeStops]
+  );
+  const duplicateStopCount = useMemo(
+    () => getDuplicateAddressSummaryCount(routeStops),
+    [routeStops]
+  );
+  const displayedPositions = useMemo(
+    () => buildDisplayedRoutePositionMap(routeStops),
+    [routeStops]
+  );
+  const totalAddresses = useMemo(
+    () => routeStops.reduce((total, stop) => total + stop.addressCount, 0),
+    [routeStops]
+  );
 
   if (!currentRoute) {
     return (
@@ -172,15 +198,25 @@ export default function DeliveryPreparationScreen() {
   };
 
   const totalPackages = currentRoute.totalPackages;
-  const totalStops = currentRoute.stops.length;
-  const totalAddresses = currentRoute.stops.reduce(
-    (total, stop) => total + stop.addressCount,
-    0
-  );
+  const totalStops = routeStops.length;
+  const startButtonLabel = currentRoute.status === 'active' || currentRoute.startTime !== null
+    ? 'Continuar entrega'
+    : 'Começar entrega';
 
   return (
     <>
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    <FlatList
+      style={styles.container}
+      contentContainerStyle={styles.content}
+      data={routeStops}
+      keyExtractor={stop => stop.id}
+      initialNumToRender={8}
+      maxToRenderPerBatch={6}
+      updateCellsBatchingPeriod={40}
+      windowSize={7}
+      removeClippedSubviews
+      ListHeaderComponent={(
+        <>
       <View style={styles.header}>
         <TouchableOpacity
           onPress={() => {
@@ -198,7 +234,7 @@ export default function DeliveryPreparationScreen() {
           <ArrowLeft size={24} color={Colors.white} />
         </TouchableOpacity>
         <View style={styles.headerTitleRow}>
-          <BrandIcon size={24} />
+          <HeaderBrandIcon size={20} />
           <Text style={styles.headerTitle}>Revisar Rota</Text>
         </View>
         <View style={{ width: 40 }} />
@@ -240,6 +276,15 @@ export default function DeliveryPreparationScreen() {
           Confira as paradas, os endereços agrupados e os pacotes antes de começar. Toque em uma parada para ver os códigos SPX TN.
         </Text>
       </View>
+
+      {duplicateStopCount > 0 ? (
+        <View style={styles.duplicateSummaryCard}>
+          <AlertTriangle size={16} color={Colors.warning} />
+          <Text style={styles.duplicateSummaryText}>
+            {duplicateStopCount} parada{duplicateStopCount !== 1 ? 's têm' : ' tem'} endereços que aparecem em outra parada.
+          </Text>
+        </View>
+      ) : null}
 
       <View style={styles.secondaryActions}>
         <AppButton
@@ -289,19 +334,22 @@ export default function DeliveryPreparationScreen() {
         </AppCard>
       ) : null}
 
-      <Text style={styles.sectionTitle}>Paradas ({totalStops})</Text>
-
-      {currentRoute.stops.map((stop, index) => {
+          <Text style={styles.sectionTitle}>Paradas ({totalStops})</Text>
+        </>
+      )}
+      renderItem={({ item: stop, index }) => {
         const isExpanded = expandedStop === stop.id;
         const mainAddress = getPrimaryExecutionAddress(stop);
         const isFirstStop = index === 0;
-        const isLastStop = index === currentRoute.stops.length - 1;
+        const isLastStop = index === routeStops.length - 1;
         const mapStop = reviewMapStops[index];
+        const canonicalAddress = buildCanonicalNavigationAddress(buildStopGeocodingInput(stop));
         const isCompleted = mapStop?.status === 'completed';
         const isCurrent = mapStop?.status === 'current';
         const unresolved = mapStop ? mapStop.latitude === null || mapStop.longitude === null : false;
-        const duplicateWarning = getDuplicateAddressWarning(currentRoute.stops, stop);
-        const stopBadge = formatRouteOrderBadge(stop, index + 1);
+        const duplicateWarning = duplicateWarnings[stop.id] ?? null;
+        const stopPosition = displayedPositions[stop.id];
+        const stopBadge = stopPosition?.badge ?? formatRouteOrderBadge(stop, index + 1);
 
         return (
           <View
@@ -384,7 +432,7 @@ export default function DeliveryPreparationScreen() {
                     <View style={[styles.metaBadge, styles.metaBadgeWarn]}>
                       <Hash size={11} color={Colors.warning} />
                       <Text style={[styles.metaBadgeText, { color: Colors.warning }]}>
-                        {MISSING_STOP_DESCRIPTION}
+                        {SHOPEE_PRIORITY_LABEL}
                       </Text>
                     </View>
                   ) : null}
@@ -442,7 +490,7 @@ export default function DeliveryPreparationScreen() {
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.stopOrderButton, styles.navigateButton]}
-                onPress={() => handleNavigate(mainAddress)}
+                onPress={() => handleNavigate(canonicalAddress || mainAddress)}
                 activeOpacity={0.75}
                 accessibilityRole="button"
                 accessibilityLabel={`Navegar para ${mainAddress}`}
@@ -453,7 +501,7 @@ export default function DeliveryPreparationScreen() {
               {unresolved ? (
                 <TouchableOpacity
                   style={[styles.stopOrderButton, styles.navigateButton]}
-                  onPress={() => handleCopyAddress(mainAddress, stop.zipCode)}
+                  onPress={() => handleCopyAddress(canonicalAddress || mainAddress, stop.zipCode)}
                   activeOpacity={0.75}
                   accessibilityRole="button"
                   accessibilityLabel={`Copiar endereço da parada ${stopBadge}`}
@@ -491,7 +539,12 @@ export default function DeliveryPreparationScreen() {
                           <View style={styles.packageIcon}>
                             <Text style={styles.packageIconText}>{pkgIdx + 1}</Text>
                           </View>
-                          <Text style={styles.packageTracking}>{pkg.trackingNumber}</Text>
+                          <View style={styles.packageTextBlock}>
+                            <Text style={styles.packageTracking}>{getPackagePrimaryLabel(pkg)}</Text>
+                            {getPackageSecondaryLabel(pkg) ? (
+                              <Text style={styles.packageSecondary}>{getPackageSecondaryLabel(pkg)}</Text>
+                            ) : null}
+                          </View>
                           <Package size={13} color={Colors.gold[500]} style={{ opacity: 0.5 }} />
                         </View>
                       ))}
@@ -501,8 +554,9 @@ export default function DeliveryPreparationScreen() {
             )}
           </View>
         );
-      })}
-
+      }}
+      ListFooterComponent={(
+        <>
       <View style={styles.optimizationNote}>
         <MapPin size={16} color={Colors.gray} />
         <Text style={styles.optimizationText}>
@@ -516,10 +570,12 @@ export default function DeliveryPreparationScreen() {
           style={styles.startGradient}
         >
           <Play size={24} color={Colors.primary[900]} />
-          <Text style={styles.startText}>Começar entrega</Text>
+          <Text style={styles.startText}>{startButtonLabel}</Text>
         </LinearGradient>
       </TouchableOpacity>
-    </ScrollView>
+        </>
+      )}
+    />
     <Modal
       visible={moveStopIndex !== null}
       transparent
@@ -628,6 +684,18 @@ const styles = StyleSheet.create({
     padding: Spacing.md, gap: Spacing.sm, marginBottom: Spacing.lg,
   },
   instructionText: { flex: 1, fontSize: FontSizes.sm, color: Colors.gold[300], lineHeight: 20 },
+  duplicateSummaryCard: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: Spacing.sm,
+    padding: Spacing.md,
+    marginBottom: Spacing.lg,
+    borderRadius: BorderRadius.md,
+    borderWidth: 1,
+    borderColor: Colors.warningBorder,
+    backgroundColor: Colors.warningBg,
+  },
+  duplicateSummaryText: { flex: 1, fontSize: FontSizes.sm, color: Colors.warning, lineHeight: 20 },
   secondaryActions: { gap: Spacing.sm, marginBottom: Spacing.lg },
   editCard: { gap: Spacing.sm, marginBottom: Spacing.lg },
   routeNameInput: {
@@ -742,7 +810,9 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: 'rgba(212,160,23,0.2)',
   },
   packageIconText: { fontSize: FontSizes.xs, fontWeight: '800', color: Colors.gold[400] },
+  packageTextBlock: { flex: 1, gap: 2 },
   packageTracking: { flex: 1, fontSize: FontSizes.md, fontWeight: '700', color: Colors.white },
+  packageSecondary: { fontSize: FontSizes.xs, fontWeight: '600', color: Colors.gray },
 
   optimizationNote: {
     flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.cardBg,

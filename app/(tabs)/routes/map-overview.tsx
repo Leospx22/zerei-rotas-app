@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+﻿import React, { useMemo, useState } from 'react';
 import * as Clipboard from 'expo-clipboard';
 import {
   Alert,
   Linking,
+  Platform,
   ScrollView,
   StyleSheet,
   Text,
@@ -28,25 +29,96 @@ import { useRoute } from '@/contexts/RouteContext';
 import { buildGoogleMapsSearchUrl } from '@/lib/mapNavigation';
 import { useMapStops } from '@/hooks/useMapStops';
 import {
+  buildSafeMapPayload,
+  applyRecoveredMapCoordinates,
   getMapCoordinateSummary,
   getMapCoordinateState,
+  shouldAttemptNativeRouteMap,
   mapStopStatusLabel,
 } from '@/lib/mapOverview';
+import { buildStopGeocodingInput, resolveGeocoding } from '@/lib/geocoding';
 import {
   getBestManualAddress,
   UNRESOLVED_COORDINATE_LABEL,
 } from '@/lib/routeStopPresentation';
 
+const NATIVE_ROUTE_MAP_FLAG = process.env.EXPO_PUBLIC_ENABLE_NATIVE_ROUTE_MAP;
+
+class MapVisualizationBoundary extends React.Component<
+  { children: React.ReactNode; fallback: React.ReactNode },
+  { hasError: boolean }
+> {
+  state = { hasError: false };
+
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+
+  retry = () => {
+    this.setState({ hasError: false });
+  };
+
+  render() {
+    if (this.state.hasError) return this.props.fallback;
+    return this.props.children;
+  }
+}
+
+function MapFallbackCard({ reason, onRetry }: { reason: string; onRetry: () => void }) {
+  return (
+    <View style={styles.mapFallbackCard}>
+      <MapPinned size={24} color={Colors.warning} />
+      <Text style={styles.mapFallbackTitle}>Não foi possível carregar o mapa agora.</Text>
+      <Text style={styles.mapFallbackText}>{reason}</Text>
+      <TouchableOpacity
+        style={styles.mapFallbackButton}
+        onPress={onRetry}
+        activeOpacity={0.75}
+        accessibilityRole="button"
+        accessibilityLabel="Tentar abrir o mapa novamente"
+      >
+        <Text style={styles.mapFallbackButtonText}>Tentar abrir o mapa novamente</Text>
+      </TouchableOpacity>
+    </View>
+  );
+}
+
 export default function MapOverviewScreen() {
   const router = useRouter();
   const { currentRoute } = useRoute();
-  const mapStops = useMapStops(currentRoute);
+  const baseMapStops = useMapStops(currentRoute);
+  const [recoveredCoordinates, setRecoveredCoordinates] = useState<Record<string, { latitude: number; longitude: number }>>({});
+  const mapStops = useMemo(
+    () => applyRecoveredMapCoordinates(baseMapStops, recoveredCoordinates),
+    [baseMapStops, recoveredCoordinates]
+  );
   const initialStop = mapStops.find(stop => stop.status === 'current') ?? mapStops[0] ?? null;
   const [selectedStopId, setSelectedStopId] = useState<string | null>(initialStop?.id ?? null);
   const [focusStopId, setFocusStopId] = useState<string | null>(null);
+  const [retryingStopId, setRetryingStopId] = useState<string | null>(null);
+  const [mapRetryKey, setMapRetryKey] = useState(0);
   const selectedStop = mapStops.find(stop => stop.id === selectedStopId) ?? initialStop;
   const coordinateState = getMapCoordinateState(mapStops);
   const coordinateSummary = getMapCoordinateSummary(mapStops);
+  const safeMapPayload = useMemo(
+    () => buildSafeMapPayload(mapStops, selectedStop?.id ?? null),
+    [mapStops, selectedStop?.id]
+  );
+  const canAttemptNativeMap = shouldAttemptNativeRouteMap(
+    safeMapPayload.canRenderNativeMap,
+    Platform.OS,
+    NATIVE_ROUTE_MAP_FLAG
+  );
+  const isNativeMapDisabledForAndroid =
+    Platform.OS === 'android' && !shouldAttemptNativeRouteMap(true, Platform.OS, NATIVE_ROUTE_MAP_FLAG);
+
+  const retryNativeMap = () => {
+    if (isNativeMapDisabledForAndroid) {
+      Alert.alert('O mapa está desativado nesta versão de teste.');
+      return;
+    }
+    setMapRetryKey(previous => previous + 1);
+  };
 
   const selectStopFromList = (stopId: string) => {
     setSelectedStopId(stopId);
@@ -66,14 +138,16 @@ export default function MapOverviewScreen() {
 
   const navigateToStop = async () => {
     if (!selectedStop) return;
-    await navigateToAddress(selectedStop.address);
+    await navigateToAddress(selectedStop.navigationAddress || selectedStop.address);
   };
 
   const copyStopAddress = async (stop: typeof selectedStop) => {
     if (!stop) return;
     const address = getBestManualAddress({
-      address: stop.address,
+      address: stop.navigationAddress || stop.address,
       zipCode: stop.zipCode,
+      city: stop.city,
+      state: stop.state,
     });
     if (!address.trim()) {
       Alert.alert('Não foi possível copiar o endereço.');
@@ -84,6 +158,33 @@ export default function MapOverviewScreen() {
       Alert.alert('Endereço copiado.');
     } catch {
       Alert.alert('Não foi possível copiar o endereço.');
+    }
+  };
+
+  const retryLocateStop = async (stopId: string) => {
+    if (!currentRoute) return;
+    const routeStop = currentRoute.stops.find(stop => stop.id === stopId);
+    if (!routeStop) return;
+
+    setRetryingStopId(stopId);
+    try {
+      const result = await resolveGeocoding(buildStopGeocodingInput(routeStop));
+      if (result.status === 'cached' || result.status === 'resolved') {
+        setRecoveredCoordinates(previous => ({
+          ...previous,
+          [stopId]: {
+            latitude: result.entry.latitude,
+            longitude: result.entry.longitude,
+          },
+        }));
+        setFocusStopId(stopId);
+        return;
+      }
+      Alert.alert('Não foi possível localizar este endereço automaticamente.');
+    } catch {
+      Alert.alert('Não foi possível localizar este endereço automaticamente.');
+    } finally {
+      setRetryingStopId(null);
     }
   };
 
@@ -119,7 +220,7 @@ export default function MapOverviewScreen() {
 
       <View style={styles.summaryRow}>
         <Text style={styles.summaryText}>
-          {mapStops.length} {mapStops.length === 1 ? 'parada' : 'paradas'} · {currentRoute.totalPackages} pacotes
+          {mapStops.length} {mapStops.length === 1 ? 'parada' : 'paradas'} • {currentRoute.totalPackages} pacotes
         </Text>
         <View style={styles.legend}>
           <View style={styles.legendItem}><View style={[styles.dot, styles.dotPending]} /><Text style={styles.legendText}>Amarelo: pendente</Text></View>
@@ -150,12 +251,35 @@ export default function MapOverviewScreen() {
         </View>
       ) : null}
 
-      <RouteMap
-        stops={mapStops}
-        selectedStopId={selectedStop?.id ?? null}
-        focusStopId={focusStopId}
-        onSelectStop={setSelectedStopId}
-      />
+      {canAttemptNativeMap ? (
+        <MapVisualizationBoundary
+          key={mapRetryKey}
+          fallback={(
+            <MapFallbackCard
+              reason="Não foi possível carregar o mapa agora. Você ainda pode usar a lista da rota."
+              onRetry={retryNativeMap}
+            />
+          )}
+        >
+          <RouteMap
+            stops={mapStops}
+            selectedStopId={selectedStop?.id ?? null}
+            focusStopId={focusStopId}
+            onSelectStop={setSelectedStopId}
+          />
+        </MapVisualizationBoundary>
+      ) : (
+        <MapFallbackCard
+          reason={
+            safeMapPayload.canRenderNativeMap
+              ? isNativeMapDisabledForAndroid
+                ? 'O mapa está desativado nesta versão de teste.'
+                : 'Não foi possível carregar o mapa agora. Você ainda pode usar a lista da rota.'
+              : 'Não foi possível carregar o mapa agora. Você ainda pode usar a lista da rota.'
+          }
+          onRetry={retryNativeMap}
+        />
+      )}
 
       {selectedStop ? (
         <View style={styles.detailCard}>
@@ -205,6 +329,19 @@ export default function MapOverviewScreen() {
                 <Copy size={15} color={Colors.warning} />
                 <Text style={styles.copyInlineButtonText}>Copiar endereço</Text>
               </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.copyInlineButton}
+                onPress={() => retryLocateStop(selectedStop.id)}
+                disabled={retryingStopId === selectedStop.id}
+                activeOpacity={0.75}
+                accessibilityRole="button"
+                accessibilityLabel={`Tentar localizar novamente: ${selectedStop.address}`}
+              >
+                <MapPinned size={15} color={Colors.warning} />
+                <Text style={styles.copyInlineButtonText}>
+                  {retryingStopId === selectedStop.id ? 'Localizando...' : 'Tentar localizar novamente'}
+                </Text>
+              </TouchableOpacity>
             </View>
           ) : null}
           <View style={styles.actions}>
@@ -239,8 +376,10 @@ export default function MapOverviewScreen() {
           stops={mapStops}
           selectedStopId={selectedStop?.id ?? null}
           onSelectStop={selectStopFromList}
-          onNavigateStop={stop => navigateToAddress(stop.address)}
+          onNavigateStop={stop => navigateToAddress(stop.navigationAddress || stop.address)}
           onCopyStop={copyStopAddress}
+          onRetryLocateStop={stop => retryLocateStop(stop.id)}
+          retryingStopId={retryingStopId}
         />
       </View>
     </ScrollView>
@@ -295,6 +434,30 @@ const styles = StyleSheet.create({
   warningTitle: { color: Colors.warning, fontSize: FontSizes.md, fontWeight: '800' },
   warningText: { flex: 1, color: Colors.gray, fontSize: FontSizes.sm, lineHeight: 18 },
   warningCount: { color: Colors.warning, fontSize: FontSizes.sm, fontWeight: '700' },
+  mapFallbackCard: {
+    minHeight: 180,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: Spacing.sm,
+    padding: Spacing.lg,
+    borderRadius: BorderRadius.lg,
+    borderWidth: 1,
+    borderColor: Colors.warningBorder,
+    backgroundColor: Colors.cardBg,
+  },
+  mapFallbackTitle: { color: Colors.white, fontSize: FontSizes.md, fontWeight: '900', textAlign: 'center' },
+  mapFallbackText: { color: Colors.gray, fontSize: FontSizes.sm, lineHeight: 18, textAlign: 'center' },
+  mapFallbackButton: {
+    minHeight: 42,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: Spacing.md,
+    borderRadius: BorderRadius.sm,
+    borderWidth: 1,
+    borderColor: Colors.gold[700],
+    backgroundColor: Colors.overlay,
+  },
+  mapFallbackButtonText: { color: Colors.gold[400], fontSize: FontSizes.sm, fontWeight: '800' },
   detailCard: {
     gap: Spacing.md,
     padding: Spacing.md,

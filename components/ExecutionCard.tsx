@@ -6,6 +6,7 @@ import { BorderRadius, Colors, FontSizes, Spacing } from '@/constants/theme';
 import { PlaceInfoCard } from '@/components/PlaceInfoCard';
 import type { ExecutionStep } from '@/lib/executionState';
 import type { GroupedStop, PackageItem } from '@/lib/packageUtils';
+import { getPackagePrimaryLabel, getPackageSecondaryLabel } from '@/lib/packageUtils';
 import type { PlaceInfo } from '@/lib/placeIntelligence';
 import { isPackageGroupSelected } from '@/lib/packageSelection';
 import {
@@ -266,15 +267,20 @@ export function ExecutionCard({
                         activeOpacity={0.78}
                         accessibilityRole="checkbox"
                         accessibilityState={{ checked: separated, disabled: selectionDisabled }}
-                        accessibilityLabel={`${pkg.trackingNumber}, ${packageStateLabel}`}
+                        accessibilityLabel={`${getPackagePrimaryLabel(pkg)}, ${packageStateLabel}`}
                       >
                         <View style={[styles.checkbox, separated && styles.checkboxSelected]}>
                           {separated ? <Check size={18} color={Colors.primary[900]} /> : null}
                         </View>
                         <View style={styles.packageRowContent}>
                           <Text style={styles.packageTracking} numberOfLines={1}>
-                            {pkg.trackingNumber}
+                            {getPackagePrimaryLabel(pkg)}
                           </Text>
+                          {getPackageSecondaryLabel(pkg) ? (
+                            <Text style={styles.packageSecondary} numberOfLines={1}>
+                              {getPackageSecondaryLabel(pkg)}
+                            </Text>
+                          ) : null}
                           <Text style={styles.packageAddress} numberOfLines={1}>
                             {pkg.destinationAddress}
                           </Text>
@@ -658,6 +664,11 @@ const styles = StyleSheet.create({
     color: Colors.white,
     fontSize: FontSizes.md,
     fontWeight: '700',
+  },
+  packageSecondary: {
+    color: Colors.gray,
+    fontSize: FontSizes.xs,
+    fontWeight: '600',
   },
   packageAddress: {
     color: Colors.gray,

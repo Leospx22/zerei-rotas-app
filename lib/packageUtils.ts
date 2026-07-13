@@ -10,8 +10,11 @@
 
 export interface RawPackage {
   trackingNumber: string;
+  sequence?: string;
   destinationAddress: string;
   zipCode: string;
+  city?: string;
+  state?: string;
   latitude: number | null;
   longitude: number | null;
   stopNumber: number | null;
@@ -20,8 +23,11 @@ export interface RawPackage {
 export interface PackageItem {
   id: string;
   trackingNumber: string;
+  sequence?: string;
   destinationAddress: string;
   zipCode: string;
+  city?: string;
+  state?: string;
   latitude: number | null;
   longitude: number | null;
   stopNumber: number | null;
@@ -38,6 +44,8 @@ export interface AddressGroup {
   normalizedAddress: string;
   originalAddress: string;
   zipCode: string;
+  city?: string;
+  state?: string;
   packageIds: string[];   // references to PackageItem ids in this group
   packageCount: number;
 }
@@ -47,6 +55,7 @@ export interface AddressGroup {
 export interface GroupedStop {
   id: string;
   stopNumber: number;
+  originalStopNumber: number | null;
   // Primary display address (first address in this stop)
   normalizedAddress: string;
   originalAddress: string;
@@ -103,6 +112,45 @@ export function extractHouseNumber(address: string): string {
   return match ? match[1] : '';
 }
 
+const INVALID_EMPTY_VALUES = new Set(['', '-', '—', 'n/a', 'na', 'null', 'undefined']);
+
+function cleanSpreadsheetValue(value: unknown): string {
+  return String(value ?? '').trim();
+}
+
+export function parseValidStopNumber(value: unknown): number | null {
+  const raw = cleanSpreadsheetValue(value);
+  if (INVALID_EMPTY_VALUES.has(raw.toLowerCase())) return null;
+  if (!/^\d+$/.test(raw)) return null;
+  const parsed = Number.parseInt(raw, 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+}
+
+export function parseValidSequence(value: unknown): string | undefined {
+  const raw = cleanSpreadsheetValue(value);
+  if (INVALID_EMPTY_VALUES.has(raw.toLowerCase())) return undefined;
+  return /^\d+$/.test(raw) ? raw : undefined;
+}
+
+export function isShopeePriorityPackage(
+  pkg: Pick<RawPackage | PackageItem, 'stopNumber' | 'sequence'>
+): boolean {
+  return pkg.stopNumber === null && !parseValidSequence(pkg.sequence);
+}
+
+export function getPackagePrimaryLabel(
+  pkg: Pick<PackageItem, 'trackingNumber' | 'sequence'>
+): string {
+  const sequence = pkg.sequence?.trim();
+  return sequence ? `Seq. ${sequence}` : `SPX TN: ${pkg.trackingNumber}`;
+}
+
+export function getPackageSecondaryLabel(
+  pkg: Pick<PackageItem, 'trackingNumber' | 'sequence'>
+): string | null {
+  return pkg.sequence?.trim() ? `SPX TN: ${pkg.trackingNumber}` : null;
+}
+
 function normalizedAddressKey(address: string): string {
   return normalizeAddress(address).toLowerCase().trim();
 }
@@ -110,8 +158,11 @@ function normalizedAddressKey(address: string): string {
 export function detectColumns(headers: string[]): Record<keyof RawPackage, number | null> {
   const mapping: Record<keyof RawPackage, number | null> = {
     trackingNumber: null,
+    sequence: null,
     destinationAddress: null,
     zipCode: null,
+    city: null,
+    state: null,
     latitude: null,
     longitude: null,
     stopNumber: null,
@@ -125,6 +176,7 @@ export function detectColumns(headers: string[]): Record<keyof RawPackage, numbe
       'rastreio', 'número rastreio', 'numero rastreio',
       'package id', 'package_id', 'código', 'codigo', 'id pacote',
     ],
+    sequence: ['sequence', 'sequÃªncia', 'sequencia', 'seq'],
     destinationAddress: [
       'destination address', 'destination_address',
       'endereço', 'endereco', 'address', 'destino', 'destination',
@@ -134,6 +186,8 @@ export function detectColumns(headers: string[]): Record<keyof RawPackage, numbe
       'postal code', 'postal_code', 'cep', 'zip', 'zip code', 'zip_code',
       'código postal', 'codigo postal', 'postcode', 'post code',
     ],
+    city: ['city', 'cidade', 'municipio', 'municÃ­pio'],
+    state: ['state', 'estado', 'uf'],
     latitude: ['latitude', 'lat'],
     longitude: ['longitude', 'lng', 'long'],
     // "stop" and "parada" columns ONLY — NOT sequence/seq/order/ordem
@@ -146,9 +200,12 @@ export function detectColumns(headers: string[]): Record<keyof RawPackage, numbe
   // Fuzzy fallback (only applied when exact match fails)
   // stopNumber fuzzy: only /\bstop\b/i or /\bparada\b/i — not seq/order
   const fuzzyPatterns: Record<keyof RawPackage, RegExp[]> = {
+    sequence: [/sequ[eÃª]ncia/i, /^sequence$/i, /^seq$/i],
     trackingNumber: [/track/i, /rastreio/i, /cod[ií]go/i, /id[_\s]?pacote/i, /package[_\s]?id/i, /spx/i, /\btn\b/i],
     destinationAddress: [/endere[cç]o/i, /address/i, /destin/i, /logradouro/i],
     zipCode: [/cep/i, /zip/i, /postal/i],
+    city: [/cidade/i, /city/i, /munic/i],
+    state: [/estado/i, /^uf$/i, /state/i],
     latitude: [/\blat\b/i],
     longitude: [/\blng\b/i, /\blong\b/i],
     stopNumber: [/\bstop\b/i, /\bparada\b/i],
@@ -198,13 +255,15 @@ export function parseSpreadsheetData(rows: any[][], headers: string[]): RawPacka
       ? String(row[mapping.trackingNumber] ?? '').trim()
       : '';
     const finalTracking = tracking || `PKG-${i + 1}`;
+    const sequence = mapping.sequence !== null
+      ? parseValidSequence(row[mapping.sequence])
+      : undefined;
 
     if (!address && !tracking) continue;
 
-    const rawStop = mapping.stopNumber !== null
-      ? String(row[mapping.stopNumber] ?? '').trim()
-      : '';
-    const stopNum = rawStop !== '' ? parseInt(rawStop, 10) || null : null;
+    const stopNum = mapping.stopNumber !== null
+      ? parseValidStopNumber(row[mapping.stopNumber])
+      : null;
 
     const parseCoordinate = (value: unknown, minimum: number, maximum: number) => {
       const parsed = Number.parseFloat(String(value ?? '').replace(',', '.'));
@@ -213,8 +272,11 @@ export function parseSpreadsheetData(rows: any[][], headers: string[]): RawPacka
 
     packages.push({
       trackingNumber: finalTracking,
+      sequence,
       destinationAddress: address,
       zipCode: mapping.zipCode !== null ? String(row[mapping.zipCode] ?? '').trim() : '',
+      city: mapping.city !== null ? String(row[mapping.city] ?? '').trim() || undefined : undefined,
+      state: mapping.state !== null ? String(row[mapping.state] ?? '').trim() || undefined : undefined,
       latitude: mapping.latitude !== null
         ? parseCoordinate(row[mapping.latitude], -90, 90)
         : null,
@@ -244,6 +306,8 @@ function buildAddressGroups(packages: PackageItem[]): AddressGroup[] {
       normalizedAddress: normalizeAddress(first.destinationAddress),
       originalAddress: first.destinationAddress,
       zipCode: first.zipCode,
+      city: first.city,
+      state: first.state,
       packageIds: pkgs.map(p => p.id),
       packageCount: pkgs.length,
     });
@@ -257,9 +321,12 @@ function buildAddressGroups(packages: PackageItem[]): AddressGroup[] {
 export function groupPackagesByStop(rawPackages: RawPackage[]): GroupedStop[] {
   const withStop = rawPackages.filter(p => p.stopNumber !== null);
   const withoutStop = rawPackages.filter(p => p.stopNumber === null);
+  const priorityWithoutStop = withoutStop.filter(isShopeePriorityPackage);
+  const nonPriorityWithoutStop = withoutStop.filter(p => !isShopeePriorityPackage(p));
 
   // Build stop→rawPackages map
   const stopMap = new Map<number, RawPackage[]>();
+  const missingStopKeys: number[] = [];
   for (const pkg of withStop) {
     const sn = pkg.stopNumber!;
     if (!stopMap.has(sn)) stopMap.set(sn, []);
@@ -267,18 +334,24 @@ export function groupPackagesByStop(rawPackages: RawPackage[]): GroupedStop[] {
   }
 
   // Fallback: group by address for packages without stop numbers
-  if (withoutStop.length > 0) {
+  const addMissingStopGroups = (packages: RawPackage[], priority: boolean) => {
+    if (packages.length === 0) return;
     const addrMap = new Map<string, RawPackage[]>();
-    for (const pkg of withoutStop) {
+    for (const pkg of packages) {
       const key = normalizedAddressKey(pkg.destinationAddress);
       if (!addrMap.has(key)) addrMap.set(key, []);
       addrMap.get(key)!.push(pkg);
     }
     let nextStop = stopMap.size > 0 ? Math.max(...stopMap.keys()) + 1 : 1;
     for (const [, pkgs] of addrMap) {
-      stopMap.set(nextStop++, pkgs);
+      stopMap.set(nextStop, pkgs);
+      if (priority) missingStopKeys.push(nextStop);
+      nextStop++;
     }
-  }
+  };
+
+  addMissingStopGroups(priorityWithoutStop, true);
+  addMissingStopGroups(nonPriorityWithoutStop, false);
 
   // Build global set of normalized addresses to detect cross-stop duplicates
   const addressStopCount = new Map<string, Set<number>>();
@@ -290,7 +363,11 @@ export function groupPackagesByStop(rawPackages: RawPackage[]): GroupedStop[] {
     }
   }
 
-  const sortedKeys = [...stopMap.keys()].sort((a, b) => a - b);
+  const missingKeySet = new Set(missingStopKeys);
+  const sortedKeys = [
+    ...missingStopKeys,
+    ...[...stopMap.keys()].filter(key => !missingKeySet.has(key)).sort((a, b) => a - b),
+  ];
   const stops: GroupedStop[] = [];
 
   sortedKeys.forEach((stopNum, orderIndex) => {
@@ -305,8 +382,11 @@ export function groupPackagesByStop(rawPackages: RawPackage[]): GroupedStop[] {
     const packages: PackageItem[] = rawPkgs.map((p, pi) => ({
       id: `pkg-${stopNum}-${pi}`,
       trackingNumber: p.trackingNumber,
+      sequence: p.sequence,
       destinationAddress: p.destinationAddress,
       zipCode: p.zipCode,
+      city: p.city,
+      state: p.state,
       latitude: p.latitude,
       longitude: p.longitude,
       stopNumber: p.stopNumber,
@@ -326,6 +406,7 @@ export function groupPackagesByStop(rawPackages: RawPackage[]): GroupedStop[] {
     stops.push({
       id: `stop-${stopNum}`,
       stopNumber: stopNum,
+      originalStopNumber: first.stopNumber,
       normalizedAddress: normalizedAddr,
       originalAddress: first.destinationAddress,
       zipCode: first.zipCode,

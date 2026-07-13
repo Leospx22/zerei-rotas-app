@@ -25,7 +25,7 @@ import {
   SkipForward,
 } from 'lucide-react-native';
 import { Colors, Spacing, FontSizes, BorderRadius } from '@/constants/theme';
-import { BrandIcon } from '@/components/BrandIcon';
+import { HeaderBrandIcon } from '@/components/HeaderBrandIcon';
 import { ExecutionCard } from '@/components/ExecutionCard';
 import {
   PlaceInfoEditorModal,
@@ -56,6 +56,11 @@ import {
   togglePackageSelection,
 } from '@/lib/packageSelection';
 import {
+  getPackagePrimaryLabel,
+  getPackageSecondaryLabel,
+} from '@/lib/packageUtils';
+import {
+  buildDisplayedRoutePositionMap,
   formatRouteOrderBadge,
   getDuplicateAddressWarning,
 } from '@/lib/routeStopPresentation';
@@ -122,6 +127,10 @@ export default function RouteExecutionScreen() {
   const [occurrencePackageFilter, setOccurrencePackageFilter] = useState<Set<string> | null>(null);
   const derivedExecutionState = React.useMemo(
     () => deriveExecutionState(currentRoute),
+    [currentRoute]
+  );
+  const displayedPositions = React.useMemo(
+    () => currentRoute ? buildDisplayedRoutePositionMap(currentRoute.stops) : {},
     [currentRoute]
   );
   const currentOccurrenceCount = React.useMemo(
@@ -458,7 +467,7 @@ export default function RouteExecutionScreen() {
             <ArrowLeft size={24} color={Colors.white} />
           </TouchableOpacity>
           <View style={styles.headerTitleRow}>
-            <BrandIcon size={24} />
+            <HeaderBrandIcon size={20} />
             <Text style={styles.headerTitle}>Executar Rota</Text>
           </View>
           <View style={{ width: 40 }} />
@@ -571,7 +580,7 @@ export default function RouteExecutionScreen() {
           const stopOccurrenceCount = stop.packages.filter(p => p.status === 'skipped').length;
           const activeOccurrenceFilter =
             stop.id === currentStop?.id ? occurrencePackageFilter : null;
-          const stopBadge = formatRouteOrderBadge(stop, stopIndex + 1);
+          const stopBadge = displayedPositions[stop.id]?.badge ?? formatRouteOrderBadge(stop, stopIndex + 1);
           const duplicateWarning = getDuplicateAddressWarning(currentRoute.stops, stop);
 
           return (
@@ -709,9 +718,14 @@ export default function RouteExecutionScreen() {
                                     ]}
                                     numberOfLines={1}
                                   >
-                                    {pkg.trackingNumber}
+                                    {getPackagePrimaryLabel(pkg)}
                                   </Text>
                                 </View>
+                                {getPackageSecondaryLabel(pkg) ? (
+                                  <Text style={styles.packageSecondary} numberOfLines={1}>
+                                    {getPackageSecondaryLabel(pkg)}
+                                  </Text>
+                                ) : null}
                                 <Text style={styles.packageAddress} numberOfLines={1}>
                                   {pkg.destinationAddress}
                                 </Text>
@@ -968,6 +982,7 @@ const styles = StyleSheet.create({
   packageInfo: { flex: 1, gap: 2, paddingRight: Spacing.xs },
   packageTrackingRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   packageTracking: { flex: 1, fontSize: FontSizes.sm, fontWeight: '600', color: Colors.white },
+  packageSecondary: { fontSize: 11, color: Colors.gray, marginLeft: 17, fontWeight: '600' },
   packageTrackingDelivered: { color: Colors.success, textDecorationLine: 'line-through' },
   packageTrackingOccurrence: { color: Colors.error, textDecorationLine: 'line-through' },
   packageAddress: { fontSize: 11, color: Colors.gray, marginLeft: 17 },

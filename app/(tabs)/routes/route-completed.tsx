@@ -4,7 +4,7 @@ import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Trophy, MapPin, Clock, CheckCircle2, Home, Package } from 'lucide-react-native';
 import { Colors, Spacing, FontSizes, BorderRadius } from '@/constants/theme';
-import { BrandIcon } from '@/components/BrandIcon';
+import { HeaderBrandIcon } from '@/components/HeaderBrandIcon';
 import { useRoute } from '@/contexts/RouteContext';
 
 export default function RouteCompletedScreen() {
@@ -30,7 +30,7 @@ export default function RouteCompletedScreen() {
     >
       <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.brandHeader}>
-          <BrandIcon size={32} />
+          <HeaderBrandIcon size={24} />
           <Text style={styles.brandText}>Zerei Rotas</Text>
         </View>
 

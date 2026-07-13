@@ -23,12 +23,14 @@ import {
   ClipboardPaste,
 } from 'lucide-react-native';
 import { Colors, Spacing, FontSizes, BorderRadius } from '@/constants/theme';
-import { BrandIcon } from '@/components/BrandIcon';
-import { useRoute } from '@/contexts/RouteContext';
+import { HeaderBrandIcon } from '@/components/HeaderBrandIcon';
+import { useRoute, type RouteData } from '@/contexts/RouteContext';
 import {
   RawPackage,
   parseSpreadsheetData,
   buildPlanningRoute,
+  getPackagePrimaryLabel,
+  getPackageSecondaryLabel,
 } from '@/lib/packageUtils';
 import { parseSpreadsheetText, parseSpreadsheetFile, isBinarySpreadsheet } from '@/lib/spreadsheetParser';
 
@@ -99,6 +101,8 @@ export default function ImportScreen() {
   const [detectedColumns, setDetectedColumns] = useState<string[]>([]);
   const [fileName, setFileName] = useState<string>('');
   const [importedRouteId, setImportedRouteId] = useState<string | null>(null);
+  const [importedRoute, setImportedRoute] = useState<RouteData | null>(null);
+  const [continuing, setContinuing] = useState(false);
   const [pasteText, setPasteText] = useState('');
   const [error, setError] = useState<string | null>(null);
 
@@ -113,6 +117,7 @@ export default function ImportScreen() {
       setDetectedColumns(headers);
       setRawPackages(packages);
       setImportedRouteId(route.id);
+      setImportedRoute(route);
       setCurrentRoute(route);
       setError(null);
     } catch (err) {
@@ -271,13 +276,22 @@ export default function ImportScreen() {
   };
 
   const handleContinue = () => {
-    if (rawPackages.length === 0) return;
+    if (rawPackages.length === 0 || continuing) return;
+    setContinuing(true);
+    const route = importedRoute ?? currentRoute;
+    if (!route) {
+      setContinuing(false);
+      setError('Não foi possível preparar a rota. Importe a planilha novamente.');
+      return;
+    }
     if (!currentRoute || currentRoute.id !== importedRouteId) {
-      const route = buildPlanningRoute(rawPackages);
+      setImportedRoute(route);
       setImportedRouteId(route.id);
       setCurrentRoute(route);
     }
-    router.replace('/(tabs)/routes/import-summary');
+    requestAnimationFrame(() => {
+      router.replace('/(tabs)/routes/import-summary');
+    });
   };
 
   return (
@@ -287,7 +301,7 @@ export default function ImportScreen() {
           <ArrowLeft size={24} color={Colors.white} />
         </TouchableOpacity>
         <View style={styles.headerTitleRow}>
-          <BrandIcon size={24} />
+          <HeaderBrandIcon size={20} />
           <Text style={styles.headerTitle}>Importar Planilha</Text>
         </View>
         <View style={{ width: 40 }} />
@@ -378,7 +392,10 @@ export default function ImportScreen() {
                 <Text style={styles.packageIndex}>{i + 1}</Text>
               </View>
               <View style={styles.packageInfo}>
-                <Text style={styles.packageTracking}>{pkg.trackingNumber}</Text>
+                <Text style={styles.packageTracking}>{getPackagePrimaryLabel(pkg)}</Text>
+                {getPackageSecondaryLabel(pkg) ? (
+                  <Text style={styles.packageSecondary}>{getPackageSecondaryLabel(pkg)}</Text>
+                ) : null}
                 <Text style={styles.packageAddress} numberOfLines={1}>
                   {pkg.destinationAddress}
                 </Text>
@@ -400,12 +417,19 @@ export default function ImportScreen() {
       </TouchableOpacity>
 
       {rawPackages.length > 0 ? (
-        <TouchableOpacity style={styles.continueButton} onPress={handleContinue}>
+        <TouchableOpacity style={[styles.continueButton, continuing && styles.continueButtonDisabled]} onPress={handleContinue} disabled={continuing}>
           <LinearGradient
             colors={[Colors.gold[500], Colors.gold[700]]}
             style={styles.continueGradient}
           >
-            <Text style={styles.continueText}>Continuar</Text>
+            {continuing ? (
+              <View style={styles.continueLoadingRow}>
+                <ActivityIndicator color={Colors.primary[900]} />
+                <Text style={styles.continueText}>Preparando rota...</Text>
+              </View>
+            ) : (
+              <Text style={styles.continueText}>Continuar</Text>
+            )}
           </LinearGradient>
         </TouchableOpacity>
       ) : null}
@@ -626,6 +650,12 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: Colors.gold[400],
   },
+  packageSecondary: {
+    fontSize: FontSizes.xs,
+    fontWeight: '600',
+    color: Colors.gray,
+    marginTop: 1,
+  },
   packageAddress: {
     fontSize: FontSizes.sm,
     color: Colors.gray,
@@ -653,11 +683,13 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     marginTop: Spacing.sm,
   },
+  continueButtonDisabled: { opacity: 0.78 },
   continueGradient: {
     alignItems: 'center',
     justifyContent: 'center',
     height: 56,
   },
+  continueLoadingRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
   continueText: {
     fontSize: FontSizes.xl,
     fontWeight: '800',

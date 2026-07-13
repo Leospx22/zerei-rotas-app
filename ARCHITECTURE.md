@@ -1,4 +1,4 @@
-# Zerei Rotas Architecture
+﻿# Zerei Rotas Architecture
 
 This document is the source of truth for the current application architecture. New work should preserve the ownership boundaries and invariants described here unless an architectural change is explicitly approved.
 
@@ -217,9 +217,9 @@ RouteData
     `-- PackageItem[]
 ```
 
-Stops are grouped exclusively by the spreadsheet Stop column. Sequence/order columns must never be interpreted as stop numbers. Packages are grouped by stop first, then by normalized address within that stop. Packages without a valid Stop value are kept in the route and displayed with the compact `#P` badge; descriptive helper text may explain this as `Sem número de parada na planilha`.
+Stops are grouped exclusively by the spreadsheet Stop column. Sequence/order columns must never be interpreted as stop numbers. Packages are grouped by stop first, then by normalized address within that stop. Packages without a valid Stop and without a valid Sequence are treated as `Prioridade Shopee`, displayed with the compact `#P` badge, and placed first on fresh import. They remain fully movable by the driver; display numbering is recalculated from current route order and regular stops do not count `#P` rows, so `#P, #P, #1, #2` and `#1, #P, #2` are both valid presentations. The original spreadsheet Stop and package Sequence values are preserved separately from display numbering.
 
-Duplicate-address warnings compare normalized base street + number and ignore complements such as apartment, floor, store, and building notes. Warnings should name the exact matching stop identifiers, including `#P` for missing-Stop groups. Duplicate stops are never merged, removed, or reordered automatically.
+Duplicate-address warnings compare normalized base street + number and ignore complements such as apartment, floor, store, and building notes. Warnings should name the exact matching stop identifiers and use `Prioridade Shopee` wording for `#P` groups. Duplicate stops are never merged, removed, or reordered automatically.
 
 `PackageItem` stores occurrence metadata additively:
 
@@ -231,9 +231,9 @@ occurrenceResolvedAt?: string;
 occurrenceUpdatedAt?: string;
 ```
 
-These fields are optional so previously persisted routes remain valid. A package occurrence continues using the existing `skipped` status convention. Current-route AsyncStorage persistence serializes these fields with the route; skipped packages without a saved reason display `Motivo não informado`. Occurrence edits and resolutions set `occurrenceUpdatedAt`; older resolved records fall back to `occurrenceResolvedAt` when displaying their latest update.
+These fields are optional so previously persisted routes remain valid. A package occurrence continues using the existing `skipped` status convention. Current-route AsyncStorage persistence serializes these fields with the route; skipped packages without a saved reason display `Motivo nÃ£o informado`. Occurrence edits and resolutions set `occurrenceUpdatedAt`; older resolved records fall back to `occurrenceResolvedAt` when displaying their latest update.
 
-Occurrence resolution is also additive. `delivered` changes only the target package to the existing delivered status; `returned_to_hub` retains the skipped status. Both preserve the original reason and registration timestamp. The Ocorrências screen shows unresolved records under Pendentes and resolved records for seven days under Resolvidas recentemente.
+Occurrence resolution is also additive. `delivered` changes only the target package to the existing delivered status; `returned_to_hub` retains the skipped status. Both preserve the original reason and registration timestamp. The OcorrÃªncias screen shows unresolved records under Pendentes and resolved records for seven days under Resolvidas recentemente.
 
 Occurrence edits target the existing package or exact completed-history summary. Pending edits may change only the reason. Resolved edits may change the reason and reverse the result; result reversal preserves both timestamps and adjusts delivered counters by exactly one without duplicating records.
 
@@ -248,9 +248,11 @@ Map overview presentation is local-first and non-mutating:
 3. Exclude unfixable invalid/outlier coordinates.
 4. Reuse a valid coordinate from another stop in the same route only when normalized street and number match.
 5. Use cached geocode recovery when available.
-6. Leave the stop unresolved when no safe coordinate exists.
+6. Use a configured geocoding provider later if one is explicitly approved.
+7. Build a canonical map query from street + number + city/state/CEP + Brasil.
+8. Leave the stop unresolved when no safe coordinate exists.
 
-Unresolved stops remain visible in the ordered list and selected-card detail. User-facing copy should say `Insira o endereço manualmente`, and the UI should offer `Copiar endereço` with a normalized street/number search string plus useful postal/country context. The original imported address and route/package data are not mutated by map presentation recovery.
+Unresolved stops remain visible in the ordered list and selected-card detail. User-facing copy should say `Insira o endereço manualmente`, and the UI should offer `Copiar endereço`, `Navegar`, and `Tentar localizar novamente`. External Google Maps navigation does not provide reliable coordinates back to Zerei Rotas, so tapping `Navegar` must not fabricate markers. Retry can update the local map only when cache/provider resolution returns validated coordinates. Native map rendering is isolated from the route list: the screen renders the ordered list first, filters invalid coordinate pairs, skips invalid polylines, avoids `fitToCoordinates` for empty sets, safely centers a single coordinate, and falls back to `Não foi possível carregar o mapa agora. Você ainda pode usar a lista da rota.` when native map rendering is unavailable. Android native map rendering is feature-flagged by `EXPO_PUBLIC_ENABLE_NATIVE_ROUTE_MAP`; missing/false values keep the safe fallback, and preview builds can set it to `true` for controlled closed-beta testing. The original imported address and route/package data are not mutated by map presentation recovery.
 
 ## History Model
 
@@ -284,7 +286,7 @@ History invariants:
 - History records created before occurrence summaries remain valid and expose an empty occurrence collection.
 - `reloadHistory()` is the synchronization boundary after a history mutation.
 
-Minhas Rotas derives card status without changing persisted data: a current route with zero delivered packages is `Planejada`, a current route with deliveries is `Em rota`, and a history entry is `Concluída`. Planned cards can enter Review or activate execution; in-route cards continue execution.
+Minhas Rotas derives card status without changing persisted data: a current route with zero delivered packages is `Planejada`, a current route with deliveries is `Em rota`, and a history entry is `ConcluÃ­da`. Planned cards can enter Review or activate execution; in-route cards continue execution.
 
 ## Persistence Layer
 
@@ -311,7 +313,7 @@ Active-route operations are local-first:
 - Import, route rename, stop reordering, route start, package delivery/undo, stop status changes, occurrence registration/edit/resolution/deletion, and current-route clearing write the current route snapshot immediately.
 - AppState `inactive` and `background` transitions flush the latest non-completed route snapshot.
 - AppState `active` reloads the persisted route and restores it if it is valid, newer/different than memory, and not completed.
-- A restored active route can show the one-time Painel notice `Rota restaurada. Você pode continuar a entrega.`
+- A restored active route can show the one-time Painel notice `Rota restaurada. VocÃª pode continuar a entrega.`
 - Place Intelligence and geocode cache remain separate local stores and do not mutate route/package data.
 
 Route completion is sequenced for durability: save or update the completed history entry first, then clear the active-route key. History writes are idempotent by route id and preserve an existing `completedAt` and renamed title for repeated completion attempts.
@@ -380,7 +382,7 @@ Parsing behavior:
 4. `groupPackagesByStop()` creates stops, address subgroups, package records, counts, and duplicate-address warnings.
 5. `buildPlanningRoute()` generates an opaque route ID, a default date-based name, totals, estimates, and `planning` status.
 6. `setCurrentRoute()` updates memory and persistence immediately after successful parsing, before Continue is pressed.
-7. Continue checks the imported route ID and reuses the existing route to prevent duplication.
+7. Continue checks the imported route ID and reuses the already-built route snapshot to prevent duplication and avoid regrouping large spreadsheets on button press.
 
 ## Naming Conventions
 

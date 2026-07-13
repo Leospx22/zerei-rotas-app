@@ -1,8 +1,8 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import MapView, { Marker, Polyline } from 'react-native-maps';
-import { BorderRadius, Colors, FontSizes } from '@/constants/theme';
-import { getLocatedMapStops, type MapStop } from '@/lib/mapOverview';
+import { BorderRadius, Colors, FontSizes, Spacing } from '@/constants/theme';
+import { buildSafeMapPayload, type MapStop } from '@/lib/mapOverview';
 
 interface RouteMapProps {
   stops: MapStop[];
@@ -11,126 +11,202 @@ interface RouteMapProps {
   onSelectStop: (stopId: string) => void;
 }
 
+const ENABLE_MAP_DIAGNOSTICS =
+  __DEV__ || process.env.EXPO_PUBLIC_ROUTE_MAP_DIAGNOSTICS === 'true';
+
+function logMapDiagnostic(event: string, details: Record<string, unknown> = {}) {
+  if (!ENABLE_MAP_DIAGNOSTICS) return;
+  console.info('[ZR MAP]', event, details);
+}
+
+function markerColor(status: MapStop['status'], selected: boolean): string {
+  if (selected) return Colors.primary[400];
+  if (status === 'completed') return Colors.darkGray;
+  if (status === 'current') return Colors.gold[400];
+  return Colors.gold[600];
+}
+
 export default function RouteMap({ stops, selectedStopId, focusStopId, onSelectStop }: RouteMapProps) {
   const mapRef = useRef<MapView>(null);
+  const fitAttemptedRef = useRef(false);
+  const [isMounted, setIsMounted] = useState(false);
+  const [isContainerLaidOut, setIsContainerLaidOut] = useState(false);
   const [isMapReady, setIsMapReady] = useState(false);
-  const [isMapLaidOut, setIsMapLaidOut] = useState(false);
-  const [tracksMarkerChanges, setTracksMarkerChanges] = useState(true);
-  const locatedStops = useMemo(
-    () => getLocatedMapStops(stops),
-    [stops]
-  );
-  const coordinates = useMemo(
-    () => locatedStops.map(stop => ({ latitude: stop.latitude, longitude: stop.longitude })),
-    [locatedStops]
+  const [renderMarkers, setRenderMarkers] = useState(false);
+  const [renderPolyline, setRenderPolyline] = useState(false);
+  const safePayload = useMemo(
+    () => buildSafeMapPayload(stops, selectedStopId),
+    [selectedStopId, stops]
   );
 
   useEffect(() => {
-    if (!isMapReady || !isMapLaidOut || coordinates.length === 0) return;
+    setIsMounted(true);
+    logMapDiagnostic('component-mounted', {
+      validCoordinates: safePayload.coordinates.length,
+      markerCount: safePayload.markers.length,
+      polylineCount: safePayload.polylineCoordinates.length,
+      canRenderNativeMap: safePayload.canRenderNativeMap,
+    });
+    return undefined;
+  }, []);
+
+  useEffect(() => {
+    setIsMapReady(false);
+    setRenderMarkers(false);
+    setRenderPolyline(false);
+    fitAttemptedRef.current = false;
+  }, [safePayload.initialRegion?.latitude, safePayload.initialRegion?.longitude, safePayload.markers.length]);
+
+  useEffect(() => {
+    if (!isMapReady) return;
+    const markerTimer = setTimeout(() => {
+      setRenderMarkers(true);
+      logMapDiagnostic('markers-enabled', { markerCount: safePayload.markers.length });
+    }, 50);
+    return () => clearTimeout(markerTimer);
+  }, [isMapReady, safePayload.markers.length]);
+
+  useEffect(() => {
+    if (!renderMarkers || safePayload.polylineCoordinates.length < 2) return;
+    const polylineTimer = setTimeout(() => {
+      setRenderPolyline(true);
+      logMapDiagnostic('polyline-enabled', { polylineCount: safePayload.polylineCoordinates.length });
+    }, 50);
+    return () => clearTimeout(polylineTimer);
+  }, [renderMarkers, safePayload.polylineCoordinates.length]);
+
+  useEffect(() => {
+    if (
+      !isMapReady ||
+      !isContainerLaidOut ||
+      !renderMarkers ||
+      safePayload.coordinates.length <= 1 ||
+      fitAttemptedRef.current
+    ) {
+      return;
+    }
+
+    fitAttemptedRef.current = true;
     const timer = setTimeout(() => {
-      mapRef.current?.fitToCoordinates(coordinates, {
-        edgePadding: { top: 48, right: 48, bottom: 48, left: 48 },
-        animated: false,
-      });
-    }, 100);
+      try {
+        logMapDiagnostic('fit-attempt', { coordinateCount: safePayload.coordinates.length });
+        mapRef.current?.fitToCoordinates(safePayload.coordinates, {
+          edgePadding: { top: 56, right: 48, bottom: 56, left: 48 },
+          animated: false,
+        });
+      } catch (error) {
+        logMapDiagnostic('fit-failed', {
+          message: error instanceof Error ? error.message : 'unknown',
+        });
+      }
+    }, 180);
     return () => clearTimeout(timer);
-  }, [coordinates, isMapLaidOut, isMapReady]);
-
-  useEffect(() => {
-    setTracksMarkerChanges(true);
-    const timer = setTimeout(() => setTracksMarkerChanges(false), 1000);
-    return () => clearTimeout(timer);
-  }, [selectedStopId, stops]);
+  }, [isContainerLaidOut, isMapReady, renderMarkers, safePayload.coordinates]);
 
   useEffect(() => {
     if (!isMapReady || !focusStopId) return;
-    const stop = locatedStops.find(candidate => candidate.id === focusStopId);
-    if (!stop) return;
-    mapRef.current?.animateToRegion({
-      latitude: stop.latitude,
-      longitude: stop.longitude,
-      latitudeDelta: 0.02,
-      longitudeDelta: 0.02,
-    }, 300);
-  }, [focusStopId, isMapReady, locatedStops]);
+    const marker = safePayload.markers.find(candidate => candidate.stop.id === focusStopId);
+    if (!marker) return;
+    try {
+      mapRef.current?.animateToRegion({
+        latitude: marker.stop.latitude,
+        longitude: marker.stop.longitude,
+        latitudeDelta: 0.02,
+        longitudeDelta: 0.02,
+      }, 300);
+    } catch (error) {
+      logMapDiagnostic('focus-failed', {
+        message: error instanceof Error ? error.message : 'unknown',
+      });
+    }
+  }, [focusStopId, isMapReady, safePayload.markers]);
 
-  if (locatedStops.length === 0) {
+  if (!safePayload.canRenderNativeMap || !safePayload.initialRegion) {
     return (
       <View style={styles.unavailable}>
-        <Text style={styles.unavailableText}>Nenhuma parada com coordenadas válidas.</Text>
+        <Text style={styles.unavailableTitle}>Não foi possível carregar o mapa agora.</Text>
+        <Text style={styles.unavailableText}>Você ainda pode usar a lista da rota.</Text>
       </View>
     );
   }
 
-  const initial = locatedStops[0];
+  const shouldMountMap = isMounted && isContainerLaidOut;
 
   return (
-    <MapView
-      ref={mapRef}
-      style={styles.map}
-      initialRegion={{
-        latitude: initial.latitude,
-        longitude: initial.longitude,
-        latitudeDelta: 0.08,
-        longitudeDelta: 0.08,
-      }}
-      toolbarEnabled={false}
-      onMapReady={() => setIsMapReady(true)}
-      onLayout={() => setIsMapLaidOut(true)}
+    <View
+      style={styles.mapShell}
+      onLayout={() => setIsContainerLaidOut(true)}
     >
-      {coordinates.length > 1 ? (
-        <Polyline coordinates={coordinates} strokeColor={Colors.gold[500]} strokeWidth={3} />
-      ) : null}
-      {locatedStops.map(stop => {
-        const selected = selectedStopId === stop.id;
-        const completed = stop.status === 'completed';
-        const current = stop.status === 'current';
-        return (
-          <Marker
-            key={stop.id}
-            coordinate={{ latitude: stop.latitude, longitude: stop.longitude }}
-            onPress={() => onSelectStop(stop.id)}
-            tracksViewChanges={tracksMarkerChanges}
-            accessibilityLabel={`Parada ${stop.order}: ${stop.address}`}
-          >
-            <View style={[
-              styles.marker,
-              current && styles.markerCurrent,
-              completed && styles.markerCompleted,
-              selected && styles.markerSelected,
-            ]}>
-              <Text style={styles.markerText}>{completed ? '✓' : stop.order}</Text>
-            </View>
-          </Marker>
-        );
-      })}
-    </MapView>
+      {!shouldMountMap ? (
+        <View style={styles.preparingMap}>
+          <Text style={styles.preparingText}>Preparando mapa...</Text>
+        </View>
+      ) : (
+        <MapView
+          ref={mapRef}
+          style={styles.map}
+          initialRegion={safePayload.initialRegion}
+          toolbarEnabled={false}
+          onMapReady={() => {
+            logMapDiagnostic('map-ready', {
+              markerCount: safePayload.markers.length,
+              polylineCount: safePayload.polylineCoordinates.length,
+            });
+            setIsMapReady(true);
+          }}
+        >
+          {renderMarkers ? safePayload.markers.map(({ key, stop }) => {
+            const selected = safePayload.selectedStopId === stop.id;
+            return (
+              <Marker
+                key={key}
+                identifier={key}
+                coordinate={{ latitude: stop.latitude, longitude: stop.longitude }}
+                title={stop.badge}
+                description={stop.address}
+                pinColor={markerColor(stop.status, selected)}
+                onPress={() => onSelectStop(stop.id)}
+              />
+            );
+          }) : null}
+          {renderPolyline && safePayload.polylineCoordinates.length >= 2 ? (
+            <Polyline
+              coordinates={safePayload.polylineCoordinates}
+              strokeColor={Colors.gold[500]}
+              strokeWidth={3}
+            />
+          ) : null}
+        </MapView>
+      )}
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  map: { width: '100%', height: 390, borderRadius: BorderRadius.lg },
+  mapShell: {
+    width: '100%',
+    height: 390,
+    overflow: 'hidden',
+    borderRadius: BorderRadius.lg,
+    backgroundColor: Colors.cardBg,
+  },
+  map: { width: '100%', height: '100%' },
   unavailable: {
     minHeight: 160,
     alignItems: 'center',
     justifyContent: 'center',
+    gap: Spacing.xs,
+    padding: Spacing.md,
     borderRadius: BorderRadius.lg,
     backgroundColor: Colors.cardBg,
   },
-  unavailableText: { color: Colors.gray, fontSize: FontSizes.md },
-  marker: {
-    minWidth: 34,
-    height: 34,
-    paddingHorizontal: 7,
+  unavailableTitle: { color: Colors.white, fontSize: FontSizes.md, fontWeight: '800', textAlign: 'center' },
+  unavailableText: { color: Colors.gray, fontSize: FontSizes.sm, textAlign: 'center' },
+  preparingMap: {
+    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: BorderRadius.full,
-    borderWidth: 2,
-    borderColor: Colors.white,
-    backgroundColor: Colors.gold[600],
+    padding: Spacing.md,
   },
-  markerCurrent: { borderColor: Colors.gold[200], backgroundColor: Colors.gold[400] },
-  markerCompleted: { backgroundColor: Colors.darkGray },
-  markerSelected: { borderColor: Colors.gold[200], transform: [{ scale: 1.15 }] },
-  markerText: { color: Colors.white, fontSize: FontSizes.sm, fontWeight: '900' },
+  preparingText: { color: Colors.gray, fontSize: FontSizes.sm, textAlign: 'center' },
 });

@@ -35,6 +35,9 @@ The project uses `eas.json` with a `preview` profile:
   "build": {
     "preview": {
       "distribution": "internal",
+      "env": {
+        "EXPO_PUBLIC_ENABLE_NATIVE_ROUTE_MAP": "true"
+      },
       "android": {
         "buildType": "apk"
       }
@@ -44,6 +47,24 @@ The project uses `eas.json` with a `preview` profile:
 ```
 
 This creates an APK suitable for internal field testing. It does not publish to Google Play.
+
+## Native Overview Map Flag
+
+The Android overview map is controlled by a public beta flag:
+
+```text
+EXPO_PUBLIC_ENABLE_NATIVE_ROUTE_MAP=true
+```
+
+The `preview` EAS build profile enables it explicitly so closed-beta APKs can test the native map. If the flag is missing or false, Zerei Rotas keeps the safe ordered-list fallback and does not mount the native Android map.
+
+If the EAS environment is managed outside `eas.json`, configure the same public variable manually:
+
+```bash
+eas env:create --environment preview --name EXPO_PUBLIC_ENABLE_NATIVE_ROUTE_MAP --value "true" --visibility plain
+```
+
+This is not a secret. Do not use this mechanism for private keys.
 
 ## Prerequisites
 
@@ -167,3 +188,13 @@ Local route features still work, but Supabase account/profile behavior may show 
 ### APK installs but opens old behavior
 
 Confirm the build was created from the expected Git commit and branch. Rebuild after committing the latest changes.
+
+### Native map still crashes or falls back
+
+The map screen should keep the ordered route list usable even if native map rendering fails. If the APK still crashes when opening **Mostrar no mapa**, capture Android logs for the next diagnostic pass:
+
+```bash
+adb logcat | findstr /i "Zerei ReactNativeJS AndroidRuntime react-native-maps"
+```
+
+Share the log excerpt around the crash. Do not include private route/package data in screenshots or logs.

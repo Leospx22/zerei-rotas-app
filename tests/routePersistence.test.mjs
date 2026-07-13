@@ -369,6 +369,7 @@ test('manual order, #P groups, SPX TN and delivered package survive restore', as
         ...active.stops[0].packages[0],
         id: 'pkg-p',
         trackingNumber: 'SPX-P',
+        sequence: '18',
         stopNumber: null,
         status: 'delivered',
       }],
@@ -399,6 +400,7 @@ test('manual order, #P groups, SPX TN and delivered package survive restore', as
   assert.equal(restored?.name, 'Rota recuperavel');
   assert.deepEqual(restored?.stops.map(stop => stop.id), ['stop-p', 'stop-2']);
   assert.equal(restored?.stops[0].packages[0].trackingNumber, 'SPX-P');
+  assert.equal(restored?.stops[0].packages[0].sequence, '18');
   assert.equal(restored?.stops[0].packages[0].stopNumber, null);
   assert.equal(restored?.stops[0].packages[0].status, 'delivered');
 });

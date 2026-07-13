@@ -21,7 +21,7 @@ import {
   AlertCircle,
 } from 'lucide-react-native';
 import { Colors, Spacing, FontSizes, BorderRadius } from '@/constants/theme';
-import { BrandIcon } from '@/components/BrandIcon';
+import { HeaderBrandIcon } from '@/components/HeaderBrandIcon';
 import { StatusBadge } from '@/components/ui';
 import { usePersistence } from '@/hooks/usePersistence';
 import { useRoute } from '@/contexts/RouteContext';
@@ -173,7 +173,7 @@ export default function RoutesScreen() {
     <>
       <ScrollView style={styles.container} contentContainerStyle={styles.content}>
         <View style={styles.headerRow}>
-          <BrandIcon size={28} />
+          <HeaderBrandIcon size={22} />
           <Text style={styles.pageTitle}>Minhas Rotas</Text>
         </View>
 

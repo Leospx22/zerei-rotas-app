@@ -22,7 +22,7 @@ import {
   UserRound,
 } from 'lucide-react-native';
 import { Colors, Spacing, FontSizes, BorderRadius } from '@/constants/theme';
-import { BrandIcon } from '@/components/BrandIcon';
+import { HeaderBrandIcon } from '@/components/HeaderBrandIcon';
 import { useAuth } from '@/contexts/AuthContext';
 import {
   formatProfileDate,
@@ -207,7 +207,7 @@ export default function ProfileScreen() {
       <View style={styles.header}>
         <View style={styles.avatar}>
           {session
-            ? <BrandIcon size={44} />
+            ? <HeaderBrandIcon size={24} containerSize={44} filled />
             : <UserRound size={30} color={Colors.primary[900]} />}
         </View>
         <Text style={styles.title}>Perfil</Text>

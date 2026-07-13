@@ -2,7 +2,9 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
   KEY_GEOCODE_CACHE,
+  buildCanonicalNavigationAddress,
   buildGeocodingQuery,
+  buildStopGeocodingInput,
   loadCachedGeocode,
   resolveGeocoding,
   saveCachedGeocode,
@@ -13,6 +15,12 @@ import {
   getMapCoordinateSummary,
 } from '../lib/mapOverview.ts';
 import { buildGoogleMapsSearchUrl } from '../lib/mapNavigation.ts';
+import { groupPackagesByStop, parseSpreadsheetData } from '../lib/packageUtils.ts';
+
+const JURUA = 'Rua Juru\u00e1, 137';
+const CANINDE = 'Canind\u00e9';
+const SAO_PAULO = 'S\u00e3o Paulo';
+const ANTONIO = 'Rua Ant\u00f4nio dos Santos Neto, 629';
 
 class MemoryStorage {
   values = new Map();
@@ -26,7 +34,8 @@ function missingMapStop(id = 'stop-1') {
     id,
     order: 1,
     badge: '#1',
-    address: 'Rua Juruá, 137',
+    address: JURUA,
+    navigationAddress: `${JURUA}, 03036-010, Brasil`,
     zipCode: '03036-010',
     baseAddressKey: 'rua jurua|137',
     missingSpreadsheetStop: false,
@@ -42,40 +51,72 @@ function missingMapStop(id = 'stop-1') {
 
 test('builds geocoding query from street, number, and Brazil fallback', () => {
   assert.equal(
-    buildGeocodingQuery({ address: 'Rua Juruá, 137' }),
-    'Rua Juruá, 137, Brasil'
+    buildGeocodingQuery({ address: JURUA }),
+    `${JURUA}, Brasil`
   );
 });
 
 test('includes safe locality, city, state, postal code, and country details', () => {
   const query = buildGeocodingQuery({
-    address: 'Rua Juruá, 137, Canindé',
+    address: `${JURUA}, ${CANINDE}`,
     zipCode: '03036-010',
-    city: 'São Paulo',
+    city: SAO_PAULO,
     state: 'SP',
     country: 'Brasil',
   });
 
-  assert.equal(query, 'Rua Juruá, 137, Canindé, 03036-010, São Paulo, SP, Brasil');
+  assert.equal(query, `${JURUA}, ${CANINDE}, ${SAO_PAULO}, SP, 03036-010, Brasil`);
+});
+
+test('canonical navigation address uses street, number, city, state, CEP, and Brazil', () => {
+  assert.equal(
+    buildCanonicalNavigationAddress({
+      address: `${ANTONIO}, APTO 2`,
+      city: SAO_PAULO,
+      state: 'SP',
+      zipCode: '02000-000',
+    }),
+    `${ANTONIO}, ${SAO_PAULO}, SP, 02000-000, Brasil`
+  );
+});
+
+test('spreadsheet city and state fields feed stop geocoding input without altering package address', () => {
+  const fullAddress = `${ANTONIO}, APTO 2`;
+  const rawPackages = parseSpreadsheetData(
+    [
+      ['BR1', fullAddress, '02000-000', SAO_PAULO, 'SP', '1'],
+    ],
+    ['SPX TN', 'Endere\u00e7o', 'CEP', 'Cidade', 'UF', 'Stop']
+  );
+  const [stop] = groupPackagesByStop(rawPackages);
+  const input = buildStopGeocodingInput(stop);
+
+  assert.equal(stop.packages[0].destinationAddress, fullAddress);
+  assert.equal(input.city, SAO_PAULO);
+  assert.equal(input.state, 'SP');
+  assert.equal(
+    buildCanonicalNavigationAddress(input),
+    `${ANTONIO}, ${SAO_PAULO}, SP, 02000-000, Brasil`
+  );
 });
 
 test('excludes delivery complements while preserving useful locality text', () => {
   const query = buildGeocodingQuery({
-    address: 'Rua Juruá, 137, Apto 31, Canindé, São Paulo, SP, tocar campainha',
+    address: `${JURUA}, Apto 31, ${CANINDE}, ${SAO_PAULO}, SP, tocar campainha`,
   });
 
-  assert.equal(query, 'Rua Juruá, 137, Canindé, São Paulo, SP, Brasil');
+  assert.equal(query, `${JURUA}, ${CANINDE}, ${SAO_PAULO}, SP, Brasil`);
   assert.equal(query.includes('Apto'), false);
   assert.equal(query.includes('campainha'), false);
 });
 
 test('cache saves and returns one coordinate per normalized address key', async () => {
   const storage = new MemoryStorage();
-  const input = { address: 'R. Juruá, 137', zipCode: '03036-010' };
+  const input = { address: 'R. Juru\u00e1, 137', zipCode: '03036-010' };
 
   await saveCachedGeocode(input, { latitude: -23.52, longitude: -46.61 }, 'test', storage);
   await saveCachedGeocode(
-    { address: 'Rua Juruá, 137', zipCode: '03036-010' },
+    { address: JURUA, zipCode: '03036-010' },
     { latitude: -23.521, longitude: -46.611 },
     'test',
     storage
@@ -100,7 +141,7 @@ test('an unconfigured provider makes no network request', async () => {
     },
   };
 
-  const result = await resolveGeocoding({ address: 'Rua Juruá, 137' }, provider, storage);
+  const result = await resolveGeocoding({ address: JURUA }, provider, storage);
   assert.equal(result.status, 'not_configured');
   assert.equal(calls, 0);
 });
@@ -122,12 +163,12 @@ test('unresolved stops remain selectable list data without becoming markers', ()
   const unresolved = [missingMapStop('stop-missing')];
 
   assert.equal(unresolved.length, 1);
-  assert.equal(unresolved[0].address, 'Rua Juruá, 137');
+  assert.equal(unresolved[0].address, JURUA);
   assert.equal(getLocatedMapStops(unresolved).length, 0);
 });
 
 test('quick navigation uses the existing complement-free Google Maps query', () => {
-  const url = buildGoogleMapsSearchUrl('Rua Juruá, 137, Apto 31, Canindé');
+  const url = buildGoogleMapsSearchUrl(`${JURUA}, Apto 31, ${CANINDE}`);
 
-  assert.equal(decodeURIComponent(url.split('query=')[1]), 'Rua Juruá, 137');
+  assert.equal(decodeURIComponent(url.split('query=')[1]), JURUA);
 });

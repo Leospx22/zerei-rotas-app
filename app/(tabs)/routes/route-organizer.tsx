@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -11,11 +11,18 @@ import {
   Trash2,
   CheckCircle2,
   Package,
+  AlertTriangle,
 } from 'lucide-react-native';
 import { Colors, Spacing, FontSizes, BorderRadius } from '@/constants/theme';
-import { BrandIcon } from '@/components/BrandIcon';
+import { HeaderBrandIcon } from '@/components/HeaderBrandIcon';
 import { useRoute } from '@/contexts/RouteContext';
-import { formatRouteOrderBadge, formatStopBadge } from '@/lib/routeStopPresentation';
+import {
+  buildDuplicateAddressWarnings,
+  buildDisplayedRoutePositionMap,
+  formatRouteOrderBadge,
+  formatStopBadge,
+  SHOPEE_PRIORITY_LABEL,
+} from '@/lib/routeStopPresentation';
 
 export default function RouteOrganizerScreen() {
   const router = useRouter();
@@ -34,6 +41,14 @@ export default function RouteOrganizerScreen() {
 
   const duplicateCount =
     currentRoute.stops.length - new Set(currentRoute.stops.map(s => s.normalizedAddress.toLowerCase().trim())).size;
+  const duplicateWarnings = useMemo(
+    () => buildDuplicateAddressWarnings(currentRoute.stops),
+    [currentRoute.stops]
+  );
+  const displayedPositions = useMemo(
+    () => buildDisplayedRoutePositionMap(currentRoute.stops),
+    [currentRoute.stops]
+  );
 
   const startRoute = () => {
     setCurrentRoute({
@@ -51,7 +66,7 @@ export default function RouteOrganizerScreen() {
           <ArrowLeft size={24} color={Colors.white} />
         </TouchableOpacity>
         <View style={styles.headerTitleRow}>
-          <BrandIcon size={24} />
+          <HeaderBrandIcon size={20} />
           <Text style={styles.headerTitle}>Organizar Rota</Text>
         </View>
         <View style={{ width: 40 }} />
@@ -127,10 +142,15 @@ export default function RouteOrganizerScreen() {
         Paradas Agrupadas ({currentRoute.stops.length})
       </Text>
 
-      {currentRoute.stops.map((stop, index) => (
+      {currentRoute.stops.map((stop, index) => {
+        const stopBadge = formatStopBadge(stop);
+        const routeBadge = displayedPositions[stop.id]?.badge ?? formatRouteOrderBadge(stop, index + 1);
+        const duplicateWarning = duplicateWarnings[stop.id];
+
+        return (
         <View key={stop.id} style={styles.stopCard}>
           <View style={styles.stopNumberCircle}>
-            <Text style={styles.stopNumberText}>{formatRouteOrderBadge(stop, index + 1)}</Text>
+            <Text style={styles.stopNumberText}>{routeBadge}</Text>
           </View>
           <View style={styles.stopContent}>
             <Text style={styles.stopAddress}>{stop.normalizedAddress}</Text>
@@ -138,6 +158,15 @@ export default function RouteOrganizerScreen() {
               <Text style={styles.stopMeta}>
                 {stop.packageCount} pacote{stop.packageCount !== 1 ? 's' : ''} · Parada {formatStopBadge(stop)}
               </Text>
+              {stopBadge === '#P' ? (
+                <Text style={styles.stopHint}>{SHOPEE_PRIORITY_LABEL}</Text>
+              ) : null}
+              {duplicateWarning ? (
+                <View style={styles.warningRow}>
+                  <AlertTriangle size={12} color={Colors.warning} />
+                  <Text style={styles.warningText}>{duplicateWarning}</Text>
+                </View>
+              ) : null}
             </View>
           </View>
           <View style={styles.stopStatus}>
@@ -148,7 +177,8 @@ export default function RouteOrganizerScreen() {
             )}
           </View>
         </View>
-      ))}
+        );
+      })}
 
       {currentRoute.stops.length > 0 && (
         <TouchableOpacity style={styles.startButton} onPress={startRoute}>
@@ -278,10 +308,25 @@ const styles = StyleSheet.create({
     color: Colors.white,
     fontWeight: '500',
   },
-  stopMetaRow: { flexDirection: 'row', marginTop: 4 },
+  stopMetaRow: { marginTop: 4, gap: 4 },
   stopMeta: {
     fontSize: FontSizes.sm,
     color: Colors.gray,
+  },
+  stopHint: {
+    fontSize: FontSizes.xs,
+    color: Colors.gray,
+  },
+  warningRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 4,
+  },
+  warningText: {
+    flex: 1,
+    fontSize: FontSizes.xs,
+    color: Colors.warning,
+    fontWeight: '700',
   },
   stopStatus: { width: 24, alignItems: 'center' },
   pendingDot: {

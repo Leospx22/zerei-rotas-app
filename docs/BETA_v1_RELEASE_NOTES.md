@@ -20,7 +20,7 @@ Validate whether Zerei Rotas can reliably support a real driver importing, revie
 - XLSX, XLS, CSV, pasted CSV/TSV, and native document picker support.
 - Immediate planning-route persistence after import.
 - Route summary, route review, manual stop ordering, and map overview.
-- Package grouping by stop, address group, `#P` missing-stop grouping, and duplicate-address warnings.
+- Package grouping by stop, address group, concise `#P` Prioridade Shopee grouping, independent regular-stop display numbering, and duplicate-address warnings.
 - Address-level package selection, delivery completion, navigation, and PlaceInfo.
 - Package-level and address-level occurrence registration.
 - Occurrence reason editing, resolution as Entregue or Devolvido ao Hub, and deletion.
@@ -57,7 +57,9 @@ Manual beta validation must still cover:
 - Payments and paywall are not active.
 - Route progress is local to the device and is not cloud-synced.
 - Reinstalling the app or clearing storage can remove local route progress.
-- Live geocoding is not configured.
+- Live geocoding is not configured; unresolved stops remain actionable through Copiar endereço, Navegar, and Tentar localizar novamente when cache/provider data exists.
+- Android map visualization can fall back to the ordered route list if native map rendering is unsafe; route actions remain available.
+- Native Android map rendering is enabled only for controlled preview builds with `EXPO_PUBLIC_ENABLE_NATIVE_ROUTE_MAP=true`; missing/false values keep the ordered-list fallback.
 - iOS is not validated for this beta.
 - Supabase profile/funnel actions need connectivity, although local route work should continue offline.
 - Automated UI/E2E coverage is still limited.

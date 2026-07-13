@@ -1,10 +1,16 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
+  buildSafeInitialRegion,
+  buildSafeMapPayload,
   buildMapStops,
   getLocatedMapStops,
   getMapCoordinateSummary,
   getMapCoordinateState,
+  isFiniteCoordinate,
+  isNativeRouteMapFeatureEnabled,
+  isValidCoordinatePair,
+  shouldAttemptNativeRouteMap,
 } from '../lib/mapOverview.ts';
 import { groupPackagesByStop, parseSpreadsheetData } from '../lib/packageUtils.ts';
 import {
@@ -58,6 +64,22 @@ test('map stops preserve the customized route order and use one-based labels', (
 
   assert.deepEqual(mapStops.map(stop => stop.id), reordered.map(stop => stop.id));
   assert.deepEqual(mapStops.map(stop => stop.order), [1, 2, 3]);
+});
+
+test('map badges exclude Prioridade Shopee from regular numbering', () => {
+  const stops = groupPackagesByStop(parseSpreadsheetData(
+    [
+      ['PKG-P', 'Rua Prioridade, 9', '', '', ''],
+      ['PKG-1', 'Rua Regular, 10', '1', '-23.51', '-46.61'],
+      ['PKG-2', 'Rua Regular, 20', '2', '-23.52', '-46.62'],
+    ],
+    ['SPX TN', 'Endereço', 'Stop', 'Latitude', 'Longitude']
+  ));
+
+  const mapStops = buildMapStops(route(stops));
+
+  assert.deepEqual(mapStops.map(stop => stop.badge), ['#P', '#1', '#2']);
+  assert.deepEqual(mapStops.map(stop => stop.missingSpreadsheetStop), [true, false, false]);
 });
 
 test('all coordinate-bearing stops reach the native marker renderer', () => {
@@ -124,6 +146,78 @@ test('coordinate availability distinguishes complete, partial, and unavailable r
   assert.equal(getMapCoordinateState(complete), 'available');
   assert.equal(getMapCoordinateState(partial), 'partial');
   assert.equal(getMapCoordinateState(unavailable), 'unavailable');
+});
+
+test('safe native map payload rejects NaN, Infinity, and malformed coordinates', () => {
+  assert.equal(isFiniteCoordinate(Number.NaN), false);
+  assert.equal(isFiniteCoordinate(Number.POSITIVE_INFINITY), false);
+  assert.equal(isValidCoordinatePair(Number.NaN, -46.6), false);
+  assert.equal(isValidCoordinatePair(-23.5, Number.POSITIVE_INFINITY), false);
+  assert.equal(buildSafeInitialRegion({ latitude: Number.NaN, longitude: -46.6 }), null);
+
+  const malformedStops = [
+    { ...buildMapStops(route(groupPackagesByStop([rawPackage('A', 1, -23.5, -46.6)])))[0], latitude: Number.NaN },
+    { ...buildMapStops(route(groupPackagesByStop([rawPackage('B', 2, -23.6, -46.7)])))[0], longitude: Number.POSITIVE_INFINITY },
+  ];
+  const payload = buildSafeMapPayload(malformedStops, 'stop-1');
+
+  assert.equal(payload.canRenderNativeMap, false);
+  assert.equal(payload.markers.length, 0);
+  assert.equal(payload.initialRegion, null);
+});
+
+test('native Android map feature flag keeps missing or false values on the safe fallback', () => {
+  assert.equal(isNativeRouteMapFeatureEnabled(undefined), false);
+  assert.equal(isNativeRouteMapFeatureEnabled('false'), false);
+  assert.equal(isNativeRouteMapFeatureEnabled('true'), true);
+  assert.equal(shouldAttemptNativeRouteMap(true, 'android', undefined), false);
+  assert.equal(shouldAttemptNativeRouteMap(true, 'android', 'false'), false);
+  assert.equal(shouldAttemptNativeRouteMap(true, 'android', 'true'), true);
+  assert.equal(shouldAttemptNativeRouteMap(true, 'web', undefined), true);
+  assert.equal(shouldAttemptNativeRouteMap(false, 'android', 'true'), false);
+});
+
+test('safe native map payload handles zero, one, and multiple coordinates without unsafe polylines', () => {
+  const zero = buildSafeMapPayload(buildMapStops(route(groupPackagesByStop([
+    rawPackage('A', 1, null, null),
+  ]))), null);
+  assert.equal(zero.canRenderNativeMap, false);
+  assert.deepEqual(zero.polylineCoordinates, []);
+
+  const one = buildSafeMapPayload(buildMapStops(route(groupPackagesByStop([
+    rawPackage('A', 1, -23.5, -46.6),
+  ]))), 'missing-selected');
+  assert.equal(one.canRenderNativeMap, true);
+  assert.equal(one.markers.length, 1);
+  assert.equal(one.selectedStopId, one.markers[0].stop.id);
+  assert.deepEqual(one.polylineCoordinates, []);
+  assert.deepEqual(one.initialRegion, {
+    latitude: -23.5,
+    longitude: -46.6,
+    latitudeDelta: 0.08,
+    longitudeDelta: 0.08,
+  });
+
+  const many = buildSafeMapPayload(buildMapStops(route(groupPackagesByStop([
+    rawPackage('A', 1, -23.5, -46.6),
+    rawPackage('B', 2, -23.6, -46.7),
+  ]))), null);
+  assert.equal(many.canRenderNativeMap, true);
+  assert.equal(many.polylineCoordinates.length, 2);
+  assert.deepEqual(many.markers.map(marker => marker.key), ['stop-1', 'stop-2']);
+});
+
+test('safe native map payload removes duplicate marker keys before native rendering', () => {
+  const [first, second] = buildMapStops(route(groupPackagesByStop([
+    rawPackage('A', 1, -23.5, -46.6),
+    rawPackage('B', 2, -23.6, -46.7),
+  ])));
+  const duplicate = { ...second, id: first.id };
+  const payload = buildSafeMapPayload([first, duplicate], first.id);
+
+  assert.equal(payload.markers.length, 1);
+  assert.deepEqual(payload.markers.map(marker => marker.key), [first.id]);
+  assert.equal(payload.polylineCoordinates.length, 0);
 });
 
 test('normal valid coordinates remain unchanged', () => {

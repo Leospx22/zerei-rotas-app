@@ -48,3 +48,5 @@ Priority meanings:
 | ZR-F002 | Live geocoding provider and coordinate confidence review. | Deferred | Unassigned | Requires provider choice, API key strategy, cost review, and privacy review. |
 | ZR-F003 | Payment, subscription enforcement, and server-managed trial expiration. | Deferred | Unassigned | Do not implement before payment architecture approval. |
 | ZR-F004 | Automated E2E tests for import, execution, occurrence, recovery, and completion flows. | Deferred | Unassigned | Consider after beta workflows stabilize. |
+| ZR-F005 | Definir localização no mapa for unresolved stops. | Deferred | Unassigned | Future workflow: search address, move/confirm a map pin, save validated coordinates locally, and reuse them for matching normalized street + number addresses. |
+| ZR-F006 | Native overview map remains feature-flagged during closed beta. | Monitoring | Unassigned | Preview APKs enable `EXPO_PUBLIC_ENABLE_NATIVE_ROUTE_MAP=true`; if Android crashes recur, capture `adb logcat` and rely on the ordered-list fallback. |

@@ -22,7 +22,7 @@ import {
   Star,
 } from 'lucide-react-native';
 import { Colors, Spacing, FontSizes, BorderRadius } from '@/constants/theme';
-import { BrandIcon } from '@/components/BrandIcon';
+import { HeaderBrandIcon } from '@/components/HeaderBrandIcon';
 import { useRoute } from '@/contexts/RouteContext';
 import { useDashboard } from '@/hooks/useDashboard';
 
@@ -243,7 +243,7 @@ export default function DashboardScreen() {
       <View style={styles.header}>
         <View style={styles.brandRow}>
           <View style={styles.logoCircle}>
-            <BrandIcon size={44} />
+            <HeaderBrandIcon size={24} containerSize={44} filled />
           </View>
           <View>
             <Text style={styles.brandName}>Zerei Rotas</Text>

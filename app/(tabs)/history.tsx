@@ -9,7 +9,7 @@ import {
   Package,
 } from 'lucide-react-native';
 import { Colors, Spacing, FontSizes, BorderRadius } from '@/constants/theme';
-import { BrandIcon } from '@/components/BrandIcon';
+import { HeaderBrandIcon } from '@/components/HeaderBrandIcon';
 import { useRoute } from '@/contexts/RouteContext';
 
 export default function HistoryScreen() {
@@ -28,7 +28,7 @@ export default function HistoryScreen() {
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <View style={styles.headerRow}>
-        <BrandIcon size={28} />
+        <HeaderBrandIcon size={22} />
         <Text style={styles.pageTitle}>Histórico</Text>
       </View>
 

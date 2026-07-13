@@ -1,9 +1,9 @@
-import React from 'react';
+﻿import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { Copy, MapPin } from 'lucide-react-native';
+import { Copy, LocateFixed, MapPin } from 'lucide-react-native';
 import { BorderRadius, Colors, FontSizes, Spacing } from '@/constants/theme';
 import { mapStopStatusLabel, type MapStop } from '@/lib/mapOverview';
-import { UNRESOLVED_COORDINATE_LABEL } from '@/lib/routeStopPresentation';
+import { SHOPEE_PRIORITY_LABEL, UNRESOLVED_COORDINATE_LABEL } from '@/lib/routeStopPresentation';
 
 interface RouteSequenceListProps {
   stops: MapStop[];
@@ -11,6 +11,8 @@ interface RouteSequenceListProps {
   onSelectStop: (stopId: string) => void;
   onNavigateStop?: (stop: MapStop) => void;
   onCopyStop?: (stop: MapStop) => void;
+  onRetryLocateStop?: (stop: MapStop) => void;
+  retryingStopId?: string | null;
 }
 
 export default function RouteSequenceList({
@@ -19,6 +21,8 @@ export default function RouteSequenceList({
   onSelectStop,
   onNavigateStop,
   onCopyStop,
+  onRetryLocateStop,
+  retryingStopId,
 }: RouteSequenceListProps) {
   return (
     <View style={styles.container}>
@@ -43,14 +47,15 @@ export default function RouteSequenceList({
                 stop.status === 'completed' && styles.numberCompleted,
               ]}>
                 <Text style={styles.numberText}>
-                  {stop.status === 'completed' ? '✓' : stop.badge}
+                  {stop.status === 'completed' ? 'âœ“' : stop.badge}
                 </Text>
               </View>
               <View style={styles.stopCopy}>
                 <Text style={styles.address}>{stop.address}</Text>
                 <Text style={styles.meta}>
-                  {stop.packageCount} {stop.packageCount === 1 ? 'pacote' : 'pacotes'} · {mapStopStatusLabel(stop.status)}
-                  {unresolved ? ` · ${UNRESOLVED_COORDINATE_LABEL}` : ''}
+                  {stop.packageCount} {stop.packageCount === 1 ? 'pacote' : 'pacotes'} Â· {mapStopStatusLabel(stop.status)}
+                  {stop.missingSpreadsheetStop ? ` · ${SHOPEE_PRIORITY_LABEL}` : ''}
+                  {unresolved ? ` Â· ${UNRESOLVED_COORDINATE_LABEL}` : ''}
                 </Text>
               </View>
             </TouchableOpacity>
@@ -60,9 +65,21 @@ export default function RouteSequenceList({
                 onPress={() => onCopyStop(stop)}
                 activeOpacity={0.72}
                 accessibilityRole="button"
-                accessibilityLabel={`Copiar endereço desta parada: ${stop.address}`}
+                accessibilityLabel={`Copiar endereÃ§o desta parada: ${stop.address}`}
               >
                 <Copy size={18} color={Colors.warning} />
+              </TouchableOpacity>
+            ) : null}
+            {unresolved && onRetryLocateStop ? (
+              <TouchableOpacity
+                style={styles.iconAction}
+                onPress={() => onRetryLocateStop(stop)}
+                disabled={retryingStopId === stop.id}
+                activeOpacity={0.72}
+                accessibilityRole="button"
+                accessibilityLabel={`Tentar localizar novamente: ${stop.address}`}
+              >
+                <LocateFixed size={18} color={Colors.warning} />
               </TouchableOpacity>
             ) : null}
             {onNavigateStop ? (
@@ -71,7 +88,7 @@ export default function RouteSequenceList({
                 onPress={() => onNavigateStop(stop)}
                 activeOpacity={0.72}
                 accessibilityRole="button"
-                accessibilityLabel={`Navegar até esta parada: ${stop.address}`}
+                accessibilityLabel={`Navegar atÃ© esta parada: ${stop.address}`}
               >
                 <MapPin size={20} color={Colors.gold[400]} />
               </TouchableOpacity>

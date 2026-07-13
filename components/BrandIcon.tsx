@@ -7,7 +7,12 @@ interface BrandIconProps {
 
 export function BrandIcon({ size = 36 }: BrandIconProps) {
   return (
-    <View style={[styles.container, { width: size, height: size, borderRadius: size / 2 }]}>
+    <View
+      pointerEvents="none"
+      accessibilityElementsHidden
+      importantForAccessibility="no-hide-descendants"
+      style={[styles.container, { width: size, height: size, borderRadius: size / 2 }]}
+    >
       <Image
         source={require('../assets/images/adaptive-icon.png')}
         style={{ width: size, height: size }}

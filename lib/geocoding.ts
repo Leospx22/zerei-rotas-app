@@ -79,9 +79,9 @@ export function buildGeocodingQuery(input: GeocodingAddressInput): string {
   const candidates = [
     normalized.displayAddress,
     ...localityParts,
-    input.zipCode?.trim(),
     input.city?.trim(),
     input.state?.trim(),
+    input.zipCode?.trim(),
     input.country?.trim() || 'Brasil',
   ].filter((part): part is string => Boolean(part));
   const seen = new Set<string>();
@@ -97,11 +97,17 @@ export function buildGeocodingQuery(input: GeocodingAddressInput): string {
   }).join(', ');
 }
 
+export function buildCanonicalNavigationAddress(input: GeocodingAddressInput): string {
+  return buildGeocodingQuery(input);
+}
+
 export function buildStopGeocodingInput(stop: GroupedStop): GeocodingAddressInput {
   const firstPackage = stop.packages[0];
   return {
     address: firstPackage?.destinationAddress || stop.originalAddress || stop.normalizedAddress,
     zipCode: firstPackage?.zipCode || stop.zipCode,
+    city: firstPackage?.city,
+    state: firstPackage?.state,
     country: 'Brasil',
   };
 }

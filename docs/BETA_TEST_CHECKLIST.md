@@ -58,6 +58,7 @@ Use one copy of this checklist for each closed-beta tester. Do not store passwor
 ## Map And Navigation
 
 - [ ] Confirm the APK was built with `EXPO_PUBLIC_ENABLE_NATIVE_ROUTE_MAP=true` for native map testing.
+- [ ] Confirm the APK was built after configuring `GOOGLE_MAPS_API_KEY` in the EAS preview environment.
 - [ ] Tap Mostrar no mapa.
 - [ ] Confirm the app does not close or show an Android crash dialog.
 - [ ] If the native map loads, confirm markers appear in the saved route order.

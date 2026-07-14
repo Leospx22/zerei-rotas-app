@@ -88,6 +88,7 @@ All notable product and architecture changes are recorded here. Versions follow 
 - Android map overview now isolates native map rendering behind a safe fallback while keeping the ordered route list and actions usable.
 - Android preview builds can now explicitly enable the native overview map with `EXPO_PUBLIC_ENABLE_NATIVE_ROUTE_MAP=true`, while missing/false values keep the safe ordered-list fallback.
 - Native map rendering now stages MapView mount, marker rendering, polyline rendering, and camera fitting to reduce Android crash risk during closed-beta testing.
+- Standalone Android builds now receive the Google Maps SDK key through dynamic Expo config and the `react-native-maps` config plugin, using `GOOGLE_MAPS_API_KEY` from the EAS environment instead of hardcoding secrets.
 
 - Current-route persistence now writes a versioned envelope under the existing `zerei_current_route` key instead of relying on a debounced raw-route save.
 - Route completion now saves history before clearing the active route, preserving idempotent completed-history behavior.

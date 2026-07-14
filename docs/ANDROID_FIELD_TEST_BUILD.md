@@ -66,6 +66,23 @@ eas env:create --environment preview --name EXPO_PUBLIC_ENABLE_NATIVE_ROUTE_MAP 
 
 This is not a secret. Do not use this mechanism for private keys.
 
+## Google Maps API Key
+
+Standalone Android builds also require the native Google Maps SDK key:
+
+```text
+GOOGLE_MAPS_API_KEY
+```
+
+This value must be supplied through EAS environments and must never be committed to `app.json`, `app.config.js`, `eas.json`, source code, tests, or documentation.
+
+For the closed-beta preview build, the Google Cloud key restriction must match:
+
+- Android package: `com.zereirotas.app`
+- The EAS preview signing certificate SHA-1 used for the APK.
+
+After changing native Maps configuration or key restrictions, create a new APK. An already-installed APK will not pick up native manifest/configuration changes.
+
 ## Prerequisites
 
 1. Install or access the EAS CLI.
@@ -184,6 +201,8 @@ Follow the EAS prompt for Android credentials. For internal APK testing, EAS can
 ### Environment variables are missing
 
 Local route features still work, but Supabase account/profile behavior may show configuration warnings. Confirm `.env.local` for local testing and Expo/EAS environment configuration for cloud builds.
+
+For native Android map testing, confirm the EAS preview environment has `GOOGLE_MAPS_API_KEY` configured as a secret/sensitive variable and `EXPO_PUBLIC_ENABLE_NATIVE_ROUTE_MAP=true` enabled for the preview profile.
 
 ### APK installs but opens old behavior
 

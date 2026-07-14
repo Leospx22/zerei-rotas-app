@@ -63,15 +63,21 @@ test('dynamic Expo config updates an existing Android Google Maps key without ch
   assert.equal(config.android.config.googleMaps.apiKey, 'AIza-test-masked');
 });
 
-test('missing Google Maps key throws clearly when a native map build requires it', () => {
+test('missing Google Maps key does not break local preview config resolution', () => {
+  const config = appConfig.withAndroidGoogleMapsApiKey(appConfig.cloneExpoConfig(), {
+    EAS_BUILD_PROFILE: 'preview',
+    EXPO_PUBLIC_ENABLE_NATIVE_ROUTE_MAP: 'true',
+  });
+
+  assert.equal(config.android.package, 'com.zereirotas.app');
+  assert.equal(config.android.config?.googleMaps, undefined);
+  assert.ok(config.plugins.includes('expo-router'));
+});
+
+test('missing Google Maps key throws clearly only in remote Android build context', () => {
   assert.throws(
     () => appConfig.withAndroidGoogleMapsApiKey(appConfig.cloneExpoConfig(), {
-      EXPO_PUBLIC_ENABLE_NATIVE_ROUTE_MAP: 'true',
-    }),
-    new RegExp(appConfig.MISSING_MAPS_KEY_ERROR)
-  );
-  assert.throws(
-    () => appConfig.withAndroidGoogleMapsApiKey(appConfig.cloneExpoConfig(), {
+      EAS_BUILD: 'true',
       EAS_BUILD_PLATFORM: 'android',
     }),
     new RegExp(appConfig.MISSING_MAPS_KEY_ERROR)

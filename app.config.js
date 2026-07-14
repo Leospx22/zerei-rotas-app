@@ -9,9 +9,7 @@ function cloneExpoConfig() {
 function nativeMapsKeyIsRequired(env = process.env) {
   return (
     env.ZR_REQUIRE_GOOGLE_MAPS_API_KEY === 'true' ||
-    env.EAS_BUILD_PLATFORM === 'android' ||
-    env.EAS_BUILD_PROFILE === 'preview' ||
-    env.EXPO_PUBLIC_ENABLE_NATIVE_ROUTE_MAP === 'true'
+    (env.EAS_BUILD === 'true' && env.EAS_BUILD_PLATFORM === 'android')
   );
 }
 

@@ -151,6 +151,13 @@ test('operational route screens avoid eager repeated work on large routes', () =
   assert.match(routeExecution, /updatePackagesStatus/);
   assert.doesNotMatch(routeExecution, /getDuplicateAddressWarning/);
   assert.doesNotMatch(routeExecution, /pendingPackageIds\.forEach/);
+  assert.match(routeExecution, /optimisticCompletedAddressGroupKeys/);
+  assert.match(routeExecution, /InteractionManager\.runAfterInteractions/);
+  assert.match(routeExecution, /React\.startTransition/);
+
+  const executionCard = read('components/ExecutionCard.tsx');
+  assert.match(executionCard, /completedAddressGroupKeys/);
+  assert.match(executionCard, /completedAddressGroupKeys\.has\(group\.key\)/);
 
   const context = read('contexts/RouteContext.tsx');
   assert.match(context, /persistQueueRef/);

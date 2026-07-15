@@ -60,9 +60,9 @@ import {
   getPackageSecondaryLabel,
 } from '@/lib/packageUtils';
 import {
+  buildDuplicateAddressWarnings,
   buildDisplayedRoutePositionMap,
   formatRouteOrderBadge,
-  getDuplicateAddressWarning,
 } from '@/lib/routeStopPresentation';
 import {
   deletePlaceInfo,
@@ -117,6 +117,7 @@ export default function RouteExecutionScreen() {
     currentRoute,
     updateStopStatus,
     updatePackageStatus,
+    updatePackagesStatus,
     updatePackageOccurrence,
     occurrences,
   } = useRoute();
@@ -131,6 +132,10 @@ export default function RouteExecutionScreen() {
   );
   const displayedPositions = React.useMemo(
     () => currentRoute ? buildDisplayedRoutePositionMap(currentRoute.stops) : {},
+    [currentRoute]
+  );
+  const duplicateWarnings = React.useMemo(
+    () => currentRoute ? buildDuplicateAddressWarnings(currentRoute.stops) : {},
     [currentRoute]
   );
   const currentOccurrenceCount = React.useMemo(
@@ -360,9 +365,7 @@ export default function RouteExecutionScreen() {
       pkg => pkg.status === 'pending' && !groupPackageIds.has(pkg.id)
     );
 
-    pendingPackageIds.forEach(packageId => {
-      updatePackageStatus(currentStop.id, packageId, 'delivered');
-    });
+    updatePackagesStatus(currentStop.id, pendingPackageIds, 'delivered');
 
     if (!hasPendingOutsideGroup) {
       setExecutionStep('separacao');
@@ -372,7 +375,7 @@ export default function RouteExecutionScreen() {
         hasNextStop: nextStop !== null,
       });
     }
-  }, [currentStop, executionStep, nextStop, updatePackageStatus]);
+  }, [currentStop, executionStep, nextStop, updatePackagesStatus]);
 
   const handleSavePlaceInfo = useCallback(async (draft: PlaceInfoDraft) => {
     if (!editingPlaceGroup) return;
@@ -581,7 +584,7 @@ export default function RouteExecutionScreen() {
           const activeOccurrenceFilter =
             stop.id === currentStop?.id ? occurrencePackageFilter : null;
           const stopBadge = displayedPositions[stop.id]?.badge ?? formatRouteOrderBadge(stop, stopIndex + 1);
-          const duplicateWarning = getDuplicateAddressWarning(currentRoute.stops, stop);
+          const duplicateWarning = duplicateWarnings[stop.id] ?? null;
 
           return (
             <View

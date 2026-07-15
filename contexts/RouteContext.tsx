@@ -51,6 +51,7 @@ interface RouteContextType {
   renameCurrentRoute: (name: string) => Promise<boolean>;
   updateStopStatus: (stopId: string, status: GroupedStop['status']) => void;
   updatePackageStatus: (stopId: string, packageId: string, status: PackageItem['status']) => void;
+  updatePackagesStatus: (stopId: string, packageIds: readonly string[], status: PackageItem['status']) => void;
   // Persists occurrence reason and the existing skipped status convention.
   updatePackageOccurrence: (stopId: string, packageId: string, reason: string) => void;
   resolvePackageOccurrence: (packageId: string, resolution: OccurrenceResolution) => void;
@@ -98,6 +99,7 @@ export function RouteProvider({ children }: { children: ReactNode }) {
   } = usePersistence();
   const currentRouteRef = useRef<RouteData | null>(null);
   const restoreNoticeShownRef = useRef(false);
+  const persistQueueRef = useRef<Promise<void>>(Promise.resolve());
 
   useEffect(() => {
     currentRouteRef.current = currentRoute;
@@ -128,14 +130,23 @@ export function RouteProvider({ children }: { children: ReactNode }) {
     return () => { mounted = false; };
   }, [loadCurrentRoute, reloadHistory]);
 
+  const enqueuePersistence = useCallback((task: () => Promise<unknown>) => {
+    setTimeout(() => {
+      persistQueueRef.current = persistQueueRef.current
+        .then(() => task())
+        .then(() => undefined)
+        .catch(() => undefined);
+    }, 0);
+  }, []);
+
   const persistActiveRouteSnapshot = useCallback((route: RouteData | null) => {
     if (!route) {
-      clearCurrentRoute().catch(() => {});
+      enqueuePersistence(clearCurrentRoute);
       return;
     }
     if (route.status === 'completed') return;
-    saveRoute(route).catch(() => {});
-  }, [clearCurrentRoute, saveRoute]);
+    enqueuePersistence(() => saveRoute(route));
+  }, [clearCurrentRoute, enqueuePersistence, saveRoute]);
 
   const commitRouteUpdate = useCallback((
     updater: (route: RouteData) => RouteData | null
@@ -229,6 +240,32 @@ export function RouteProvider({ children }: { children: ReactNode }) {
       const stops = prev.stops.map(s => {
         if (s.id !== stopId) return s;
         const packages = s.packages.map(p => p.id === packageId ? { ...p, status } : p);
+        const allDelivered = packages.every(p => p.status === 'delivered' || p.status === 'skipped');
+        const stopStatus = allDelivered ? 'completed' as const : 'pending' as const;
+        return { ...s, packages, status: stopStatus, packageCount: packages.length };
+      });
+      const completedStops = stops.filter(s => s.status === 'completed').length;
+      const deliveredPackages = stops.reduce(
+        (sum, s) => sum + s.packages.filter(p => p.status === 'delivered').length, 0
+      );
+      const updated = { ...prev, stops, completedStops, deliveredPackages };
+      return checkCompletion(updated);
+    });
+  }, [commitRouteUpdate]);
+
+  const updatePackagesStatus = useCallback((
+    stopId: string,
+    packageIds: readonly string[],
+    status: PackageItem['status']
+  ) => {
+    if (packageIds.length === 0) return;
+    const targetPackageIds = new Set(packageIds);
+    commitRouteUpdate(prev => {
+      const stops = prev.stops.map(s => {
+        if (s.id !== stopId) return s;
+        const packages = s.packages.map(p =>
+          targetPackageIds.has(p.id) ? { ...p, status } : p
+        );
         const allDelivered = packages.every(p => p.status === 'delivered' || p.status === 'skipped');
         const stopStatus = allDelivered ? 'completed' as const : 'pending' as const;
         return { ...s, packages, status: stopStatus, packageCount: packages.length };
@@ -395,6 +432,7 @@ export function RouteProvider({ children }: { children: ReactNode }) {
       renameCurrentRoute,
       updateStopStatus,
       updatePackageStatus,
+      updatePackagesStatus,
       updatePackageOccurrence,
       resolvePackageOccurrence,
       editPackageOccurrence,

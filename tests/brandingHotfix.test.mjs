@@ -122,12 +122,39 @@ test('map overview isolates native map rendering behind a fallback', () => {
 
 test('native map component stages risky Android rendering work', () => {
   const source = read('components/RouteMap.native.tsx');
-  assert.match(source, /setRenderMarkers\(true\)/);
-  assert.match(source, /setRenderPolyline\(true\)/);
+  assert.doesNotMatch(source, /renderMarkers/);
+  assert.doesNotMatch(source, /setRenderMarkers/);
+  assert.match(source, /tracksMarkerChanges/);
+  assert.match(source, /setTracksMarkerChanges\(true\)/);
+  assert.match(source, /setTracksMarkerChanges\(false\)/);
   assert.match(source, /fitAttemptedRef/);
   assert.match(source, /safePayload\.polylineCoordinates\.length >= 2/);
-  assert.match(source, /pinColor=/);
-  assert.doesNotMatch(source, /<Marker[\s\S]*?<View style=/);
+  assert.match(source, /markerLabel/);
+  assert.match(source, /collapsable=\{false\}/);
+  assert.match(source, /pointerEvents="none"/);
+  assert.match(source, /styles\.markerText/);
+  assert.match(source, /title=\{stop\.badge\}/);
+  assert.match(source, /tracksViewChanges=\{tracksMarkerChanges\}/);
+  assert.match(source, /safePayload\.markers\.map/);
+});
+
+test('operational route screens avoid eager repeated work on large routes', () => {
+  const importSummary = read('app/(tabs)/routes/import-summary.tsx');
+  assert.match(importSummary, /FlatList/);
+  assert.match(importSummary, /initialNumToRender=\{8\}/);
+  assert.match(importSummary, /buildDuplicateAddressWarnings/);
+  assert.doesNotMatch(importSummary, /getDuplicateAddressWarning/);
+  assert.doesNotMatch(importSummary, /<ScrollView/);
+
+  const routeExecution = read('app/(tabs)/routes/route-execution.tsx');
+  assert.match(routeExecution, /buildDuplicateAddressWarnings/);
+  assert.match(routeExecution, /updatePackagesStatus/);
+  assert.doesNotMatch(routeExecution, /getDuplicateAddressWarning/);
+  assert.doesNotMatch(routeExecution, /pendingPackageIds\.forEach/);
+
+  const context = read('contexts/RouteContext.tsx');
+  assert.match(context, /persistQueueRef/);
+  assert.match(context, /updatePackagesStatus/);
 });
 
 test('map overview user-facing text is valid Portuguese, not mojibake', () => {
@@ -139,7 +166,7 @@ test('map overview user-facing text is valid Portuguese, not mojibake', () => {
 
   for (const file of files) {
     const source = read(file);
-    assert.doesNotMatch(source, /Ã|Â|â/, `${file} contains corrupted visible text`);
+    assert.doesNotMatch(source, new RegExp('[\\u00c3\\u00c2\\u00e2]'), `${file} contains corrupted visible text`);
   }
 
   const overview = read('app/(tabs)/routes/map-overview.tsx');

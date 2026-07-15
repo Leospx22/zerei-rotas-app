@@ -95,6 +95,32 @@ export default function DeliveryPreparationScreen() {
     () => routeStops.reduce((total, stop) => total + stop.addressCount, 0),
     [routeStops]
   );
+  const reviewRows = useMemo(
+    () => routeStops.map((stop, index) => {
+      const mapStop = reviewMapStops[index];
+      const mainAddress = getPrimaryExecutionAddress(stop);
+      const canonicalAddress = buildCanonicalNavigationAddress(buildStopGeocodingInput(stop));
+      const stopPosition = displayedPositions[stop.id];
+      const stopBadge = stopPosition?.badge ?? formatRouteOrderBadge(stop, index + 1);
+
+      return {
+        stop,
+        index,
+        mainAddress,
+        canonicalAddress,
+        mapStop,
+        isFirstStop: index === 0,
+        isLastStop: index === routeStops.length - 1,
+        isCompleted: mapStop?.status === 'completed',
+        isCurrent: mapStop?.status === 'current',
+        unresolved: mapStop ? mapStop.latitude === null || mapStop.longitude === null : false,
+        duplicateWarning: duplicateWarnings[stop.id] ?? null,
+        stopBadge,
+        statusLabel: mapStop ? mapStopStatusLabel(mapStop.status) : 'Planejada',
+      };
+    }),
+    [displayedPositions, duplicateWarnings, reviewMapStops, routeStops]
+  );
 
   if (!currentRoute) {
     return (
@@ -208,8 +234,8 @@ export default function DeliveryPreparationScreen() {
     <FlatList
       style={styles.container}
       contentContainerStyle={styles.content}
-      data={routeStops}
-      keyExtractor={stop => stop.id}
+      data={reviewRows}
+      keyExtractor={row => row.stop.id}
       initialNumToRender={8}
       maxToRenderPerBatch={6}
       updateCellsBatchingPeriod={40}
@@ -337,19 +363,23 @@ export default function DeliveryPreparationScreen() {
           <Text style={styles.sectionTitle}>Paradas ({totalStops})</Text>
         </>
       )}
-      renderItem={({ item: stop, index }) => {
+      renderItem={({ item: row }) => {
+        const {
+          stop,
+          index,
+          mainAddress,
+          canonicalAddress,
+          mapStop,
+          isFirstStop,
+          isLastStop,
+          isCompleted,
+          isCurrent,
+          unresolved,
+          duplicateWarning,
+          stopBadge,
+          statusLabel,
+        } = row;
         const isExpanded = expandedStop === stop.id;
-        const mainAddress = getPrimaryExecutionAddress(stop);
-        const isFirstStop = index === 0;
-        const isLastStop = index === routeStops.length - 1;
-        const mapStop = reviewMapStops[index];
-        const canonicalAddress = buildCanonicalNavigationAddress(buildStopGeocodingInput(stop));
-        const isCompleted = mapStop?.status === 'completed';
-        const isCurrent = mapStop?.status === 'current';
-        const unresolved = mapStop ? mapStop.latitude === null || mapStop.longitude === null : false;
-        const duplicateWarning = duplicateWarnings[stop.id] ?? null;
-        const stopPosition = displayedPositions[stop.id];
-        const stopBadge = stopPosition?.badge ?? formatRouteOrderBadge(stop, index + 1);
 
         return (
           <View
@@ -380,7 +410,7 @@ export default function DeliveryPreparationScreen() {
                   isCurrent && styles.stopLabelCurrent,
                   isCompleted && styles.stopLabelCompleted,
                 ]}>
-                  {mapStop ? mapStopStatusLabel(mapStop.status) : 'Planejada'}
+                  {statusLabel}
                 </Text>
                 {stop.optimizedOrderIndex !== undefined && stop.optimizedOrderIndex !== null && (
                   <View style={styles.optimizedBadge}>

@@ -26,17 +26,31 @@ function markerColor(status: MapStop['status'], selected: boolean): string {
   return Colors.gold[600];
 }
 
+function markerLabel(stop: MapStop): string {
+  if (stop.status === 'completed') return '✓';
+  return stop.badge.replace('#', '');
+}
+
 export default function RouteMap({ stops, selectedStopId, focusStopId, onSelectStop }: RouteMapProps) {
   const mapRef = useRef<MapView>(null);
   const fitAttemptedRef = useRef(false);
   const [isMounted, setIsMounted] = useState(false);
   const [isContainerLaidOut, setIsContainerLaidOut] = useState(false);
   const [isMapReady, setIsMapReady] = useState(false);
-  const [renderMarkers, setRenderMarkers] = useState(false);
-  const [renderPolyline, setRenderPolyline] = useState(false);
+  const [tracksMarkerChanges, setTracksMarkerChanges] = useState(true);
   const safePayload = useMemo(
     () => buildSafeMapPayload(stops, selectedStopId),
     [selectedStopId, stops]
+  );
+  const routeMarkerSignature = useMemo(
+    () => safePayload.markers
+      .map(({ key, stop }) => `${key}:${stop.badge}:${stop.status}:${stop.latitude}:${stop.longitude}`)
+      .join('|'),
+    [safePayload.markers]
+  );
+  const markerRenderSignature = useMemo(
+    () => `${routeMarkerSignature}|selected:${safePayload.selectedStopId ?? 'none'}`,
+    [routeMarkerSignature, safePayload.selectedStopId]
   );
 
   useEffect(() => {
@@ -51,35 +65,29 @@ export default function RouteMap({ stops, selectedStopId, focusStopId, onSelectS
   }, []);
 
   useEffect(() => {
-    setIsMapReady(false);
-    setRenderMarkers(false);
-    setRenderPolyline(false);
     fitAttemptedRef.current = false;
-  }, [safePayload.initialRegion?.latitude, safePayload.initialRegion?.longitude, safePayload.markers.length]);
+  }, [
+    routeMarkerSignature,
+    safePayload.coordinates.length,
+    safePayload.initialRegion?.latitude,
+    safePayload.initialRegion?.longitude,
+  ]);
 
   useEffect(() => {
-    if (!isMapReady) return;
+    if (safePayload.markers.length === 0) return;
+    setTracksMarkerChanges(true);
+    logMapDiagnostic('marker-refresh-started', { markerCount: safePayload.markers.length });
     const markerTimer = setTimeout(() => {
-      setRenderMarkers(true);
-      logMapDiagnostic('markers-enabled', { markerCount: safePayload.markers.length });
-    }, 50);
+      setTracksMarkerChanges(false);
+      logMapDiagnostic('marker-refresh-ended', { markerCount: safePayload.markers.length });
+    }, 1400);
     return () => clearTimeout(markerTimer);
-  }, [isMapReady, safePayload.markers.length]);
-
-  useEffect(() => {
-    if (!renderMarkers || safePayload.polylineCoordinates.length < 2) return;
-    const polylineTimer = setTimeout(() => {
-      setRenderPolyline(true);
-      logMapDiagnostic('polyline-enabled', { polylineCount: safePayload.polylineCoordinates.length });
-    }, 50);
-    return () => clearTimeout(polylineTimer);
-  }, [renderMarkers, safePayload.polylineCoordinates.length]);
+  }, [markerRenderSignature, safePayload.markers.length]);
 
   useEffect(() => {
     if (
       !isMapReady ||
       !isContainerLaidOut ||
-      !renderMarkers ||
       safePayload.coordinates.length <= 1 ||
       fitAttemptedRef.current
     ) {
@@ -99,9 +107,9 @@ export default function RouteMap({ stops, selectedStopId, focusStopId, onSelectS
           message: error instanceof Error ? error.message : 'unknown',
         });
       }
-    }, 180);
+    }, 220);
     return () => clearTimeout(timer);
-  }, [isContainerLaidOut, isMapReady, renderMarkers, safePayload.coordinates]);
+  }, [isContainerLaidOut, isMapReady, routeMarkerSignature, safePayload.coordinates]);
 
   useEffect(() => {
     if (!isMapReady || !focusStopId) return;
@@ -155,7 +163,7 @@ export default function RouteMap({ stops, selectedStopId, focusStopId, onSelectS
             setIsMapReady(true);
           }}
         >
-          {renderMarkers ? safePayload.markers.map(({ key, stop }) => {
+          {safePayload.markers.map(({ key, stop }) => {
             const selected = safePayload.selectedStopId === stop.id;
             return (
               <Marker
@@ -164,12 +172,27 @@ export default function RouteMap({ stops, selectedStopId, focusStopId, onSelectS
                 coordinate={{ latitude: stop.latitude, longitude: stop.longitude }}
                 title={stop.badge}
                 description={stop.address}
-                pinColor={markerColor(stop.status, selected)}
+                tracksViewChanges={tracksMarkerChanges}
                 onPress={() => onSelectStop(stop.id)}
-              />
+                accessibilityLabel={`Parada ${stop.badge}: ${stop.address}`}
+              >
+                <View
+                  collapsable={false}
+                  pointerEvents="none"
+                  style={[
+                    styles.marker,
+                    { backgroundColor: markerColor(stop.status, selected) },
+                    stop.status === 'current' && styles.markerCurrent,
+                    stop.status === 'completed' && styles.markerCompleted,
+                    selected && styles.markerSelected,
+                  ]}
+                >
+                  <Text style={styles.markerText}>{markerLabel(stop)}</Text>
+                </View>
+              </Marker>
             );
-          }) : null}
-          {renderPolyline && safePayload.polylineCoordinates.length >= 2 ? (
+          })}
+          {safePayload.polylineCoordinates.length >= 2 ? (
             <Polyline
               coordinates={safePayload.polylineCoordinates}
               strokeColor={Colors.gold[500]}
@@ -209,4 +232,18 @@ const styles = StyleSheet.create({
     padding: Spacing.md,
   },
   preparingText: { color: Colors.gray, fontSize: FontSizes.sm, textAlign: 'center' },
+  marker: {
+    minWidth: 34,
+    height: 34,
+    paddingHorizontal: 7,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: BorderRadius.full,
+    borderWidth: 2,
+    borderColor: Colors.white,
+  },
+  markerCurrent: { borderColor: Colors.gold[200] },
+  markerCompleted: { backgroundColor: Colors.darkGray },
+  markerSelected: { borderColor: Colors.gold[200], transform: [{ scale: 1.15 }] },
+  markerText: { color: Colors.white, fontSize: FontSizes.sm, fontWeight: '900' },
 });

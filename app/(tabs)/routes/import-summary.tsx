@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, FlatList } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import {
@@ -17,16 +17,42 @@ import { useRoute } from '@/contexts/RouteContext';
 import {
   buildDisplayedRoutePositionMap,
   formatRouteOrderBadge,
+  buildDuplicateAddressWarnings,
   getDuplicateAddressSummaryCount,
-  getDuplicateAddressWarning,
 } from '@/lib/routeStopPresentation';
 
 export default function ImportSummaryScreen() {
   const router = useRouter();
   const { from } = useLocalSearchParams<{ from?: string }>();
   const { currentRoute, getSummary } = useRoute();
+  const routeStops = currentRoute?.stops ?? [];
+  const summary = React.useMemo(
+    () => currentRoute ? getSummary() : null,
+    [currentRoute, getSummary]
+  );
+  const duplicateWarnings = React.useMemo(
+    () => buildDuplicateAddressWarnings(routeStops),
+    [routeStops]
+  );
+  const duplicateStopCount = React.useMemo(
+    () => getDuplicateAddressSummaryCount(routeStops),
+    [routeStops]
+  );
+  const displayedPositions = React.useMemo(
+    () => buildDisplayedRoutePositionMap(routeStops),
+    [routeStops]
+  );
+  const stopRows = React.useMemo(
+    () => routeStops.map((stop, index) => ({
+      stop,
+      index,
+      duplicateWarning: duplicateWarnings[stop.id] ?? null,
+      stopBadge: displayedPositions[stop.id]?.badge ?? formatRouteOrderBadge(stop, index + 1),
+    })),
+    [displayedPositions, duplicateWarnings, routeStops]
+  );
 
-  if (!currentRoute) {
+  if (!currentRoute || !summary) {
     return (
       <View style={styles.emptyContainer}>
         <Text style={styles.emptyText}>Nenhuma rota importada</Text>
@@ -37,8 +63,6 @@ export default function ImportSummaryScreen() {
     );
   }
 
-  const summary = getSummary();
-  const duplicateStopCount = getDuplicateAddressSummaryCount(currentRoute.stops);
   const returningFromReview = from === 'delivery-preparation';
   const largestStopSequence =
     currentRoute.stops.findIndex(stop => stop.stopNumber === summary.largestStop.stopNumber) + 1;
@@ -46,7 +70,6 @@ export default function ImportSummaryScreen() {
     currentRoute.stops.findIndex(stop => stop.stopNumber === summary.smallestStop.stopNumber) + 1;
   const largestStop = currentRoute.stops[largestStopSequence - 1];
   const smallestStop = currentRoute.stops[smallestStopSequence - 1];
-  const displayedPositions = buildDisplayedRoutePositionMap(currentRoute.stops);
   const openRouteReview = () => {
     router.replace({
       pathname: '/(tabs)/routes/delivery-preparation',
@@ -55,7 +78,18 @@ export default function ImportSummaryScreen() {
   };
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    <FlatList
+      style={styles.container}
+      contentContainerStyle={styles.content}
+      data={stopRows}
+      keyExtractor={row => row.stop.id}
+      initialNumToRender={8}
+      maxToRenderPerBatch={8}
+      updateCellsBatchingPeriod={40}
+      windowSize={7}
+      removeClippedSubviews
+      ListHeaderComponent={(
+        <>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.replace('/(tabs)/routes/import')} style={styles.backButton}>
           <ArrowLeft size={24} color={Colors.white} />
@@ -148,10 +182,10 @@ export default function ImportSummaryScreen() {
 
       {/* All stops list */}
       <Text style={styles.sectionTitle}>Ordem atual ({currentRoute.stops.length} paradas)</Text>
-
-      {currentRoute.stops.map((stop, index) => {
-        const duplicateWarning = getDuplicateAddressWarning(currentRoute.stops, stop);
-        const stopBadge = displayedPositions[stop.id]?.badge ?? formatRouteOrderBadge(stop, index + 1);
+        </>
+      )}
+      renderItem={({ item: row }) => {
+        const { stop, duplicateWarning, stopBadge } = row;
         return (
         <View key={stop.id} style={styles.stopCard}>
           <View style={styles.stopNumberWrap}>
@@ -197,8 +231,8 @@ export default function ImportSummaryScreen() {
           </View>
         </View>
         );
-      })}
-
+      }}
+      ListFooterComponent={(
       <TouchableOpacity
         style={styles.nextButton}
         onPress={openRouteReview}
@@ -213,7 +247,8 @@ export default function ImportSummaryScreen() {
           <ChevronRight size={20} color={Colors.primary[900]} />
         </LinearGradient>
       </TouchableOpacity>
-    </ScrollView>
+      )}
+    />
   );
 }
 

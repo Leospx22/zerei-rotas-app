@@ -5,6 +5,10 @@ import { applyRecoveredMapCoordinates, buildMapStops } from '@/lib/mapOverview';
 
 export function useMapStops(route: RouteData | null) {
   const baseMapStops = useMemo(() => route ? buildMapStops(route) : [], [route]);
+  const routeStopsById = useMemo(
+    () => new Map((route?.stops ?? []).map(stop => [stop.id, stop])),
+    [route?.stops]
+  );
   const [cachedCoordinates, setCachedCoordinates] = useState<
     Record<string, { latitude: number; longitude: number }>
   >({});
@@ -20,7 +24,7 @@ export function useMapStops(route: RouteData | null) {
         stop => stop.latitude === null || stop.longitude === null
       );
       const recoveredEntries = await Promise.all(unresolvedStops.map(async mapStop => {
-        const routeStop = route.stops.find(stop => stop.id === mapStop.id);
+        const routeStop = routeStopsById.get(mapStop.id);
         if (!routeStop) return null;
         const resolution = await resolveGeocoding(buildStopGeocodingInput(routeStop));
         if (resolution.status !== 'cached' && resolution.status !== 'resolved') return null;
@@ -36,7 +40,7 @@ export function useMapStops(route: RouteData | null) {
     };
     recoverCoordinates().catch(() => {});
     return () => { mounted = false; };
-  }, [baseMapStops, route]);
+  }, [baseMapStops, route, routeStopsById]);
 
   return useMemo(
     () => applyRecoveredMapCoordinates(baseMapStops, cachedCoordinates),

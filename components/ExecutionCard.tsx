@@ -62,21 +62,31 @@ export function ExecutionCard({
   onConfirmAddressGroup,
   showNavigate = true,
 }: ExecutionCardProps) {
+  const packageGroups = React.useMemo(
+    () => currentStop ? buildExecutionPackageGroups(currentStop) : [],
+    [currentStop]
+  );
+  const groupSummary = React.useMemo(
+    () => summarizePackageGroups(packageGroups, 3, true),
+    [packageGroups]
+  );
+  const separatedPackagesCount = React.useMemo(
+    () => currentStop
+      ? currentStop.packages.filter(pkg => separatedPackageIds.has(pkg.id)).length
+      : 0,
+    [currentStop, separatedPackageIds]
+  );
+
   if (!currentStop) return null;
 
   const isPickup = executionStep === 'separacao';
   const packageCount = isPickup
     ? totalPackagesAtCurrentStop
     : pendingPackagesAtCurrentStop.length;
-  const separatedPackagesCount = currentStop.packages.filter(pkg =>
-    separatedPackageIds.has(pkg.id)
-  ).length;
   const pickupComplete =
     totalPackagesAtCurrentStop > 0 &&
     separatedPackagesCount === totalPackagesAtCurrentStop;
   const primaryDisabled = isPickup && !pickupComplete;
-  const packageGroups = buildExecutionPackageGroups(currentStop);
-  const groupSummary = summarizePackageGroups(packageGroups, 3, true);
   const mainAddress =
     packageGroups[0]?.address ?? normalizeAddress(currentStop.normalizedAddress).displayAddress;
   const addressCount = packageGroups.length;

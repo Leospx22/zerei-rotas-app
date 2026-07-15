@@ -99,6 +99,34 @@ test('all coordinate-bearing stops reach the native marker renderer', () => {
   assert.deepEqual(locatedStops.map(stop => stop.order), Array.from({ length: 15 }, (_, index) => index + 1));
 });
 
+test('native map payload follows saved route order and displayed badges after Prioridade reorder', () => {
+  const imported = groupPackagesByStop(parseSpreadsheetData(
+    [
+      ['PKG-P', 'Rua Prioridade, 9', '', '', '-23.50', '-46.60'],
+      ['PKG-1', 'Rua Regular, 10', '1', '1', '-23.51', '-46.61'],
+      ['PKG-2', 'Rua Regular, 20', '2', '2', '-23.52', '-46.62'],
+    ],
+    ['SPX TN', 'Endereço', 'Stop', 'Sequência', 'Latitude', 'Longitude']
+  ));
+  const priority = imported.find(stop => stop.packages.some(pkg => pkg.trackingNumber === 'PKG-P'));
+  const regularOne = imported.find(stop => stop.packages.some(pkg => pkg.trackingNumber === 'PKG-1'));
+  const regularTwo = imported.find(stop => stop.packages.some(pkg => pkg.trackingNumber === 'PKG-2'));
+  const manuallyReordered = [regularOne, priority, regularTwo].filter(Boolean);
+
+  const mapStops = buildMapStops(route(manuallyReordered));
+  const payload = buildSafeMapPayload(mapStops, null);
+
+  assert.deepEqual(mapStops.map(stop => stop.badge), ['#1', '#P', '#2']);
+  assert.deepEqual(payload.markers.map(marker => marker.stop.badge), ['#1', '#P', '#2']);
+  assert.deepEqual(
+    payload.polylineCoordinates,
+    payload.markers.map(marker => ({
+      latitude: marker.stop.latitude,
+      longitude: marker.stop.longitude,
+    }))
+  );
+});
+
 test('active route marks completed stops and the first remaining stop as current', () => {
   const stops = groupPackagesByStop([
     rawPackage('A', 1, -23.51, -46.61),

@@ -58,7 +58,6 @@ export default function RootLayout() {
         <RouteProvider>
           <Stack screenOptions={{ headerShown: false }}>
             <Stack.Screen name="login" />
-            <Stack.Screen name="landing" />
             <Stack.Screen name="(tabs)" />
             <Stack.Screen name="+not-found" />
           </Stack>

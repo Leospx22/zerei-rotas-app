@@ -2,6 +2,33 @@
 
 This document is the source of truth for the current application architecture. New work should preserve the ownership boundaries and invariants described here unless an architectural change is explicitly approved.
 
+## Repository Ownership
+
+Repository: `Leospx22/zerei-rotas-app`
+
+Purpose: Android mobile application.
+
+Ownership:
+
+- Supabase database schema
+- Supabase migrations
+- RLS policies
+- Shared backend contract
+
+Primary AI: Codex
+
+Shared resource:
+
+Supabase project: `xmtvjzwcfvjkiaplaiay`
+
+Landing Page lives in a separate repository: `Leospx22/zerei-rotas-landing-page`
+
+The Landing Page consumes the backend but does NOT own:
+
+- migrations
+- RLS
+- schema
+
 ## Technology
 
 - Expo SDK 54 and React Native 0.81

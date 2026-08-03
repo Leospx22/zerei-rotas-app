@@ -69,6 +69,14 @@ Deployment steps:
 
 Do not paste the Windows file path into SQL Editor. SQL Editor requires the contents of the `.sql` file, not a path such as `C:\Users\...`. Do not rerun a partially applied migration blindly; inspect existing objects and the reported SQL error first.
 
+The Founder Dashboard aggregate metrics migration is deployed with the same manual workflow:
+
+```text
+supabase/migrations/20260730000000_006_founder_dashboard_metrics_rpc.sql
+```
+
+After deploying it, provision founder/admin membership only through a controlled migration or trusted server-side administrative process. Do not add a founder row until the exact production `auth.users.id` UUID is known. The dashboard browser app consumes `public.get_founder_dashboard_metrics()` with the public anon key plus an authenticated founder/admin session; it must never use the `service_role` key.
+
 ## 4. Expected Migration Objects
 
 The migration creates:

@@ -42,6 +42,29 @@ Production migrations are owned by `Leospx22/zerei-rotas-app`.
 
 The landing page may insert into the approved public waitlist tables, but schema changes and RLS policy changes belong in the mobile app repository migration history.
 
+## Founder Dashboard
+
+Repository: `Leospx22/zerei-rotas-admin`
+
+Owns:
+
+- Browser dashboard UI
+- Founder/admin dashboard presentation
+
+Consumes:
+
+- `public.get_founder_dashboard_metrics()`
+- Public Supabase anon key
+- Authenticated founder/admin session
+
+Does not own:
+
+- Production Supabase migrations
+- Direct table grants for `waitlist_leads`, `profiles`, or `subscriptions`
+- Service-role access in the browser
+
+Founder Dashboard aggregate authorization is owned by `Leospx22/zerei-rotas-app` through the `public.admin_users` table and private authorization helper.
+
 ## Golden Rule
 
 Before editing, confirm repository, branch, and environment.

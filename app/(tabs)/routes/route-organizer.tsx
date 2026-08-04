@@ -16,6 +16,7 @@ import {
 import { Colors, Spacing, FontSizes, BorderRadius } from '@/constants/theme';
 import { HeaderBrandIcon } from '@/components/HeaderBrandIcon';
 import { useRoute } from '@/contexts/RouteContext';
+import type { GroupedStop } from '@/lib/packageUtils';
 import {
   buildDuplicateAddressWarnings,
   buildDisplayedRoutePositionMap,
@@ -24,9 +25,22 @@ import {
   SHOPEE_PRIORITY_LABEL,
 } from '@/lib/routeStopPresentation';
 
+const EMPTY_ROUTE_STOPS: GroupedStop[] = [];
+
 export default function RouteOrganizerScreen() {
   const router = useRouter();
   const { currentRoute, removeDuplicates, reorderStops, setCurrentRoute } = useRoute();
+  const routeStops = currentRoute?.stops ?? EMPTY_ROUTE_STOPS;
+  const duplicateCount =
+    routeStops.length - new Set(routeStops.map(s => s.normalizedAddress.toLowerCase().trim())).size;
+  const duplicateWarnings = useMemo(
+    () => buildDuplicateAddressWarnings(routeStops),
+    [routeStops]
+  );
+  const displayedPositions = useMemo(
+    () => buildDisplayedRoutePositionMap(routeStops),
+    [routeStops]
+  );
 
   if (!currentRoute) {
     return (
@@ -38,17 +52,6 @@ export default function RouteOrganizerScreen() {
       </View>
     );
   }
-
-  const duplicateCount =
-    currentRoute.stops.length - new Set(currentRoute.stops.map(s => s.normalizedAddress.toLowerCase().trim())).size;
-  const duplicateWarnings = useMemo(
-    () => buildDuplicateAddressWarnings(currentRoute.stops),
-    [currentRoute.stops]
-  );
-  const displayedPositions = useMemo(
-    () => buildDisplayedRoutePositionMap(currentRoute.stops),
-    [currentRoute.stops]
-  );
 
   const startRoute = () => {
     setCurrentRoute({

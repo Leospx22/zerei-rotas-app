@@ -2,6 +2,7 @@ export * from '@/components/ui/AppButton';
 export * from '@/components/ui/AppCard';
 export * from '@/components/ui/AppChip';
 export * from '@/components/ui/AppText';
+export * from '@/components/ui/DataTable';
 export * from '@/components/ui/EmptyState';
 export * from '@/components/ui/FadeInView';
 export * from '@/components/ui/IconContainer';

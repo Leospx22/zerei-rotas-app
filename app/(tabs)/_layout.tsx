@@ -1,6 +1,6 @@
 import { Tabs } from 'expo-router';
 import { getFocusedRouteNameFromRoute } from '@react-navigation/native';
-import { AlertTriangle, Home, Map, BarChart3, User } from 'lucide-react-native';
+import { AlertTriangle, Home, Map, BarChart3, User, Users } from 'lucide-react-native';
 import { Colors } from '@/constants/theme';
 
 const TAB_BAR_STYLE = {
@@ -69,6 +69,13 @@ export default function TabLayout() {
         options={{
           title: 'Histórico',
           tabBarIcon: ({ size, color }) => <BarChart3 size={size} color={color} />,
+        }}
+      />
+      <Tabs.Screen
+        name="users"
+        options={{
+          title: 'Users',
+          tabBarIcon: ({ size, color }) => <Users size={size} color={color} />,
         }}
       />
       <Tabs.Screen

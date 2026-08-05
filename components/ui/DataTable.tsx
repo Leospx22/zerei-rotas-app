@@ -1,5 +1,5 @@
 import React, { type ReactNode } from 'react';
-import { ScrollView, StyleSheet, View, type ViewStyle } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View, type ViewStyle } from 'react-native';
 import { BorderRadius, Colors, Spacing } from '@/constants/theme';
 import { AppText } from '@/components/ui/AppText';
 
@@ -16,6 +16,7 @@ export interface DataTableProps<T> {
   data: T[];
   keyExtractor: (item: T) => string;
   minWidth?: number;
+  onRowPress?: (item: T) => void;
   style?: ViewStyle;
 }
 
@@ -24,6 +25,7 @@ export function DataTable<T>({
   data,
   keyExtractor,
   minWidth = 760,
+  onRowPress,
   style,
 }: DataTableProps<T>) {
   return (
@@ -43,18 +45,39 @@ export function DataTable<T>({
             ))}
           </View>
 
-          {data.map(item => (
-            <View key={keyExtractor(item)} style={styles.dataRow}>
-              {columns.map(column => (
-                <View
-                  key={column.key}
-                  style={[styles.cell, { width: column.width, flex: column.flex }]}
+          {data.map(item => {
+            const rowContent = columns.map(column => (
+              <View
+                key={column.key}
+                style={[styles.cell, { width: column.width, flex: column.flex }]}
+              >
+                {column.render(item)}
+              </View>
+            ));
+
+            if (onRowPress) {
+              return (
+                <Pressable
+                  key={keyExtractor(item)}
+                  onPress={() => onRowPress(item)}
+                  accessibilityRole="button"
+                  style={({ pressed }) => [
+                    styles.dataRow,
+                    styles.interactiveRow,
+                    pressed && styles.pressedRow,
+                  ]}
                 >
-                  {column.render(item)}
-                </View>
-              ))}
-            </View>
-          ))}
+                  {rowContent}
+                </Pressable>
+              );
+            }
+
+            return (
+              <View key={keyExtractor(item)} style={styles.dataRow}>
+                {rowContent}
+              </View>
+            );
+          })}
         </View>
       </ScrollView>
     </View>
@@ -86,6 +109,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderBottomWidth: 1,
     borderBottomColor: Colors.cardBorder,
+  },
+  interactiveRow: {
+    backgroundColor: Colors.cardBg,
+  },
+  pressedRow: {
+    backgroundColor: Colors.overlay,
   },
   cell: {
     paddingHorizontal: Spacing.md,

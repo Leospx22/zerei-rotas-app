@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useFrameworkReady } from '@/hooks/useFrameworkReady';
 import { AuthProvider } from '@/contexts/AuthContext';
 import { RouteProvider } from '@/contexts/RouteContext';
+import { AnalyticsTimeProvider } from '@/contexts/AnalyticsTimeContext';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 
 interface ErrorBoundaryProps {
@@ -59,14 +60,16 @@ export default function RootLayout() {
     <ErrorBoundary>
       <QueryClientProvider client={queryClient}>
         <AuthProvider>
-          <RouteProvider>
-            <Stack screenOptions={{ headerShown: false }}>
-              <Stack.Screen name="login" />
-              <Stack.Screen name="(tabs)" />
-              <Stack.Screen name="+not-found" />
-            </Stack>
-            <StatusBar style="light" />
-          </RouteProvider>
+          <AnalyticsTimeProvider>
+            <RouteProvider>
+              <Stack screenOptions={{ headerShown: false }}>
+                <Stack.Screen name="login" />
+                <Stack.Screen name="(tabs)" />
+                <Stack.Screen name="+not-found" />
+              </Stack>
+              <StatusBar style="light" />
+            </RouteProvider>
+          </AnalyticsTimeProvider>
         </AuthProvider>
       </QueryClientProvider>
     </ErrorBoundary>

@@ -1,37 +1,6 @@
-﻿# Zerei Rotas Architecture
+# Zerei Rotas Architecture
 
 This document is the source of truth for the current application architecture. New work should preserve the ownership boundaries and invariants described here unless an architectural change is explicitly approved.
-
-## Repository Ownership
-
-Repository: `Leospx22/zerei-rotas-app`
-
-Purpose: Android mobile application.
-
-Ownership:
-
-- Supabase database schema
-- Supabase migrations
-- RLS policies
-- Shared backend contract
-
-Primary AI: Codex
-
-Shared resource:
-
-Supabase project: `xmtvjzwcfvjkiaplaiay`
-
-Landing Page lives in a separate repository: `Leospx22/zerei-rotas-landing-page`
-
-Founder Dashboard lives in a separate repository: `Leospx22/zerei-rotas-admin`
-
-The Landing Page consumes the backend but does NOT own:
-
-- migrations
-- RLS
-- schema
-
-The Founder Dashboard consumes the founder/admin aggregate metrics RPC but does NOT own production migrations, table grants, RLS policies, or raw production table access.
 
 ## Technology
 
@@ -376,8 +345,6 @@ Supabase authentication persistence is separate. `lib/supabase.ts` only creates 
 Closed-beta support links are isolated in `lib/appLinks.ts`. An unconfigured feedback form resolves to a safe null state, WhatsApp support uses an HTTPS configuration boundary, and opening a configured feedback form records the owner-scoped `feedback_opened` funnel event. These links do not gate local app usage.
 
 The landing-page waitlist foundation is isolated from authenticated app data. Anonymous clients may insert constrained rows into `waitlist_leads` but have no read, update, or delete access; `waitlist_lead_events` is trigger-owned and unavailable to public clients. `lib/waitlistLeads.ts` mirrors that public payload boundary without exposing workflow fields.
-
-Founder Dashboard metrics are exposed only through `public.get_founder_dashboard_metrics()` from migration `006_founder_dashboard_metrics_rpc`. The `zerei-rotas-admin` browser app must use the public Supabase anon key with an authenticated founder/admin session; it must never embed the `service_role` key. Aggregate access is controlled by `public.admin_users` and the private helper `private.is_founder_or_admin()`. Only enabled `founder` and `admin` memberships can read the aggregate RPC; `support` membership does not automatically receive financial aggregate access. Raw `waitlist_leads`, `profiles`, and `subscriptions` rows remain protected by their existing RLS policies and are not made directly readable for dashboard users.
 
 ## Import Pipeline
 

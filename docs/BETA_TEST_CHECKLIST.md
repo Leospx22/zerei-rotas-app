@@ -1,4 +1,4 @@
-﻿# Zerei Rotas Closed Beta Checklist
+# Zerei Rotas Closed Beta Checklist
 
 Use one copy of this checklist for each closed-beta tester. Do not store passwords, authentication tokens, or private delivery data in the completed document.
 

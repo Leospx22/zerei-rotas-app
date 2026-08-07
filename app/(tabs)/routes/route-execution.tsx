@@ -9,7 +9,6 @@ import {
   Pressable,
   Alert,
   Linking,
-  InteractionManager,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -154,8 +153,6 @@ export default function RouteExecutionScreen() {
   const [separatedPackageIds, setSeparatedPackageIds] = useState<Set<string>>(
     () => new Set()
   );
-  const [optimisticCompletedAddressGroupKeys, setOptimisticCompletedAddressGroupKeys] =
-    useState<Set<string>>(() => new Set());
   const [completionFeedback, setCompletionFeedback] = useState<{
     id: number;
     hasNextStop: boolean;
@@ -185,7 +182,6 @@ export default function RouteExecutionScreen() {
   React.useEffect(() => {
     setExecutionStep(derivedExecutionState.executionStep);
     setSeparatedPackageIds(new Set());
-    setOptimisticCompletedAddressGroupKeys(new Set());
     setEditingPlaceGroup(null);
     setOccurrencePackageFilter(null);
   }, [currentStop?.id]);
@@ -369,29 +365,16 @@ export default function RouteExecutionScreen() {
       pkg => pkg.status === 'pending' && !groupPackageIds.has(pkg.id)
     );
 
-    setOptimisticCompletedAddressGroupKeys(previous => {
-      if (previous.has(group.key)) return previous;
-      const next = new Set(previous);
-      next.add(group.key);
-      return next;
-    });
+    updatePackagesStatus(currentStop.id, pendingPackageIds, 'delivered');
 
-    requestAnimationFrame(() => {
-      InteractionManager.runAfterInteractions(() => {
-        React.startTransition(() => {
-          updatePackagesStatus(currentStop.id, pendingPackageIds, 'delivered');
-
-          if (!hasPendingOutsideGroup) {
-            setExecutionStep('separacao');
-            setSeparatedPackageIds(new Set());
-            setCompletionFeedback({
-              id: Date.now(),
-              hasNextStop: nextStop !== null,
-            });
-          }
-        });
+    if (!hasPendingOutsideGroup) {
+      setExecutionStep('separacao');
+      setSeparatedPackageIds(new Set());
+      setCompletionFeedback({
+        id: Date.now(),
+        hasNextStop: nextStop !== null,
       });
-    });
+    }
   }, [currentStop, executionStep, nextStop, updatePackagesStatus]);
 
   const handleSavePlaceInfo = useCallback(async (draft: PlaceInfoDraft) => {
@@ -534,7 +517,6 @@ export default function RouteExecutionScreen() {
             onEditPlaceInfo={setEditingPlaceGroup}
             onNavigateAddress={handleNavigateAddress}
             onConfirmAddressGroup={handleConfirmAddressGroup}
-            completedAddressGroupKeys={optimisticCompletedAddressGroupKeys}
             showNavigate={false}
           />
         </View>

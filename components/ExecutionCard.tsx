@@ -35,11 +35,8 @@ export interface ExecutionCardProps {
   onEditPlaceInfo?: (group: Pick<ExecutionPackageGroup, 'key' | 'address'>) => void;
   onNavigateAddress?: (address: string) => void;
   onConfirmAddressGroup?: (group: ExecutionPackageGroup) => void;
-  completedAddressGroupKeys?: ReadonlySet<string>;
   showNavigate?: boolean;
 }
-
-const EMPTY_COMPLETED_ADDRESS_GROUP_KEYS: ReadonlySet<string> = new Set();
 
 /**
  * Presentation-only card for the focused delivery stop.
@@ -63,7 +60,6 @@ export function ExecutionCard({
   onEditPlaceInfo,
   onNavigateAddress,
   onConfirmAddressGroup,
-  completedAddressGroupKeys = EMPTY_COMPLETED_ADDRESS_GROUP_KEYS,
   showNavigate = true,
 }: ExecutionCardProps) {
   const packageGroups = React.useMemo(
@@ -164,9 +160,7 @@ export function ExecutionCard({
         <View style={styles.packageRows}>
             {packageGroups.map(group => {
               const groupPlaceInfo = placeInfoByAddressKey[group.key] ?? null;
-              const groupCompleted =
-                completedAddressGroupKeys.has(group.key) ||
-                isExecutionPackageGroupCompleted(group);
+              const groupCompleted = isExecutionPackageGroupCompleted(group);
               const groupPackageIds = group.packages.map(pkg => pkg.id);
               const selectableGroupPackageIds = isPickup
                 ? groupPackageIds

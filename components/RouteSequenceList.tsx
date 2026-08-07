@@ -1,4 +1,4 @@
-﻿import React from 'react';
+import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Copy, LocateFixed, MapPin } from 'lucide-react-native';
 import { BorderRadius, Colors, FontSizes, Spacing } from '@/constants/theme';

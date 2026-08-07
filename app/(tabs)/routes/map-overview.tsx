@@ -1,4 +1,4 @@
-﻿import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import * as Clipboard from 'expo-clipboard';
 import {
   Alert,

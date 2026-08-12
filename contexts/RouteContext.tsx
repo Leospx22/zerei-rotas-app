@@ -23,6 +23,7 @@ import {
   resolvePackageOccurrenceInStops,
   type OccurrenceResolution,
 } from '@/lib/occurrenceRecords';
+import { learnFromCompletedRoute, type RouteAIReport } from '@/lib/route-ai';
 
 export interface RouteData {
   id: string;
@@ -35,6 +36,7 @@ export interface RouteData {
   deliveredPackages: number;
   startTime: number | null;
   durationMinutes: number;
+  routeAIReport?: RouteAIReport;
 }
 
 interface RouteContextType {
@@ -189,7 +191,14 @@ export function RouteProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (currentRoute?.status === 'completed') {
       saveToHistory(currentRoute)
-        .then(() => reloadHistory())
+        .then(saved => {
+          if (saved) {
+            setTimeout(() => {
+              learnFromCompletedRoute({ route: currentRoute }).catch(() => {});
+            }, 0);
+          }
+          return reloadHistory();
+        })
         .catch(() => {});
     }
   }, [currentRoute?.status, currentRoute, saveToHistory, reloadHistory]);
@@ -414,6 +423,9 @@ export function RouteProvider({ children }: { children: ReactNode }) {
     const completedRoute = { ...currentRoute, status: 'completed' as const, durationMinutes: elapsed };
     const saved = await saveToHistory(completedRoute);
     if (!saved) return;
+    setTimeout(() => {
+      learnFromCompletedRoute({ route: completedRoute }).catch(() => {});
+    }, 0);
     setCurrentRouteState(completedRoute);
     await reloadHistory();
   }, [currentRoute, saveToHistory, reloadHistory]);

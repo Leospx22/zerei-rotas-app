@@ -33,6 +33,7 @@ import {
   getPackageSecondaryLabel,
 } from '@/lib/packageUtils';
 import { parseSpreadsheetText, parseSpreadsheetFile, isBinarySpreadsheet } from '@/lib/spreadsheetParser';
+import { generateRouteAIReport } from '@/lib/route-ai';
 
 const MAX_NATIVE_FILE_SIZE_BYTES = 10 * 1024 * 1024;
 
@@ -96,7 +97,7 @@ function getPickedAsset(result: any) {
 export default function ImportScreen() {
   const router = useRouter();
   const { currentRoute, setCurrentRoute } = useRoute();
-  const [loading, setLoading] = useState(false);
+  const [, setLoading] = useState(false);
   const [rawPackages, setRawPackages] = useState<RawPackage[]>([]);
   const [detectedColumns, setDetectedColumns] = useState<string[]>([]);
   const [fileName, setFileName] = useState<string>('');
@@ -275,7 +276,7 @@ export default function ImportScreen() {
     }
   };
 
-  const handleContinue = () => {
+  const handleContinue = async () => {
     if (rawPackages.length === 0 || continuing) return;
     setContinuing(true);
     const route = importedRoute ?? currentRoute;
@@ -284,14 +285,22 @@ export default function ImportScreen() {
       setError('Não foi possível preparar a rota. Importe a planilha novamente.');
       return;
     }
-    if (!currentRoute || currentRoute.id !== importedRouteId) {
-      setImportedRoute(route);
-      setImportedRouteId(route.id);
-      setCurrentRoute(route);
+    try {
+      const routeAIReport = route.routeAIReport
+        ?? await generateRouteAIReport(route.stops, 'balanced');
+      const routeWithAnalysis = { ...route, routeAIReport };
+      if (!currentRoute || currentRoute.id !== importedRouteId || !currentRoute.routeAIReport) {
+        setImportedRoute(routeWithAnalysis);
+        setImportedRouteId(routeWithAnalysis.id);
+        setCurrentRoute(routeWithAnalysis);
+      }
+      requestAnimationFrame(() => {
+        router.replace('/(tabs)/routes/import-summary');
+      });
+    } catch (err) {
+      setError('Não foi possível gerar a análise da rota: ' + getErrorMessage(err));
+      setContinuing(false);
     }
-    requestAnimationFrame(() => {
-      router.replace('/(tabs)/routes/import-summary');
-    });
   };
 
   return (

@@ -307,7 +307,7 @@ test('an unfixable extreme route outlier is excluded from markers but kept in th
   });
 });
 
-test('same normalized address reuses valid coordinates for missing duplicate stops', () => {
+test('same normalized address merges into one coordinate-bearing stop', () => {
   const stops = groupPackagesByStop([
     {
       ...rawPackage('A', 1, -23.5505, -46.6333),
@@ -320,10 +320,12 @@ test('same normalized address reuses valid coordinates for missing duplicate sto
   ]);
   const mapStops = buildMapStops(route(stops));
 
-  assert.equal(mapStops[1].latitude, -23.5505);
-  assert.equal(mapStops[1].longitude, -46.6333);
-  assert.equal(mapStops[1].coordinateStatus, 'recovered');
-  assert.deepEqual(getLocatedMapStops(mapStops).map(stop => stop.order), [1, 2]);
+  assert.equal(mapStops.length, 1);
+  assert.equal(mapStops[0].latitude, -23.5505);
+  assert.equal(mapStops[0].longitude, -46.6333);
+  assert.equal(mapStops[0].coordinateStatus, 'valid');
+  assert.equal(mapStops[0].packageCount, 2);
+  assert.deepEqual(getLocatedMapStops(mapStops).map(stop => stop.order), [1]);
 });
 
 test('coordinate inheritance does not cross different street numbers', () => {
@@ -344,7 +346,7 @@ test('coordinate inheritance does not cross different street numbers', () => {
   assert.equal(mapStops[1].coordinateStatus, 'missing');
 });
 
-test('invalid coordinates are not propagated to duplicate addresses', () => {
+test('invalid coordinates stay isolated inside the merged address stop', () => {
   const stops = groupPackagesByStop([
     {
       ...rawPackage('A', 1, 95, -46.6333),
@@ -357,12 +359,13 @@ test('invalid coordinates are not propagated to duplicate addresses', () => {
   ]);
   const mapStops = buildMapStops(route(stops));
 
+  assert.equal(mapStops.length, 1);
   assert.equal(mapStops[0].coordinateStatus, 'invalid');
-  assert.equal(mapStops[1].coordinateStatus, 'missing');
+  assert.equal(mapStops[0].packageCount, 2);
   assert.equal(getLocatedMapStops(mapStops).length, 0);
 });
 
-test('multiple duplicate stops reuse the valid coordinate and keep saved route order', () => {
+test('multiple duplicate addresses merge and keep total packages', () => {
   const stops = groupPackagesByStop([
     {
       ...rawPackage('A', 1, -23.5505, -46.6333),
@@ -377,17 +380,14 @@ test('multiple duplicate stops reuse the valid coordinate and keep saved route o
       destinationAddress: 'Rua Duplicada, 20 - Fundos',
     },
   ]);
-  const mapStops = buildMapStops(route([stops[2], stops[0], stops[1]]));
+  const mapStops = buildMapStops(route(stops));
 
-  assert.deepEqual(mapStops.map(stop => stop.order), [1, 2, 3]);
-  assert.equal(getLocatedMapStops(mapStops).length, 3);
+  assert.deepEqual(mapStops.map(stop => stop.order), [1]);
+  assert.equal(getLocatedMapStops(mapStops).length, 1);
+  assert.equal(mapStops[0].packageCount, 3);
   assert.deepEqual(
-    mapStops.map(stop => [stop.latitude, stop.longitude, stop.coordinateStatus]),
-    [
-      [-23.5505, -46.6333, 'recovered'],
-      [-23.5505, -46.6333, 'valid'],
-      [-23.5505, -46.6333, 'recovered'],
-    ]
+    [mapStops[0].latitude, mapStops[0].longitude, mapStops[0].coordinateStatus],
+    [-23.5505, -46.6333, 'valid']
   );
 });
 

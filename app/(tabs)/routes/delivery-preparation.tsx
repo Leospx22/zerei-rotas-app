@@ -562,7 +562,54 @@ export default function DeliveryPreparationScreen() {
                       </View>
                     </View>
 
-                    {stop.packages
+                    {ag.isCondominium ? (
+                      <View style={styles.hierarchyPanel}>
+                        {ag.blockGroups.map(block => (
+                          <View key={block.key} style={styles.blockSection}>
+                            {ag.blockCount > 0 ? (
+                              <View style={styles.blockHeader}>
+                                <Text style={styles.blockTitle}>{block.name}</Text>
+                                <Text style={styles.blockMeta}>
+                                  {block.packageCount} pacote{block.packageCount !== 1 ? 's' : ''} · {block.deliveryCount} entrega{block.deliveryCount !== 1 ? 's' : ''}
+                                </Text>
+                              </View>
+                            ) : null}
+                            {block.units.map(unit => {
+                              const unitPackages = unit.packageIds
+                                .map(packageId => stop.packages.find(pkg => pkg.id === packageId))
+                                .filter((pkg): pkg is typeof stop.packages[number] => Boolean(pkg));
+
+                              return (
+                                <View key={unit.key} style={styles.unitSection}>
+                                  <View style={styles.unitHeader}>
+                                    <Text style={styles.unitTitle}>{unit.label}</Text>
+                                    <Text style={styles.unitMeta}>
+                                      {unit.packageCount} pacote{unit.packageCount !== 1 ? 's' : ''}
+                                    </Text>
+                                  </View>
+                                  {unitPackages.map((pkg, pkgIdx) => (
+                                    <View key={pkg.id} style={styles.packageItem}>
+                                      <View style={styles.packageIcon}>
+                                        <Text style={styles.packageIconText}>{pkgIdx + 1}</Text>
+                                      </View>
+                                      <View style={styles.packageTextBlock}>
+                                        <Text style={styles.packageTracking}>{getPackagePrimaryLabel(pkg)}</Text>
+                                        {getPackageSecondaryLabel(pkg) ? (
+                                          <Text style={styles.packageSecondary}>{getPackageSecondaryLabel(pkg)}</Text>
+                                        ) : null}
+                                      </View>
+                                      <Package size={13} color={Colors.gold[500]} style={{ opacity: 0.5 }} />
+                                    </View>
+                                  ))}
+                                </View>
+                              );
+                            })}
+                          </View>
+                        ))}
+                      </View>
+                    ) : null}
+
+                    {!ag.isCondominium ? stop.packages
                       .filter(p => ag.packageIds.includes(p.id))
                       .map((pkg, pkgIdx) => (
                         <View key={pkg.id} style={styles.packageItem}>
@@ -577,7 +624,7 @@ export default function DeliveryPreparationScreen() {
                           </View>
                           <Package size={13} color={Colors.gold[500]} style={{ opacity: 0.5 }} />
                         </View>
-                      ))}
+                      )) : null}
                   </View>
                 ))}
               </View>
@@ -828,6 +875,36 @@ const styles = StyleSheet.create({
     paddingHorizontal: 6, paddingVertical: 2,
   },
   addressPkgBadgeText: { fontSize: FontSizes.xs, fontWeight: '800', color: Colors.gold[400] },
+  hierarchyPanel: {
+    gap: Spacing.sm,
+    padding: Spacing.sm,
+    borderRadius: BorderRadius.sm,
+    borderWidth: 1,
+    borderColor: 'rgba(28,45,74,0.8)',
+    backgroundColor: Colors.overlay,
+  },
+  blockSection: { gap: Spacing.xs },
+  blockHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: Spacing.sm,
+  },
+  blockTitle: { flex: 1, fontSize: FontSizes.sm, fontWeight: '800', color: Colors.primary[200] },
+  blockMeta: { fontSize: FontSizes.xs, fontWeight: '700', color: Colors.gray },
+  unitHeader: {
+    minHeight: 28,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: Spacing.sm,
+    paddingHorizontal: Spacing.sm,
+    borderRadius: BorderRadius.sm,
+    backgroundColor: 'rgba(3,13,66,0.45)',
+  },
+  unitSection: { gap: Spacing.xs },
+  unitTitle: { flex: 1, fontSize: FontSizes.xs, fontWeight: '700', color: Colors.white },
+  unitMeta: { fontSize: FontSizes.xs, fontWeight: '800', color: Colors.gold[400] },
 
   packageItem: {
     flexDirection: 'row', alignItems: 'center', gap: Spacing.sm,

@@ -1,14 +1,18 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
-import {
+
+process.env.EXPO_PUBLIC_SUPABASE_URL ||= 'https://example.supabase.co';
+process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ||= 'test-anon-key';
+
+const {
   WAITLIST_PLATFORMS,
   buildWaitlistLeadPayload,
   getWaitlistLeadFriendlyError,
   normalizeWhatsApp,
   submitWaitlistLead,
   validateWaitlistLead,
-} from '../lib/waitlistLeads.ts';
+} = await import('../lib/waitlistLeads.ts');
 
 const validLead = {
   name: 'Motorista Beta',

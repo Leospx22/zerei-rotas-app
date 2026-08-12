@@ -6,6 +6,10 @@ All notable product and architecture changes are recorded here. Versions follow 
 
 ### Added
 
+- Offline Route AI foundation with deterministic analysis, scoring, comparison, local optimization strategies, provider interfaces for future AI providers, import-summary metrics, and architecture docs in `docs/route-ai.md`.
+- Offline Route AI runtime foundation for continuously analyzing only remaining stops, preserving completed/skipped/locked stops, simulating remaining-route strategies, and generating driver-controlled recommendations.
+- `ZR Intelligence™` presentation layer with reusable premium route AI cards for score, optimization summary, recommendation, simulation, and explainable insights.
+- `ZR Learning Engine™` local-only foundation for anonymous completed-route learning, driver profile metrics, delivery category aggregates, preference scoring, learning controls, and a ZR Intelligence™ learning status card.
 - `Prioridade Shopee` semantics for `#P` groups: missing Stop + missing Sequence appears first after import, remains manually movable, and no longer consumes regular display numbering.
 - Canonical map/navigation address construction from street + number with optional city/state/CEP, plus unresolved-stop retry action (`Tentar localizar novamente`) that uses cache/provider recovery without fabricating coordinates after Google Maps navigation.
 - Route-level duplicate-address summary banners in import summary and route review, backed by the same indexed duplicate-address warnings as each stop card.

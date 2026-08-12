@@ -13,7 +13,9 @@ import {
 } from 'lucide-react-native';
 import { Colors, Spacing, FontSizes, BorderRadius } from '@/constants/theme';
 import { HeaderBrandIcon } from '@/components/HeaderBrandIcon';
+import { ZRIntelligenceCard } from '@/components/route-ai';
 import { useRoute } from '@/contexts/RouteContext';
+import { getLearningStatus, simulateRemainingRouteStrategies, type LearningStatus } from '@/lib/route-ai';
 import {
   buildDisplayedRoutePositionMap,
   formatRouteOrderBadge,
@@ -25,7 +27,21 @@ export default function ImportSummaryScreen() {
   const router = useRouter();
   const { from } = useLocalSearchParams<{ from?: string }>();
   const { currentRoute, getSummary } = useRoute();
-  const routeStops = currentRoute?.stops ?? [];
+  const [learningStatus, setLearningStatus] = React.useState<LearningStatus | null>(null);
+  const routeStops = React.useMemo(
+    () => currentRoute?.stops ?? [],
+    [currentRoute?.stops]
+  );
+  const routeAIReport = currentRoute?.routeAIReport;
+  const routeSimulation = React.useMemo(
+    () => currentRoute
+      ? simulateRemainingRouteStrategies({
+        currentPosition: null,
+        stops: currentRoute.stops,
+      })
+      : null,
+    [currentRoute]
+  );
   const summary = React.useMemo(
     () => currentRoute ? getSummary() : null,
     [currentRoute, getSummary]
@@ -51,6 +67,16 @@ export default function ImportSummaryScreen() {
     })),
     [displayedPositions, duplicateWarnings, routeStops]
   );
+
+  React.useEffect(() => {
+    let mounted = true;
+    getLearningStatus()
+      .then(status => {
+        if (mounted) setLearningStatus(status);
+      })
+      .catch(() => {});
+    return () => { mounted = false; };
+  }, [currentRoute?.id]);
 
   if (!currentRoute || !summary) {
     return (
@@ -170,6 +196,18 @@ export default function ImportSummaryScreen() {
         </View>
       </LinearGradient>
 
+      {routeAIReport ? (
+        <ZRIntelligenceCard
+          report={routeAIReport}
+          simulation={routeSimulation ?? undefined}
+          learningStatus={learningStatus ?? undefined}
+          totalStops={currentRoute.stops.length}
+          onPreview={openRouteReview}
+          onUseOptimized={openRouteReview}
+          onKeepOriginal={openRouteReview}
+        />
+      ) : null}
+
       {/* Duplicate address warning */}
       {duplicateStopCount > 0 && (
         <View style={styles.duplicateWarningCard}>
@@ -214,6 +252,14 @@ export default function ImportSummaryScreen() {
                   <Text style={styles.metaBadgeText}>{stop.addressCount} endereços</Text>
                 </View>
               )}
+              {stop.addressGroups.some(group => group.blockCount > 0) ? (
+                <View style={styles.metaBadge}>
+                  <MapPin size={11} color={Colors.gold[400]} />
+                  <Text style={styles.metaBadgeText}>
+                    {stop.addressGroups.reduce((sum, group) => sum + group.blockCount, 0)} blocos
+                  </Text>
+                </View>
+              ) : null}
               {duplicateWarning && (
                 <View style={[styles.metaBadge, styles.metaBadgeWarning]}>
                   <AlertTriangle size={11} color={Colors.warning} />

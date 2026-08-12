@@ -1,4 +1,9 @@
-import type { GroupedStop, PackageItem } from '@/lib/packageUtils';
+import type { GroupedStop, PackageItem } from './packageUtils.ts';
+import {
+  buildSmartAddressGroups,
+  normalizeSmartAddress,
+  type SmartBlockGroup,
+} from './smartAddressGrouping.ts';
 
 export interface NormalizedPresentationAddress {
   streetType: string;
@@ -10,83 +15,17 @@ export interface NormalizedPresentationAddress {
   displayAddress: string;
 }
 
-export const ADDRESS_NORMALIZATION_DICTIONARY: Readonly<Record<string, string>> = {
-  r: 'Rua',
-  rua: 'Rua',
-  av: 'Avenida',
-  avenida: 'Avenida',
-  cel: 'Coronel',
-  coronel: 'Coronel',
-  dr: 'Doutor',
-  doutor: 'Doutor',
-  prof: 'Professor',
-  professor: 'Professor',
-};
-
-const LOWERCASE_STREET_WORDS = new Set(['da', 'das', 'de', 'do', 'dos', 'e']);
-
-function comparisonText(value: string): string {
-  return value
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .toLocaleLowerCase('pt-BR')
-    .trim();
-}
-
-function cleanAddressText(address: string): string {
-  return address
-    .replace(/\./g, '')
-    .replace(/,+/g, ',')
-    .replace(/\s*,\s*/g, ', ')
-    .replace(/\s*-\s*/g, ' - ')
-    .replace(/\s+/g, ' ')
-    .replace(/^[,\s]+|[,\s]+$/g, '')
-    .trim();
-}
-
-function normalizeStreetToken(token: string, index: number): string {
-  const key = comparisonText(token);
-  const dictionaryValue = ADDRESS_NORMALIZATION_DICTIONARY[key];
-  if (dictionaryValue) return dictionaryValue;
-
-  const lower = token.toLocaleLowerCase('pt-BR');
-  if (index > 0 && LOWERCASE_STREET_WORDS.has(comparisonText(lower))) return lower;
-  return lower.charAt(0).toLocaleUpperCase('pt-BR') + lower.slice(1);
-}
-
 export function normalizeAddress(address: string): NormalizedPresentationAddress {
-  const cleaned = cleanAddressText(address);
-  const parts = cleaned.match(
-    /^(.*?)(?:,\s*|\s+)(\d+[a-zA-Z]?(?:-\d+[a-zA-Z]?)?|s\/?n)(?:\s*(?:,|-)\s*(.*))?$/i
-  );
-  const rawStreet = (parts?.[1] ?? cleaned).trim();
-  const number = (parts?.[2] ?? '').toLocaleUpperCase('pt-BR');
-  const complement = (parts?.[3] ?? '').trim();
-  const streetTokens = rawStreet
-    .split(/\s+/)
-    .filter(Boolean)
-    .map(normalizeStreetToken);
-  const streetType = ['Rua', 'Avenida'].includes(streetTokens[0] ?? '')
-    ? streetTokens[0]
-    : '';
-  const street = (streetType ? streetTokens.slice(1) : streetTokens).join(' ');
-  const normalizedStreet = streetType
-    ? `${streetType} ${street}`.trim()
-    : street;
-  const normalizedStreetKey = comparisonText(normalizedStreet);
-  const groupKey = `${normalizedStreetKey}|${comparisonText(number)}`;
-  const displayAddress = number
-    ? `${normalizedStreet}, ${number}`
-    : normalizedStreet;
+  const normalized = normalizeSmartAddress(address);
 
   return {
-    streetType,
-    street,
-    number,
-    complement,
-    normalizedStreet,
-    groupKey,
-    displayAddress,
+    streetType: normalized.streetType,
+    street: normalized.street,
+    number: normalized.number,
+    complement: normalized.complement,
+    normalizedStreet: normalized.normalizedStreet,
+    groupKey: normalized.addressKey,
+    displayAddress: normalized.displayAddress,
   };
 }
 
@@ -94,6 +33,10 @@ export interface ExecutionPackageGroup {
   key: string;
   address: string;
   packages: PackageItem[];
+  blocks: SmartBlockGroup[];
+  blockCount: number;
+  deliveryCount: number;
+  isCondominium: boolean;
 }
 
 export interface PackageGroupSummary {
@@ -126,19 +69,17 @@ export function buildExecutionPackageGroups(
   if (!stop) return [];
 
   const groups = new Map<string, ExecutionPackageGroup>();
-  stop.packages.forEach(pkg => {
-    const originalAddress = pkg.destinationAddress.trim() || stop.normalizedAddress;
-    const normalized = normalizeAddress(originalAddress);
-    const existing = groups.get(normalized.groupKey);
-    if (existing) {
-      existing.packages.push(pkg);
-      return;
-    }
-
-    groups.set(normalized.groupKey, {
-      key: normalized.groupKey,
-      address: normalized.displayAddress || originalAddress,
-      packages: [pkg],
+  const hierarchy = buildSmartAddressGroups(stop.packages);
+  hierarchy.forEach(addressGroup => {
+    const packages = stop.packages.filter(pkg => addressGroup.packageIds.includes(pkg.id));
+    groups.set(addressGroup.key, {
+      key: addressGroup.key,
+      address: addressGroup.displayAddress,
+      packages,
+      blocks: addressGroup.blocks,
+      blockCount: addressGroup.blockCount,
+      deliveryCount: addressGroup.deliveryCount,
+      isCondominium: addressGroup.isCondominium,
     });
   });
 

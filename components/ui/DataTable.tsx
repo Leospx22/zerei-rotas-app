@@ -86,6 +86,9 @@ export function DataTable<T>({
 
 const styles = StyleSheet.create({
   frame: {
+    width: '100%',
+    maxWidth: '100%',
+    minWidth: 0,
     borderWidth: 1,
     borderColor: Colors.cardBorder,
     borderRadius: BorderRadius.md,
@@ -94,6 +97,7 @@ const styles = StyleSheet.create({
   },
   table: {
     width: '100%',
+    flexShrink: 0,
   },
   headerRow: {
     minHeight: 46,

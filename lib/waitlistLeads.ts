@@ -38,10 +38,11 @@ export interface WaitlistLeadResult {
   error: string | null;
 }
 
-const EXTERNAL_SUPABASE_URL = 'https://xmtvjzwcfvjkiaplaiay.supabase.co';
-const EXTERNAL_SUPABASE_ANON_KEY =
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhtdHZqendjZnZqa2lhcGxhaWF5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIxODc5NDcsImV4cCI6MjA5Nzc2Mzk0N30.cV8GVo2EmHEK6FOW3MRDuMP9MXT3XX3xdEB48qktDmA';
-const WAITLIST_REST_URL = `${EXTERNAL_SUPABASE_URL}/rest/v1/waitlist_leads`;
+const waitlistSupabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL?.trim() ?? '';
+const waitlistSupabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY?.trim() ?? '';
+const WAITLIST_REST_URL = waitlistSupabaseUrl
+  ? `${waitlistSupabaseUrl}/rest/v1/waitlist_leads`
+  : '';
 
 export function normalizeWhatsApp(value: string): string {
   return value.replace(/\D/g, '');
@@ -115,6 +116,10 @@ export function getWaitlistLeadFriendlyError(error: unknown): string {
 export async function submitWaitlistLead(
   input: WaitlistLeadInput
 ): Promise<WaitlistLeadResult> {
+  if (!WAITLIST_REST_URL || !waitlistSupabaseAnonKey) {
+    return { success: false, error: getWaitlistLeadFriendlyError({ code: 'WAITLIST_NOT_CONFIGURED' }) };
+  }
+
   const validation = validateWaitlistLead(input);
   if (!validation.isValid) return { success: false, error: validation.errors[0] };
 
@@ -127,18 +132,12 @@ export async function submitWaitlistLead(
     source: 'landing_page' as const,
   };
 
-  console.log(
-    'Submitting waitlist lead to external Supabase REST:',
-    WAITLIST_REST_URL
-  );
-  console.log('Waitlist payload:', payload);
-
   try {
     const response = await fetch(WAITLIST_REST_URL, {
       method: 'POST',
       headers: {
-        apikey: EXTERNAL_SUPABASE_ANON_KEY,
-        Authorization: `Bearer ${EXTERNAL_SUPABASE_ANON_KEY}`,
+        apikey: waitlistSupabaseAnonKey,
+        Authorization: `Bearer ${waitlistSupabaseAnonKey}`,
         'Content-Type': 'application/json',
         Prefer: 'return=minimal',
       },
@@ -147,7 +146,6 @@ export async function submitWaitlistLead(
 
     if (!response.ok) {
       const responseBody = await response.text();
-      console.error('Waitlist REST insert failed:', response.status, responseBody);
 
       if (
         response.status === 409 ||

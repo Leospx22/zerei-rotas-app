@@ -254,7 +254,117 @@ export function ExecutionCard({
 
                   {groupPlaceInfo ? <PlaceInfoCard place={groupPlaceInfo} /> : null}
 
-                {group.packages.map(pkg => {
+                  {group.isCondominium ? (
+                    <View style={styles.hierarchyPanel}>
+                      {group.blocks.map(block => (
+                        <View key={block.key} style={styles.blockSection}>
+                          {group.blockCount > 0 ? (
+                            <View style={styles.blockHeader}>
+                              <Text style={styles.blockTitle}>{block.name}</Text>
+                              <Text style={styles.blockMeta}>
+                                {block.packageCount} pacote{block.packageCount !== 1 ? 's' : ''} · {block.deliveryCount} entrega{block.deliveryCount !== 1 ? 's' : ''}
+                              </Text>
+                            </View>
+                          ) : null}
+                          {block.units.map(unit => {
+                            const unitPackages = unit.packageIds
+                              .map(packageId => group.packages.find(pkg => pkg.id === packageId))
+                              .filter((pkg): pkg is PackageItem => Boolean(pkg));
+
+                            return (
+                              <View key={unit.key} style={styles.unitSection}>
+                                <View style={styles.unitHeader}>
+                                  <Text style={styles.unitTitle}>{unit.label}</Text>
+                                  <Text style={styles.unitMeta}>
+                                    {unit.packageCount} pacote{unit.packageCount !== 1 ? 's' : ''}
+                                  </Text>
+                                </View>
+                                {unitPackages.map(pkg => {
+                  const separated = separatedPackageIds.has(pkg.id);
+                  const selectionDisabled = !isPickup && pkg.status !== 'pending';
+                  const packageStateLabel = isPickup
+                    ? 'Separado'
+                    : pkg.status === 'delivered'
+                      ? 'Entregue'
+                      : pkg.status === 'skipped'
+                        ? 'OcorrÃªncia'
+                        : 'Pendente';
+                  return (
+                    <View
+                      key={pkg.id}
+                      style={[
+                        styles.packageRow,
+                        separated && styles.packageRowSeparated,
+                        !isPickup && groupCompleted && styles.packageRowCompleted,
+                      ]}
+                    >
+                      <TouchableOpacity
+                        style={[
+                          styles.packageSelectionArea,
+                          selectionDisabled && styles.packageSelectionAreaDisabled,
+                        ]}
+                        onPress={() => onTogglePackageSeparated(pkg.id)}
+                        disabled={selectionDisabled}
+                        activeOpacity={0.78}
+                        accessibilityRole="checkbox"
+                        accessibilityState={{ checked: separated, disabled: selectionDisabled }}
+                        accessibilityLabel={`${getPackagePrimaryLabel(pkg)}, ${packageStateLabel}`}
+                      >
+                        <View style={[styles.checkbox, separated && styles.checkboxSelected]}>
+                          {separated ? <Check size={18} color={Colors.primary[900]} /> : null}
+                        </View>
+                        <View style={styles.packageRowContent}>
+                          <Text style={styles.packageTracking} numberOfLines={1}>
+                            {getPackagePrimaryLabel(pkg)}
+                          </Text>
+                          {getPackageSecondaryLabel(pkg) ? (
+                            <Text style={styles.packageSecondary} numberOfLines={1}>
+                              {getPackageSecondaryLabel(pkg)}
+                            </Text>
+                          ) : null}
+                          <Text style={styles.packageAddress} numberOfLines={1}>
+                            {pkg.destinationAddress}
+                          </Text>
+                        </View>
+                        <Text
+                          style={[
+                            styles.separatedLabel,
+                            (separated || pkg.status === 'delivered') && styles.separatedLabelActive,
+                            pkg.status === 'skipped' && styles.packageOccurrenceLabel,
+                          ]}
+                        >
+                          {packageStateLabel}
+                        </Text>
+                      </TouchableOpacity>
+                      {onPackageOccurrence ? (
+                        <TouchableOpacity
+                          style={[
+                            styles.packageOccurrenceAction,
+                            pkg.status === 'delivered' && styles.packageOccurrenceActionDisabled,
+                          ]}
+                          onPress={() => onPackageOccurrence(pkg.id)}
+                          disabled={pkg.status === 'delivered'}
+                          activeOpacity={0.75}
+                          accessibilityRole="button"
+                          accessibilityLabel={`Registrar ocorrÃªncia para ${pkg.trackingNumber}`}
+                          accessibilityState={{ disabled: pkg.status === 'delivered' }}
+                        >
+                          <AlertCircle size={17} color={Colors.error} />
+                          <Text style={styles.packageOccurrenceActionText}>OcorrÃªncia</Text>
+                        </TouchableOpacity>
+                      ) : null}
+                    </View>
+                  );
+                })}
+                              </View>
+                            );
+                          })}
+                        </View>
+                      ))}
+                    </View>
+                  ) : null}
+
+                {!group.isCondominium ? group.packages.map(pkg => {
                   const separated = separatedPackageIds.has(pkg.id);
                   const selectionDisabled = !isPickup && pkg.status !== 'pending';
                   const packageStateLabel = isPickup
@@ -330,7 +440,7 @@ export function ExecutionCard({
                       ) : null}
                     </View>
                   );
-                })}
+                }) : null}
                   {!isPickup && onConfirmAddressGroup ? (
                     groupCompleted ? (
                       <View style={styles.groupCompletedState}>
@@ -610,6 +720,58 @@ const styles = StyleSheet.create({
   groupHeaderActionText: {
     color: Colors.gold[400],
     fontSize: FontSizes.sm,
+    fontWeight: '800',
+  },
+  hierarchyPanel: {
+    gap: Spacing.sm,
+    padding: Spacing.sm,
+    borderRadius: BorderRadius.sm,
+    borderWidth: 1,
+    borderColor: Colors.cardBorder,
+    backgroundColor: 'rgba(10,37,114,0.22)',
+  },
+  blockSection: {
+    gap: Spacing.xs,
+  },
+  blockHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: Spacing.sm,
+  },
+  blockTitle: {
+    flex: 1,
+    color: Colors.primary[200],
+    fontSize: FontSizes.sm,
+    fontWeight: '800',
+  },
+  blockMeta: {
+    color: Colors.gray,
+    fontSize: FontSizes.xs,
+    fontWeight: '700',
+  },
+  unitHeader: {
+    minHeight: 28,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: Spacing.sm,
+    paddingHorizontal: Spacing.sm,
+    borderRadius: BorderRadius.sm,
+    backgroundColor: Colors.overlay,
+  },
+  unitSection: {
+    gap: Spacing.xs,
+  },
+  unitTitle: {
+    flex: 1,
+    color: Colors.white,
+    fontSize: FontSizes.xs,
+    fontWeight: '700',
+  },
+  unitMeta: {
+    color: Colors.gold[400],
+    fontSize: FontSizes.xs,
     fontWeight: '800',
   },
   packageRow: {

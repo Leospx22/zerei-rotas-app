@@ -7,6 +7,12 @@
 // - Packages group by Stop first, then by full normalized address within each Stop
 // - Same address under different Stop numbers = separate, flagged with duplicateAddressWarning
 // ============================================================
+import {
+  buildSmartAddressGroups,
+  normalizeSmartAddress,
+  smartAddressKeyForPackage,
+  type SmartBlockGroup,
+} from './smartAddressGrouping.ts';
 
 export interface RawPackage {
   trackingNumber: string;
@@ -48,6 +54,10 @@ export interface AddressGroup {
   state?: string;
   packageIds: string[];   // references to PackageItem ids in this group
   packageCount: number;
+  deliveryCount: number;
+  blockCount: number;
+  isCondominium: boolean;
+  blockGroups: SmartBlockGroup[];
 }
 
 // A Stop is grouped exclusively by the "Stop" column value.
@@ -108,8 +118,7 @@ export function normalizeAddress(address: string): string {
 }
 
 export function extractHouseNumber(address: string): string {
-  const match = address.match(/[,#\s]+(\d[\d\-a-zA-Z]*)/);
-  return match ? match[1] : '';
+  return normalizeSmartAddress(address).number;
 }
 
 const INVALID_EMPTY_VALUES = new Set(['', '-', '—', 'n/a', 'na', 'null', 'undefined']);
@@ -149,10 +158,6 @@ export function getPackageSecondaryLabel(
   pkg: Pick<PackageItem, 'trackingNumber' | 'sequence'>
 ): string | null {
   return pkg.sequence?.trim() ? `SPX TN: ${pkg.trackingNumber}` : null;
-}
-
-function normalizedAddressKey(address: string): string {
-  return normalizeAddress(address).toLowerCase().trim();
 }
 
 export function detectColumns(headers: string[]): Record<keyof RawPackage, number | null> {
@@ -292,95 +297,68 @@ export function parseSpreadsheetData(rows: any[][], headers: string[]): RawPacka
 
 // Build address groups inside a stop from a flat package list
 function buildAddressGroups(packages: PackageItem[]): AddressGroup[] {
-  const groupMap = new Map<string, PackageItem[]>();
-  for (const pkg of packages) {
-    const key = normalizedAddressKey(pkg.destinationAddress);
-    if (!groupMap.has(key)) groupMap.set(key, []);
-    groupMap.get(key)!.push(pkg);
-  }
-
-  const groups: AddressGroup[] = [];
-  for (const [, pkgs] of groupMap) {
-    const first = pkgs[0];
-    groups.push({
-      normalizedAddress: normalizeAddress(first.destinationAddress),
-      originalAddress: first.destinationAddress,
-      zipCode: first.zipCode,
-      city: first.city,
-      state: first.state,
-      packageIds: pkgs.map(p => p.id),
-      packageCount: pkgs.length,
-    });
-  }
-  return groups;
+  return buildSmartAddressGroups(packages).map(group => {
+    const first = packages.find(pkg => group.packageIds.includes(pkg.id)) ?? packages[0];
+    return {
+      normalizedAddress: group.displayAddress,
+      originalAddress: first?.destinationAddress ?? group.displayAddress,
+      zipCode: first?.zipCode ?? '',
+      city: first?.city,
+      state: first?.state,
+      packageIds: group.packageIds,
+      packageCount: group.packageCount,
+      deliveryCount: group.deliveryCount,
+      blockCount: group.blockCount,
+      isCondominium: group.isCondominium,
+      blockGroups: group.blocks,
+    };
+  });
 }
 
 // Primary grouping: Stop column is the ONLY source for stop identity.
 // Packages without a stop number are grouped by address as a fallback,
 // assigned synthetic stop numbers after the highest real stop.
 export function groupPackagesByStop(rawPackages: RawPackage[]): GroupedStop[] {
-  const withStop = rawPackages.filter(p => p.stopNumber !== null);
-  const withoutStop = rawPackages.filter(p => p.stopNumber === null);
-  const priorityWithoutStop = withoutStop.filter(isShopeePriorityPackage);
-  const nonPriorityWithoutStop = withoutStop.filter(p => !isShopeePriorityPackage(p));
+  const stopMap = new Map<string, { rawPackages: RawPackage[]; firstIndex: number }>();
+  rawPackages.forEach((pkg, index) => {
+    const key = smartAddressKeyForPackage(pkg);
+    const existing = stopMap.get(key) ?? { rawPackages: [], firstIndex: index };
+    existing.rawPackages.push(pkg);
+    stopMap.set(key, existing);
+  });
 
   // Build stop→rawPackages map
-  const stopMap = new Map<number, RawPackage[]>();
-  const missingStopKeys: number[] = [];
-  for (const pkg of withStop) {
-    const sn = pkg.stopNumber!;
-    if (!stopMap.has(sn)) stopMap.set(sn, []);
-    stopMap.get(sn)!.push(pkg);
-  }
+  const sortedEntries = [...stopMap.entries()].sort(([, left], [, right]) => {
+    const leftPriority = left.rawPackages.every(isShopeePriorityPackage);
+    const rightPriority = right.rawPackages.every(isShopeePriorityPackage);
+    if (leftPriority !== rightPriority) return leftPriority ? -1 : 1;
 
-  // Fallback: group by address for packages without stop numbers
-  const addMissingStopGroups = (packages: RawPackage[], priority: boolean) => {
-    if (packages.length === 0) return;
-    const addrMap = new Map<string, RawPackage[]>();
-    for (const pkg of packages) {
-      const key = normalizedAddressKey(pkg.destinationAddress);
-      if (!addrMap.has(key)) addrMap.set(key, []);
-      addrMap.get(key)!.push(pkg);
-    }
-    let nextStop = stopMap.size > 0 ? Math.max(...stopMap.keys()) + 1 : 1;
-    for (const [, pkgs] of addrMap) {
-      stopMap.set(nextStop, pkgs);
-      if (priority) missingStopKeys.push(nextStop);
-      nextStop++;
-    }
-  };
+    const leftStop = left.rawPackages.find(pkg => pkg.stopNumber !== null)?.stopNumber ?? null;
+    const rightStop = right.rawPackages.find(pkg => pkg.stopNumber !== null)?.stopNumber ?? null;
+    if (leftStop !== null && rightStop !== null && leftStop !== rightStop) return leftStop - rightStop;
+    if (leftStop !== null && rightStop === null) return 1;
+    if (leftStop === null && rightStop !== null) return -1;
+    return left.firstIndex - right.firstIndex;
+  });
 
-  addMissingStopGroups(priorityWithoutStop, true);
-  addMissingStopGroups(nonPriorityWithoutStop, false);
-
-  // Build global set of normalized addresses to detect cross-stop duplicates
-  const addressStopCount = new Map<string, Set<number>>();
-  for (const [sn, pkgs] of stopMap) {
-    for (const p of pkgs) {
-      const key = normalizedAddressKey(p.destinationAddress);
-      if (!addressStopCount.has(key)) addressStopCount.set(key, new Set());
-      addressStopCount.get(key)!.add(sn);
-    }
-  }
-
-  const missingKeySet = new Set(missingStopKeys);
-  const sortedKeys = [
-    ...missingStopKeys,
-    ...[...stopMap.keys()].filter(key => !missingKeySet.has(key)).sort((a, b) => a - b),
-  ];
   const stops: GroupedStop[] = [];
 
-  sortedKeys.forEach((stopNum, orderIndex) => {
-    const rawPkgs = stopMap.get(stopNum)!;
+  sortedEntries.forEach(([, entry], orderIndex) => {
+    const rawPkgs = entry.rawPackages;
     const first = rawPkgs[0];
+    const importedStopNumbers = rawPkgs
+      .map(pkg => pkg.stopNumber)
+      .filter((value): value is number => value !== null);
+    const stopNum = importedStopNumbers[0] ?? orderIndex + 1;
     const coordinateSource = rawPkgs.find(
       pkg => pkg.latitude !== null && pkg.longitude !== null
     ) ?? first;
-    const normalizedAddr = normalizeAddress(first.destinationAddress);
-    const houseNum = extractHouseNumber(first.destinationAddress);
+    const normalized = normalizeSmartAddress(first.destinationAddress);
+    const normalizedAddr = normalized.displayAddress;
+    const houseNum = normalized.number;
 
     const packages: PackageItem[] = rawPkgs.map((p, pi) => ({
-      id: `pkg-${stopNum}-${pi}`,
+      id: `pkg-${orderIndex + 1}-${pi}`,
       trackingNumber: p.trackingNumber,
       sequence: p.sequence,
       destinationAddress: p.destinationAddress,
@@ -396,15 +374,8 @@ export function groupPackagesByStop(rawPackages: RawPackage[]): GroupedStop[] {
     const addressGroups = buildAddressGroups(packages);
     const addressCount = addressGroups.length;
 
-    // Warning if any address in this stop appears in another stop
-    const hasDuplicate = addressGroups.some(ag => {
-      const key = normalizedAddressKey(ag.normalizedAddress);
-      const stops = addressStopCount.get(key);
-      return stops !== undefined && stops.size > 1;
-    });
-
     stops.push({
-      id: `stop-${stopNum}`,
+      id: `stop-${orderIndex + 1}`,
       stopNumber: stopNum,
       originalStopNumber: first.stopNumber,
       normalizedAddress: normalizedAddr,
@@ -419,7 +390,7 @@ export function groupPackagesByStop(rawPackages: RawPackage[]): GroupedStop[] {
       orderIndex,
       status: 'pending',
       houseNumber: houseNum,
-      duplicateAddressWarning: hasDuplicate,
+      duplicateAddressWarning: false,
     });
   });
 

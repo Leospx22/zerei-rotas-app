@@ -59,6 +59,8 @@ import {
 import {
   getPackagePrimaryLabel,
   getPackageSecondaryLabel,
+  type GroupedStop,
+  type PackageItem,
 } from '@/lib/packageUtils';
 import {
   buildDuplicateAddressWarnings,
@@ -172,9 +174,6 @@ export default function RouteExecutionScreen() {
     nextStop,
     totalPackagesAtCurrentStop,
     pendingPackagesAtCurrentStop,
-    deliveredPackagesCount,
-    totalPackagesCount,
-    remainingStopsCount,
   } = derivedExecutionState;
   const placeAddressGroups = React.useMemo(
     () => buildExecutionPackageGroups(currentStop).map(({ key, address }) => ({ key, address })),
@@ -465,6 +464,98 @@ export default function RouteExecutionScreen() {
 
   // Only show distance if it was explicitly set (not estimated from stop count)
   const hasRealDistance = currentRoute.estimatedDistanceKm > 0;
+  const renderPackageRow = (stop: GroupedStop, pkg: PackageItem) => {
+    const isDelivered = pkg.status === 'delivered';
+    const isOccurrence = pkg.status === 'skipped';
+    const occurrenceReason = pkg.occurrenceReason ?? occurrences[pkg.id];
+
+    return (
+      <View key={pkg.id} style={styles.packageRow}>
+        <View style={styles.packageInfo}>
+          <View style={styles.packageTrackingRow}>
+            <Package size={12} color={Colors.gold[400]} />
+            <Text
+              style={[
+                styles.packageTracking,
+                isDelivered && styles.packageTrackingDelivered,
+                isOccurrence && styles.packageTrackingOccurrence,
+              ]}
+              numberOfLines={1}
+            >
+              {getPackagePrimaryLabel(pkg)}
+            </Text>
+          </View>
+          {getPackageSecondaryLabel(pkg) ? (
+            <Text style={styles.packageSecondary} numberOfLines={1}>
+              {getPackageSecondaryLabel(pkg)}
+            </Text>
+          ) : null}
+          <Text style={styles.packageAddress} numberOfLines={1}>
+            {pkg.destinationAddress}
+          </Text>
+          {isOccurrence && occurrenceReason ? (
+            <Text style={styles.occurrenceReason}>{occurrenceReason}</Text>
+          ) : null}
+        </View>
+
+        <TouchableOpacity
+          style={[
+            styles.actionBtn,
+            isDelivered && styles.actionBtnActiveGreen,
+          ]}
+          onPress={() => {
+            if (isOccurrence) return;
+            updatePackageStatus(
+              stop.id,
+              pkg.id,
+              isDelivered ? 'pending' : 'delivered'
+            );
+          }}
+          hitSlop={{ top: 10, bottom: 10, left: 6, right: 6 }}
+          activeOpacity={0.7}
+        >
+          <CheckCircle2
+            size={26}
+            color={
+              isDelivered
+                ? Colors.success
+                : isOccurrence
+                ? Colors.cardBorder
+                : Colors.gray
+            }
+          />
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[
+            styles.actionBtn,
+            isOccurrence && styles.actionBtnActiveRed,
+          ]}
+          onPress={() => {
+            if (isDelivered) return;
+            if (isOccurrence) {
+              updatePackageStatus(stop.id, pkg.id, 'pending');
+            } else {
+              setOccurrenceTarget({ stopId: stop.id, packageIds: [pkg.id] });
+            }
+          }}
+          hitSlop={{ top: 10, bottom: 10, left: 6, right: 6 }}
+          activeOpacity={0.7}
+        >
+          <XCircle
+            size={26}
+            color={
+              isOccurrence
+                ? Colors.error
+                : isDelivered
+                ? Colors.cardBorder
+                : Colors.gray
+            }
+          />
+        </TouchableOpacity>
+      </View>
+    );
+  };
 
   return (
     <>
@@ -719,7 +810,52 @@ export default function RouteExecutionScreen() {
                         <Text style={styles.addressGroupCount}>{visiblePackageIds.length} pkg</Text>
                       </View>
 
-                      {stop.packages
+                      {ag.isCondominium ? (
+                        <View style={styles.hierarchyPanel}>
+                          {ag.blockGroups.map(block => {
+                            const visibleBlockPackageIds = block.packageIds.filter(packageId =>
+                              visiblePackageIds.includes(packageId)
+                            );
+                            if (visibleBlockPackageIds.length === 0) return null;
+
+                            return (
+                              <View key={block.key} style={styles.blockSection}>
+                                {ag.blockCount > 0 ? (
+                                  <View style={styles.blockHeader}>
+                                    <Text style={styles.blockTitle}>{block.name}</Text>
+                                    <Text style={styles.blockMeta}>
+                                      {visibleBlockPackageIds.length} pacote{visibleBlockPackageIds.length !== 1 ? 's' : ''}
+                                    </Text>
+                                  </View>
+                                ) : null}
+                                {block.units.map(unit => {
+                                  const visibleUnitPackageIds = unit.packageIds.filter(packageId =>
+                                    visiblePackageIds.includes(packageId)
+                                  );
+                                  if (visibleUnitPackageIds.length === 0) return null;
+                                  const unitPackages = visibleUnitPackageIds
+                                    .map(packageId => stop.packages.find(pkg => pkg.id === packageId))
+                                    .filter((pkg): pkg is PackageItem => Boolean(pkg));
+
+                                  return (
+                                    <View key={unit.key} style={styles.unitSection}>
+                                      <View style={styles.unitHeader}>
+                                        <Text style={styles.unitTitle}>{unit.label}</Text>
+                                        <Text style={styles.unitMeta}>
+                                          {visibleUnitPackageIds.length} pacote{visibleUnitPackageIds.length !== 1 ? 's' : ''}
+                                        </Text>
+                                      </View>
+                                      {unitPackages.map(pkg => renderPackageRow(stop, pkg))}
+                                    </View>
+                                  );
+                                })}
+                              </View>
+                            );
+                          })}
+                        </View>
+                      ) : null}
+
+                      {!ag.isCondominium ? stop.packages
                         .filter(p => visiblePackageIds.includes(p.id))
                         .map(pkg => {
                           const isDelivered = pkg.status === 'delivered';
@@ -820,7 +956,7 @@ export default function RouteExecutionScreen() {
                               </TouchableOpacity>
                             </View>
                           );
-                        })}
+                        }) : null}
                     </View>
                     );
                   })}
@@ -992,6 +1128,37 @@ const styles = StyleSheet.create({
   },
   addressGroupText: { flex: 1, fontSize: FontSizes.xs, fontWeight: '600', color: Colors.primary[200] },
   addressGroupCount: { fontSize: FontSizes.xs, color: Colors.gray, fontWeight: '600' },
+  hierarchyPanel: {
+    gap: Spacing.sm,
+    paddingVertical: Spacing.xs,
+  },
+  blockSection: {
+    gap: Spacing.xs,
+    padding: Spacing.xs,
+    borderRadius: BorderRadius.sm,
+    backgroundColor: Colors.overlay,
+  },
+  blockHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: Spacing.sm,
+  },
+  blockTitle: { flex: 1, fontSize: FontSizes.xs, fontWeight: '800', color: Colors.primary[200] },
+  blockMeta: { fontSize: FontSizes.xs, fontWeight: '700', color: Colors.gray },
+  unitHeader: {
+    minHeight: 28,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: Spacing.sm,
+    paddingHorizontal: Spacing.sm,
+    borderRadius: BorderRadius.sm,
+    backgroundColor: 'rgba(3,13,66,0.5)',
+  },
+  unitSection: { gap: Spacing.xs },
+  unitTitle: { flex: 1, fontSize: FontSizes.xs, fontWeight: '700', color: Colors.white },
+  unitMeta: { fontSize: FontSizes.xs, fontWeight: '800', color: Colors.gold[400] },
 
   // Package row
   packageRow: {

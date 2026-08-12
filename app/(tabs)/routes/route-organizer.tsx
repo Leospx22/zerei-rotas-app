@@ -15,6 +15,7 @@ import {
 } from 'lucide-react-native';
 import { Colors, Spacing, FontSizes, BorderRadius } from '@/constants/theme';
 import { HeaderBrandIcon } from '@/components/HeaderBrandIcon';
+import { AIInsightsCard } from '@/components/route-ai';
 import { useRoute } from '@/contexts/RouteContext';
 import type { GroupedStop } from '@/lib/packageUtils';
 import {
@@ -140,6 +141,8 @@ export default function RouteOrganizerScreen() {
           <Text style={[styles.actionLabel, { color: Colors.error }]}>Tudo</Text>
         </TouchableOpacity>
       </View>
+
+      <AIInsightsCard stops={currentRoute.stops} />
 
       <Text style={styles.sectionTitle}>
         Paradas Agrupadas ({currentRoute.stops.length})

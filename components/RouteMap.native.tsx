@@ -16,7 +16,10 @@ const ENABLE_MAP_DIAGNOSTICS =
 
 function logMapDiagnostic(event: string, details: Record<string, unknown> = {}) {
   if (!ENABLE_MAP_DIAGNOSTICS) return;
-  console.info('[ZR MAP]', event, details);
+  const safeDetails = Object.fromEntries(
+    Object.entries(details).filter(([key]) => !/address|coordinate|latitude|longitude/i.test(key))
+  );
+  console.info('[ZR MAP]', event, safeDetails);
 }
 
 function markerColor(status: MapStop['status'], selected: boolean): string {

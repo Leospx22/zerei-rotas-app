@@ -10,7 +10,7 @@ import {
   LayoutChangeEvent,
 } from 'react-native';
 import Svg, { Circle, G, Line, Path, Text as SvgText } from 'react-native-svg';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import {
   Package,
@@ -41,6 +41,7 @@ import { RecentActivity } from '@/components/dashboard/RecentActivity';
 import { HeaderBrandIcon } from '@/components/HeaderBrandIcon';
 import { FounderWaitlistTable } from '@/components/FounderWaitlistTable';
 import { FounderInlineSkeleton } from '@/components/founder/FounderStates';
+import { AnimatedValueText, FadeInView, ScreenSkeleton } from '@/components/ui';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRoute } from '@/contexts/RouteContext';
 import { useAnalyticsTime } from '@/contexts/AnalyticsTimeContext';
@@ -185,9 +186,14 @@ function KpiCard({
         <FounderInlineSkeleton compact />
       ) : (
         <>
-          <Text style={styles.kpiValue} numberOfLines={1} adjustsFontSizeToFit>
+          <AnimatedValueText
+            value={value}
+            style={styles.kpiValue}
+            numberOfLines={1}
+            adjustsFontSizeToFit
+          >
             {value}
-          </Text>
+          </AnimatedValueText>
           <Text style={styles.kpiLabel} numberOfLines={2}>
             {label}
           </Text>
@@ -740,6 +746,7 @@ const cel = StyleSheet.create({
 
 export default function DashboardScreen() {
   const router = useRouter();
+  const { admin } = useLocalSearchParams<{ admin?: string }>();
   const { session } = useAuth();
   const analyticsTime = useAnalyticsTime();
   const founderAccessQuery = useQuery({
@@ -749,8 +756,10 @@ export default function DashboardScreen() {
     staleTime: 60_000,
   });
   const showFounderAdmin = Boolean(session) && founderAccessQuery.data === true;
+  const showFounderDashboard = showFounderAdmin && admin === '1';
   const {
     currentRoute,
+    isLoading,
     routeHistory: recentRoutes,
     restoreNotice,
     clearRestoreNotice,
@@ -813,10 +822,14 @@ export default function DashboardScreen() {
     return <CelebrationScreen route={currentRoute} />;
   }
 
+  if (isLoading) {
+    return <ScreenSkeleton message="Carregando painel..." rows={5} />;
+  }
+
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       {/* Header */}
-      <View style={styles.header}>
+      <FadeInView style={styles.header}>
         <View style={styles.brandRow}>
           <View style={styles.logoCircle}>
             <HeaderBrandIcon size={24} containerSize={44} filled />
@@ -829,15 +842,16 @@ export default function DashboardScreen() {
         <View style={styles.avatar}>
           <Text style={styles.avatarText}>M</Text>
         </View>
-      </View>
+      </FadeInView>
 
-      {showFounderAdmin ? (
+      {showFounderDashboard ? (
         <>
           <FounderKpiCards />
           <FounderAnalyticsCharts />
           <FounderWaitlistTable timeRange={analyticsTime.dashboardRange} />
         </>
-      ) : null}
+      ) : (
+        <>
 
       {restoreNotice ? (
         <TouchableOpacity
@@ -853,6 +867,7 @@ export default function DashboardScreen() {
       ) : null}
 
       {/* ROTA DE HOJE hero card */}
+      <FadeInView delay={40}>
       <LinearGradient
         colors={[Colors.primary[600], Colors.primary[800]]}
         style={styles.rotaCard}
@@ -877,21 +892,31 @@ export default function DashboardScreen() {
             <View style={styles.rotaHeroRow}>
               <View style={styles.rotaHeroItem}>
                 <Package size={28} color={Colors.gold[400]} />
-                <Text style={styles.rotaHeroValue}>{total}</Text>
+                <AnimatedValueText style={styles.rotaHeroValue} value={total}>
+                  {total}
+                </AnimatedValueText>
                 <Text style={styles.rotaHeroLabel}>Pacotes</Text>
               </View>
               <View style={styles.rotaHeroDivider} />
               <View style={styles.rotaHeroItem}>
                 <MapPin size={28} color={Colors.gold[300]} />
-                <Text style={[styles.rotaHeroValue, { color: Colors.gold[300] }]}>{totalStops}</Text>
+                <AnimatedValueText
+                  style={[styles.rotaHeroValue, { color: Colors.gold[300] }]}
+                  value={totalStops}
+                >
+                  {totalStops}
+                </AnimatedValueText>
                 <Text style={styles.rotaHeroLabel}>Paradas</Text>
               </View>
               <View style={styles.rotaHeroDivider} />
               <View style={styles.rotaHeroItem}>
                 <Trophy size={28} color={Colors.success} />
-                <Text style={[styles.rotaHeroValue, { color: Colors.success }]}>
+                <AnimatedValueText
+                  style={[styles.rotaHeroValue, { color: Colors.success }]}
+                  value={largestStop?.packageCount ?? 0}
+                >
                   {largestStop?.packageCount ?? 0}
-                </Text>
+                </AnimatedValueText>
                 <Text style={styles.rotaHeroLabel}>Maior Parada</Text>
               </View>
             </View>
@@ -912,6 +937,7 @@ export default function DashboardScreen() {
           </View>
         )}
       </LinearGradient>
+      </FadeInView>
 
       {currentRoute && currentRoute.status !== 'completed' ? (
         <TouchableOpacity
@@ -919,10 +945,10 @@ export default function DashboardScreen() {
           onPress={() => router.push('/(tabs)/routes/delivery-preparation')}
           activeOpacity={0.8}
           accessibilityRole="button"
-          accessibilityLabel="Revisar Rota"
+          accessibilityLabel="Revisar rota"
         >
           <MapPin size={19} color={Colors.gold[400]} />
-          <Text style={styles.reviewRouteButtonText}>Revisar Rota</Text>
+          <Text style={styles.reviewRouteButtonText}>Revisar rota</Text>
         </TouchableOpacity>
       ) : null}
 
@@ -936,7 +962,7 @@ export default function DashboardScreen() {
       >
         <LinearGradient colors={[Colors.gold[500], Colors.gold[700]]} style={styles.importGradient}>
           <FileSpreadsheet size={22} color={Colors.primary[900]} />
-          <Text style={styles.importText}>Importar Planilha</Text>
+          <Text style={styles.importText}>Importar planilha</Text>
         </LinearGradient>
       </TouchableOpacity>
 
@@ -1105,7 +1131,7 @@ export default function DashboardScreen() {
                 <View style={styles.routeCardMetaRow}>
                   <View style={styles.routeMetaItem}>
                     <Package size={12} color={Colors.gray} />
-                    <Text style={styles.routeMetaText}>{entry.totalPackages} pkgs</Text>
+                    <Text style={styles.routeMetaText}>{entry.totalPackages} pacotes</Text>
                   </View>
                   <View style={styles.routeMetaItem}>
                     <MapPin size={12} color={Colors.gray} />
@@ -1124,6 +1150,8 @@ export default function DashboardScreen() {
             </View>
           );
         })
+      )}
+        </>
       )}
     </ScrollView>
   );

@@ -55,14 +55,24 @@ test('small internal headers use the minimalist crown, not the detailed launcher
 test('dashboard actions and bottom tabs remain structurally registered', () => {
   const dashboard = read('app/(tabs)/index.tsx');
   assert.match(dashboard, /router\.push\('\/\(tabs\)\/routes\/import'\)/);
-  assert.match(dashboard, /Importar Planilha/);
+  assert.match(dashboard, /Importar planilha/);
   assert.match(dashboard, /router\.push\('\/\(tabs\)\/routes\/delivery-preparation'\)/);
-  assert.match(dashboard, /Revisar Rota/);
+  assert.match(dashboard, /Revisar rota/);
+  assert.match(dashboard, /admin === '1'/);
 
   const tabs = read('app/(tabs)/_layout.tsx');
   for (const routeName of ['index', 'routes', 'occurrences', 'history', 'profile']) {
     assert.match(tabs, new RegExp(`name="${routeName}"`));
   }
+  for (const routeName of ['users', 'waitlist']) {
+    assert.match(tabs, new RegExp(`name="${routeName}"[\\s\\S]*href: null`));
+  }
+
+  const profile = read('app/(tabs)/profile.tsx');
+  assert.match(profile, /showFounderAdmin/);
+  assert.match(profile, /Dashboard', href: '\/\(tabs\)\?admin=1'/);
+  assert.match(profile, /Users', href: '\/\(tabs\)\/users'/);
+  assert.match(profile, /Waitlist', href: '\/\(tabs\)\/waitlist'/);
 });
 
 test('official launcher, splash, package, and EAS metadata remain unchanged', () => {

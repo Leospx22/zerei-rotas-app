@@ -101,7 +101,7 @@ export interface RouteScoreResult {
 
 export interface RouteAIRecommendation {
   action: 'use-optimized-route' | 'keep-original-route';
-  label: 'Use Optimized Route' | 'Keep Original Route';
+  label: string;
   reason: string;
 }
 

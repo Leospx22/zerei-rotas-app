@@ -86,6 +86,6 @@ test('route AI report composes analysis, optimization, comparison, score, and re
   assert.equal(report.analysis.totalStops, 4);
   assert.equal(report.optimization.strategy, 'balanced');
   assert.ok(report.comparison.percentageImprovement >= 0);
-  assert.match(report.recommendation.label, /Route$/);
+  assert.match(report.recommendation.label, /rota/i);
 });
 

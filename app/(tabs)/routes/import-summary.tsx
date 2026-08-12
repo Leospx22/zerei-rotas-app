@@ -122,7 +122,7 @@ export default function ImportSummaryScreen() {
         </TouchableOpacity>
         <View style={styles.headerTitleRow}>
           <HeaderBrandIcon size={20} />
-          <Text style={styles.headerTitle}>Resumo da Importação</Text>
+          <Text style={styles.headerTitle}>Resumo da importação</Text>
         </View>
         <View style={{ width: 40 }} />
       </View>
@@ -133,9 +133,9 @@ export default function ImportSummaryScreen() {
           onPress={openRouteReview}
           activeOpacity={0.78}
           accessibilityRole="button"
-          accessibilityLabel="Voltar para Revisar Rota"
+          accessibilityLabel="Voltar para revisar rota"
         >
-          <Text style={styles.returnToReviewText}>Voltar para Revisar Rota</Text>
+          <Text style={styles.returnToReviewText}>Voltar para revisar rota</Text>
           <ChevronRight size={18} color={Colors.gold[400]} />
         </TouchableOpacity>
       ) : null}
@@ -288,7 +288,7 @@ export default function ImportSummaryScreen() {
           style={styles.nextGradient}
         >
           <Text style={styles.nextText}>
-            {returningFromReview ? 'Voltar para Revisar Rota' : 'Revisar Rota'}
+            {returningFromReview ? 'Voltar para revisar rota' : 'Revisar rota'}
           </Text>
           <ChevronRight size={20} color={Colors.primary[900]} />
         </LinearGradient>

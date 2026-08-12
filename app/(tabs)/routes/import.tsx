@@ -311,7 +311,7 @@ export default function ImportScreen() {
         </TouchableOpacity>
         <View style={styles.headerTitleRow}>
           <HeaderBrandIcon size={20} />
-          <Text style={styles.headerTitle}>Importar Planilha</Text>
+          <Text style={styles.headerTitle}>Importar planilha</Text>
         </View>
         <View style={{ width: 40 }} />
       </View>
@@ -319,19 +319,19 @@ export default function ImportScreen() {
       <View style={styles.autoDetectCard}>
         <CheckCircle2 size={18} color={Colors.success} />
         <Text style={styles.autoDetectText}>
-          Colunas detectadas automaticamente: SPX TN, Stop, Destination Address, Postal Code, Latitude, Longitude
+          Colunas detectadas automaticamente: SPX TN, parada, endereço de destino, CEP, latitude, longitude
         </Text>
       </View>
 
-      <Text style={styles.sectionTitle}>Enviar Planilha</Text>
+      <Text style={styles.sectionTitle}>Enviar planilha</Text>
       <TouchableOpacity style={styles.uploadCard} onPress={handleFileSelect}>
         <LinearGradient colors={[Colors.cardBg, Colors.overlay]} style={styles.uploadGradient}>
           <FileSpreadsheet size={36} color={Colors.gold[400]} />
-          <Text style={styles.uploadTitle}>Enviar Arquivo</Text>
+          <Text style={styles.uploadTitle}>Enviar arquivo</Text>
           <Text style={styles.uploadSubtitle}>.xlsx, .xls ou .csv</Text>
           <View style={styles.uploadBadge}>
             <Upload size={16} color={Colors.gold[400]} />
-            <Text style={styles.uploadBadgeText}>Selecionar Arquivo</Text>
+            <Text style={styles.uploadBadgeText}>Selecionar arquivo</Text>
           </View>
         </LinearGradient>
       </TouchableOpacity>
@@ -379,7 +379,7 @@ export default function ImportScreen() {
 
       {detectedColumns.length > 0 ? (
         <View style={styles.columnsCard}>
-          <Text style={styles.columnsTitle}>Colunas Detectadas:</Text>
+          <Text style={styles.columnsTitle}>Colunas detectadas:</Text>
           <View style={styles.columnsRow}>
             {detectedColumns.map((col, i) => (
               <View key={i} style={styles.columnBadge}>
@@ -393,7 +393,7 @@ export default function ImportScreen() {
       {rawPackages.length > 0 ? (
         <View style={styles.previewSection}>
           <Text style={styles.previewTitle}>
-            Previa: {rawPackages.length} pacotes encontrados
+            Prévia: {rawPackages.length} pacotes encontrados
           </Text>
           {rawPackages.slice(0, 5).map((pkg, i) => (
             <View key={i} style={styles.packageRow}>

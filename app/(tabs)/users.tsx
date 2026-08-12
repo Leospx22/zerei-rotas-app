@@ -53,7 +53,7 @@ const filters: { value: FounderUsersFilter; label: string }[] = [
 ];
 
 const sidebarItems = [
-  { label: 'Dashboard', href: '/(tabs)' as const, icon: Home },
+  { label: 'Dashboard', href: '/(tabs)?admin=1' as const, icon: Home },
   { label: 'Metrics', href: '/(tabs)/history' as const, icon: BarChart3 },
   { label: 'Users', href: '/(tabs)/users' as const, icon: Users },
   { label: 'Waitlist', href: '/(tabs)/waitlist' as const, icon: ClipboardList },

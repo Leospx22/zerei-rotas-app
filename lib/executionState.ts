@@ -14,6 +14,17 @@ export interface DerivedExecutionState {
   executionStep: ExecutionStep;
 }
 
+export interface ExecutionProgressSummary {
+  deliveredStops: number;
+  remainingStops: number;
+  completionPercent: number;
+  deliveredPackages: number;
+  remainingPackages: number;
+  totalStops: number;
+  totalPackages: number;
+  successRate: number;
+}
+
 export function deriveExecutionState(route: RouteData | null): DerivedExecutionState {
   const remainingStops = route?.stops.filter(stop => stop.status === 'pending') ?? [];
   const currentStop = remainingStops[0] ?? null;
@@ -39,4 +50,46 @@ export function deriveExecutionState(route: RouteData | null): DerivedExecutionS
         ? 'entrega'
         : 'separacao',
   };
+}
+
+export function deriveExecutionProgress(route: RouteData | null): ExecutionProgressSummary {
+  const totalStops = route?.stops.length ?? 0;
+  const deliveredStops = route?.completedStops ?? 0;
+  const totalPackages = route?.totalPackages ?? 0;
+  const deliveredPackages = route?.deliveredPackages ?? 0;
+  const remainingStops = Math.max(0, totalStops - deliveredStops);
+  const remainingPackages = Math.max(0, totalPackages - deliveredPackages);
+  const completionPercent =
+    totalStops > 0 ? Math.round((deliveredStops / totalStops) * 100) : 0;
+  const successRate =
+    totalPackages > 0 ? Math.round((deliveredPackages / totalPackages) * 100) : 0;
+
+  return {
+    deliveredStops,
+    remainingStops,
+    completionPercent,
+    deliveredPackages,
+    remainingPackages,
+    totalStops,
+    totalPackages,
+    successRate,
+  };
+}
+
+export function formatExecutionDuration(minutes: number): string {
+  const safeMinutes = Math.max(0, Math.round(minutes));
+  const hours = Math.floor(safeMinutes / 60);
+  const remainingMinutes = safeMinutes % 60;
+
+  if (hours === 0) return `${remainingMinutes} min`;
+  if (remainingMinutes === 0) return `${hours}h`;
+  return `${hours}h ${remainingMinutes}min`;
+}
+
+export function formatExecutionTime(timestamp: number | null | undefined): string {
+  if (!timestamp) return '--:--';
+  return new Date(timestamp).toLocaleTimeString('pt-BR', {
+    hour: '2-digit',
+    minute: '2-digit',
+  });
 }

@@ -37,6 +37,7 @@ export interface ExecutionCardProps {
   onConfirmAddressGroup?: (group: ExecutionPackageGroup) => void;
   completedAddressGroupKeys?: ReadonlySet<string>;
   showNavigate?: boolean;
+  deliveryActionDisabled?: boolean;
 }
 
 const EMPTY_COMPLETED_ADDRESS_GROUP_KEYS: ReadonlySet<string> = new Set();
@@ -65,6 +66,7 @@ export function ExecutionCard({
   onConfirmAddressGroup,
   completedAddressGroupKeys = EMPTY_COMPLETED_ADDRESS_GROUP_KEYS,
   showNavigate = true,
+  deliveryActionDisabled = false,
 }: ExecutionCardProps) {
   const packageGroups = React.useMemo(
     () => currentStop ? buildExecutionPackageGroups(currentStop) : [],
@@ -90,7 +92,7 @@ export function ExecutionCard({
   const pickupComplete =
     totalPackagesAtCurrentStop > 0 &&
     separatedPackagesCount === totalPackagesAtCurrentStop;
-  const primaryDisabled = isPickup && !pickupComplete;
+  const primaryDisabled = isPickup ? !pickupComplete : deliveryActionDisabled;
   const mainAddress =
     packageGroups[0]?.address ?? normalizeAddress(currentStop.normalizedAddress).displayAddress;
   const addressCount = packageGroups.length;
@@ -287,7 +289,7 @@ export function ExecutionCard({
                     : pkg.status === 'delivered'
                       ? 'Entregue'
                       : pkg.status === 'skipped'
-                        ? 'OcorrÃªncia'
+                        ? 'Ocorrência'
                         : 'Pendente';
                   return (
                     <View
@@ -346,11 +348,11 @@ export function ExecutionCard({
                           disabled={pkg.status === 'delivered'}
                           activeOpacity={0.75}
                           accessibilityRole="button"
-                          accessibilityLabel={`Registrar ocorrÃªncia para ${pkg.trackingNumber}`}
+                          accessibilityLabel={`Registrar ocorrência para ${pkg.trackingNumber}`}
                           accessibilityState={{ disabled: pkg.status === 'delivered' }}
                         >
                           <AlertCircle size={17} color={Colors.error} />
-                          <Text style={styles.packageOccurrenceActionText}>OcorrÃªncia</Text>
+                          <Text style={styles.packageOccurrenceActionText}>Ocorrência</Text>
                         </TouchableOpacity>
                       ) : null}
                     </View>
@@ -449,10 +451,15 @@ export function ExecutionCard({
                       </View>
                     ) : (
                       <TouchableOpacity
-                        style={styles.groupCompleteButton}
+                        style={[
+                          styles.groupCompleteButton,
+                          deliveryActionDisabled && styles.primaryButtonDisabled,
+                        ]}
                         onPress={() => onConfirmAddressGroup(group)}
+                        disabled={deliveryActionDisabled}
                         activeOpacity={0.8}
                         accessibilityRole="button"
+                        accessibilityState={{ disabled: deliveryActionDisabled }}
                         accessibilityLabel={`Entregue neste endereço: ${group.address}`}
                       >
                         <CheckCircle2 size={20} color={Colors.primary[900]} />
@@ -482,10 +489,10 @@ export function ExecutionCard({
         </View>
       </View>
 
-      {isPickup ? (
+      {isPickup || pendingPackagesAtCurrentStop.length > 0 ? (
         <TouchableOpacity
           style={[styles.primaryButton, primaryDisabled && styles.primaryButtonDisabled]}
-          onPress={onConfirmPickup}
+          onPress={isPickup ? onConfirmPickup : onConfirmDelivery}
           disabled={primaryDisabled}
           activeOpacity={0.82}
           accessibilityRole="button"

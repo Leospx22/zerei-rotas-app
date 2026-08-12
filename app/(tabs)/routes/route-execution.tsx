@@ -10,6 +10,7 @@ import {
   Alert,
   Linking,
   InteractionManager,
+  LayoutAnimation,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -32,9 +33,13 @@ import {
   PlaceInfoEditorModal,
   type PlaceInfoDraft,
 } from '@/components/PlaceInfoEditorModal';
-import { AppCard, AppText } from '@/components/ui';
+import { AppCard, AppText, FadeInView, ScreenSkeleton } from '@/components/ui';
 import { useRoute } from '@/contexts/RouteContext';
-import { deriveExecutionState, type ExecutionStep } from '@/lib/executionState';
+import {
+  deriveExecutionProgress,
+  deriveExecutionState,
+  type ExecutionStep,
+} from '@/lib/executionState';
 import {
   buildExecutionPackageGroups,
   getPendingPackageIdsForGroup,
@@ -68,6 +73,11 @@ import {
   formatRouteOrderBadge,
 } from '@/lib/routeStopPresentation';
 import {
+  buildExecutionProductivitySnapshot,
+  formatExecutionEta,
+  type RoutePaceStatus,
+} from '@/lib/route-ai';
+import {
   deletePlaceInfo,
   loadPlaceInfo,
   savePlaceInfo,
@@ -75,11 +85,23 @@ import {
 } from '@/lib/placeIntelligence';
 
 const NOOP = () => {};
+type NavigationPreference = 'googleMaps' | 'waze';
+const PRODUCTIVITY_REFRESH_MS = 60000;
 
 interface OccurrenceSheetProps {
   visible: boolean;
   onSelect: (reason: string) => void;
   onClose: () => void;
+}
+
+function getPaceTone(pace: RoutePaceStatus) {
+  if (pace === 'ahead') {
+    return { color: Colors.success, backgroundColor: Colors.successBg, borderColor: Colors.successBorder };
+  }
+  if (pace === 'behind') {
+    return { color: Colors.error, backgroundColor: Colors.errorBg, borderColor: Colors.errorBorder };
+  }
+  return { color: Colors.warning, backgroundColor: Colors.warningBg, borderColor: Colors.warningBorder };
 }
 
 function OccurrenceSheet({ visible, onSelect, onClose }: OccurrenceSheetProps) {
@@ -118,6 +140,7 @@ export default function RouteExecutionScreen() {
   const { from } = useLocalSearchParams<{ from?: string }>();
   const {
     currentRoute,
+    isLoading,
     updateStopStatus,
     updatePackageStatus,
     updatePackagesStatus,
@@ -126,12 +149,26 @@ export default function RouteExecutionScreen() {
   } = useRoute();
   const executionScrollRef = React.useRef<ScrollView>(null);
   const stopOffsetsRef = React.useRef<Record<string, number>>({});
+  const lastCurrentStopIdRef = React.useRef<string | null>(null);
+  const deliveryActionPendingRef = React.useRef(false);
   const [expandedStop, setExpandedStop] = useState<string | null>(null);
+  const [deliveryActionPending, setDeliveryActionPending] = useState(false);
   const [occurrenceTarget, setOccurrenceTarget] = useState<OccurrenceTarget | null>(null);
   const [occurrencePackageFilter, setOccurrencePackageFilter] = useState<Set<string> | null>(null);
+  const [productivityNow, setProductivityNow] = useState(() => Date.now());
   const derivedExecutionState = React.useMemo(
     () => deriveExecutionState(currentRoute),
     [currentRoute]
+  );
+  const progressSummary = React.useMemo(
+    () => deriveExecutionProgress(currentRoute),
+    [currentRoute]
+  );
+  const productivitySnapshot = React.useMemo(
+    () => currentRoute
+      ? buildExecutionProductivitySnapshot(currentRoute, productivityNow)
+      : null,
+    [currentRoute, productivityNow]
   );
   const displayedPositions = React.useMemo(
     () => currentRoute ? buildDisplayedRoutePositionMap(currentRoute.stops) : {},
@@ -169,17 +206,48 @@ export default function RouteExecutionScreen() {
     Pick<ExecutionPackageGroup, 'key' | 'address'> | null
   >(null);
   const [placeInfoSaving, setPlaceInfoSaving] = useState(false);
+  const [navigationPreference, setNavigationPreference] =
+    useState<NavigationPreference | null>(null);
   const {
     currentStop,
     nextStop,
     totalPackagesAtCurrentStop,
     pendingPackagesAtCurrentStop,
   } = derivedExecutionState;
+  const activeRouteId = currentRoute?.status === 'active' ? currentRoute.id : null;
   const placeAddressGroups = React.useMemo(
     () => buildExecutionPackageGroups(currentStop).map(({ key, address }) => ({ key, address })),
-    [currentStop?.id]
+    [currentStop]
   );
   const cameFromDeliveryPreparation = from === 'delivery-preparation';
+
+  const scrollToStop = useCallback((stopId: string) => {
+    requestAnimationFrame(() => {
+      InteractionManager.runAfterInteractions(() => {
+        const stopOffset = stopOffsetsRef.current[stopId];
+        if (stopOffset === undefined) return;
+        executionScrollRef.current?.scrollTo({
+          y: Math.max(0, stopOffset - Spacing.md),
+          animated: true,
+        });
+      });
+    });
+  }, []);
+
+  const releaseDeliveryActionGuard = useCallback(() => {
+    deliveryActionPendingRef.current = false;
+    setDeliveryActionPending(false);
+  }, []);
+
+  const prepareNextStopFocus = useCallback((targetStop: GroupedStop | null) => {
+    setExecutionStep('separacao');
+    setSeparatedPackageIds(new Set());
+    setCompletionFeedback({
+      id: Date.now(),
+      hasNextStop: targetStop !== null,
+    });
+    setExpandedStop(targetStop?.id ?? null);
+  }, []);
 
   React.useEffect(() => {
     setExecutionStep(derivedExecutionState.executionStep);
@@ -187,7 +255,40 @@ export default function RouteExecutionScreen() {
     setOptimisticCompletedAddressGroupKeys(new Set());
     setEditingPlaceGroup(null);
     setOccurrencePackageFilter(null);
-  }, [currentStop?.id]);
+  }, [currentStop?.id, derivedExecutionState.executionStep]);
+
+  React.useEffect(() => {
+    if (lastCurrentStopIdRef.current === null) {
+      lastCurrentStopIdRef.current = currentStop?.id ?? null;
+      return;
+    }
+
+    const previousStopId = lastCurrentStopIdRef.current;
+    const nextStopId = currentStop?.id ?? null;
+    lastCurrentStopIdRef.current = nextStopId;
+
+    if (previousStopId && nextStopId && previousStopId !== nextStopId) {
+      setExpandedStop(nextStopId);
+      scrollToStop(nextStopId);
+    }
+
+    releaseDeliveryActionGuard();
+  }, [currentStop?.id, releaseDeliveryActionGuard, scrollToStop]);
+
+  React.useEffect(() => {
+    if (currentRoute?.status === 'completed') {
+      releaseDeliveryActionGuard();
+    }
+  }, [currentRoute?.status, releaseDeliveryActionGuard]);
+
+  React.useEffect(() => {
+    if (!activeRouteId) return;
+    setProductivityNow(Date.now());
+    const interval = setInterval(() => {
+      setProductivityNow(Date.now());
+    }, PRODUCTIVITY_REFRESH_MS);
+    return () => clearInterval(interval);
+  }, [activeRouteId]);
 
   React.useEffect(() => {
     let active = true;
@@ -229,7 +330,7 @@ export default function RouteExecutionScreen() {
     if (currentRoute?.status === 'completed') {
       router.replace('/(tabs)/routes/route-completed');
     }
-  }, [currentRoute?.status]);
+  }, [currentRoute?.status, router]);
 
   const handleOccurrenceSelect = useCallback((reason: string) => {
     if (!occurrenceTarget) return;
@@ -260,7 +361,7 @@ export default function RouteExecutionScreen() {
   }, []);
 
   const handleConfirmDelivery = useCallback(() => {
-    if (!currentStop) return;
+    if (!currentStop || deliveryActionPendingRef.current) return;
 
     const pendingPackages = currentStop.packages.filter(pkg => pkg.status === 'pending');
     const occurrencePackages = currentStop.packages.filter(pkg => pkg.status === 'skipped');
@@ -269,6 +370,8 @@ export default function RouteExecutionScreen() {
       pendingPackages.length < currentStop.packages.length;
 
     const completeStop = () => {
+      deliveryActionPendingRef.current = true;
+      setDeliveryActionPending(true);
       if (occurrencePackages.length > 0) {
         pendingPackages.forEach(pkg => {
           updatePackageStatus(currentStop.id, pkg.id, 'delivered');
@@ -277,20 +380,17 @@ export default function RouteExecutionScreen() {
         updateStopStatus(currentStop.id, 'completed');
       }
 
-      setExecutionStep('separacao');
-      setSeparatedPackageIds(new Set());
-      setCompletionFeedback({
-        id: Date.now(),
-        hasNextStop: nextStop !== null,
-      });
+      prepareNextStopFocus(nextStop);
     };
 
     if (hasMixedPendingPackages) {
+      deliveryActionPendingRef.current = true;
+      setDeliveryActionPending(true);
       Alert.alert(
         'Pacotes pendentes',
         `Ainda há ${pendingPackages.length} pacote${pendingPackages.length === 1 ? '' : 's'} pendente${pendingPackages.length === 1 ? '' : 's'} nesta parada. Deseja concluir mesmo assim?`,
         [
-          { text: 'Cancelar', style: 'cancel' },
+          { text: 'Cancelar', style: 'cancel', onPress: releaseDeliveryActionGuard },
           { text: 'Concluir parada', onPress: completeStop },
         ]
       );
@@ -298,7 +398,14 @@ export default function RouteExecutionScreen() {
     }
 
     completeStop();
-  }, [currentStop, nextStop, updatePackageStatus, updateStopStatus]);
+  }, [
+    currentStop,
+    nextStop,
+    prepareNextStopFocus,
+    releaseDeliveryActionGuard,
+    updatePackageStatus,
+    updateStopStatus,
+  ]);
 
   const scrollToOccurrenceControls = useCallback((stopId: string) => {
     requestAnimationFrame(() => {
@@ -347,18 +454,37 @@ export default function RouteExecutionScreen() {
   }, [currentStop]);
 
   const handleNavigateAddress = useCallback(async (address: string) => {
+    const selectNavigationApp = (): Promise<NavigationPreference | null> =>
+      new Promise(resolve => {
+        Alert.alert(
+          'Abrir navegação',
+          'Escolha o app para esta rota.',
+          [
+            { text: 'Google Maps', onPress: () => resolve('googleMaps') },
+            { text: 'Waze', onPress: () => resolve('waze') },
+            { text: 'Cancelar', style: 'cancel', onPress: () => resolve(null) },
+          ]
+        );
+      });
+
     try {
-      const url = buildGoogleMapsSearchUrl(address);
+      const selectedApp = navigationPreference ?? await selectNavigationApp();
+      if (!selectedApp) return;
+      if (navigationPreference === null) {
+        setNavigationPreference(selectedApp);
+      }
+
+      const url = buildGoogleMapsSearchUrl(address, selectedApp);
       const supported = await Linking.canOpenURL(url);
       if (!supported) throw new Error('Unsupported map URL');
       await Linking.openURL(url);
     } catch {
       Alert.alert('Não foi possível abrir o mapa.');
     }
-  }, []);
+  }, [navigationPreference]);
 
   const handleConfirmAddressGroup = useCallback((group: ExecutionPackageGroup) => {
-    if (!currentStop || executionStep !== 'entrega') return;
+    if (!currentStop || executionStep !== 'entrega' || deliveryActionPendingRef.current) return;
 
     const pendingPackageIds = getPendingPackageIdsForGroup(group);
     if (pendingPackageIds.length === 0) return;
@@ -368,6 +494,8 @@ export default function RouteExecutionScreen() {
       pkg => pkg.status === 'pending' && !groupPackageIds.has(pkg.id)
     );
 
+    deliveryActionPendingRef.current = true;
+    setDeliveryActionPending(true);
     setOptimisticCompletedAddressGroupKeys(previous => {
       if (previous.has(group.key)) return previous;
       const next = new Set(previous);
@@ -381,17 +509,21 @@ export default function RouteExecutionScreen() {
           updatePackagesStatus(currentStop.id, pendingPackageIds, 'delivered');
 
           if (!hasPendingOutsideGroup) {
-            setExecutionStep('separacao');
-            setSeparatedPackageIds(new Set());
-            setCompletionFeedback({
-              id: Date.now(),
-              hasNextStop: nextStop !== null,
-            });
+            prepareNextStopFocus(nextStop);
+          } else {
+            releaseDeliveryActionGuard();
           }
         });
       });
     });
-  }, [currentStop, executionStep, nextStop, updatePackagesStatus]);
+  }, [
+    currentStop,
+    executionStep,
+    nextStop,
+    prepareNextStopFocus,
+    releaseDeliveryActionGuard,
+    updatePackagesStatus,
+  ]);
 
   const handleSavePlaceInfo = useCallback(async (draft: PlaceInfoDraft) => {
     if (!editingPlaceGroup) return;
@@ -444,23 +576,32 @@ export default function RouteExecutionScreen() {
     }
   }, [editingPlaceGroup]);
 
+  if (isLoading) {
+    return <ScreenSkeleton message="Carregando execução da rota..." rows={6} />;
+  }
+
   if (!currentRoute) {
     return (
       <View style={styles.emptyContainer}>
         <Text style={styles.emptyText}>Nenhuma rota ativa</Text>
         <TouchableOpacity onPress={() => router.replace('/(tabs)/routes')}>
-          <Text style={styles.emptyLink}>Voltar para Minhas Rotas</Text>
+          <Text style={styles.emptyLink}>Voltar para minhas rotas</Text>
         </TouchableOpacity>
       </View>
     );
   }
 
-  const totalStops = currentRoute.stops.length;
-  const completedStops = currentRoute.completedStops;
-  const totalPackages = currentRoute.totalPackages;
-  const deliveredPackages = currentRoute.deliveredPackages;
+  const totalStops = progressSummary.totalStops;
+  const completedStops = progressSummary.deliveredStops;
+  const totalPackages = progressSummary.totalPackages;
+  const deliveredPackages = progressSummary.deliveredPackages;
+  const remainingStops = progressSummary.remainingStops;
+  const remainingPackages = progressSummary.remainingPackages;
   const packageProgress = totalPackages > 0 ? (deliveredPackages / totalPackages) * 100 : 0;
-  const stopProgress = totalStops > 0 ? (completedStops / totalStops) * 100 : 0;
+  const stopProgress = progressSummary.completionPercent;
+  const productivity =
+    productivitySnapshot ?? buildExecutionProductivitySnapshot(currentRoute);
+  const productivityPaceTone = getPaceTone(productivity.pace);
 
   // Only show distance if it was explicitly set (not estimated from stop count)
   const hasRealDistance = currentRoute.estimatedDistanceKm > 0;
@@ -564,7 +705,7 @@ export default function RouteExecutionScreen() {
         style={styles.container}
         contentContainerStyle={styles.content}
       >
-        <View style={styles.header}>
+        <FadeInView style={styles.header}>
           <TouchableOpacity
             onPress={() => {
               if (cameFromDeliveryPreparation) {
@@ -582,14 +723,93 @@ export default function RouteExecutionScreen() {
             <Text style={styles.headerTitle}>Executar Rota</Text>
           </View>
           <View style={{ width: 40 }} />
-        </View>
+        </FadeInView>
 
-        <View style={styles.routeNameContext}>
+        <FadeInView delay={30} style={styles.routeNameContext}>
           <Text style={styles.routeNameContextLabel}>Rota:</Text>
           <Text style={styles.routeNameContextValue} numberOfLines={1}>
             {currentRoute.name?.trim() || 'Rota atual'}
           </Text>
-        </View>
+        </FadeInView>
+
+        <FadeInView delay={60} style={styles.productivityCard}>
+          <View style={styles.productivityHeader}>
+            <View>
+              <Text style={styles.productivityEyebrow}>PRODUTIVIDADE</Text>
+              <Text style={styles.productivityTitle}>Ritmo da rota</Text>
+            </View>
+            <View
+              style={[
+                styles.paceBadge,
+                {
+                  backgroundColor: productivityPaceTone.backgroundColor,
+                  borderColor: productivityPaceTone.borderColor,
+                },
+              ]}
+            >
+              <Text style={[styles.paceBadgeText, { color: productivityPaceTone.color }]}>
+                {productivity.paceLabel}
+              </Text>
+            </View>
+          </View>
+
+          <View style={styles.productivityGrid}>
+            <View style={styles.productivityMetric}>
+              <Text style={styles.productivityValue}>{productivity.completedStops}</Text>
+              <Text style={styles.productivityLabel}>Paradas concluídas</Text>
+            </View>
+            <View style={styles.productivityMetric}>
+              <Text style={styles.productivityValue}>{productivity.remainingStops}</Text>
+              <Text style={styles.productivityLabel}>Paradas restantes</Text>
+            </View>
+            <View style={styles.productivityMetric}>
+              <Text style={styles.productivityValue}>{productivity.deliveredPackages}</Text>
+              <Text style={styles.productivityLabel}>Pacotes entregues</Text>
+            </View>
+            <View style={styles.productivityMetric}>
+              <Text style={styles.productivityValue}>
+                {formatExecutionEta(productivity.estimatedCompletionTime)}
+              </Text>
+              <Text style={styles.productivityLabel}>Tempo estimado</Text>
+            </View>
+            <View style={[styles.productivityMetric, styles.productivityMetricWide]}>
+              <Text style={styles.productivityValue}>
+                {productivity.averagePackagesPerHour.toFixed(1)}
+              </Text>
+              <Text style={styles.productivityLabel}>Pacotes/hora</Text>
+            </View>
+          </View>
+
+          <View style={styles.aiTipsPanel}>
+            <Text style={styles.aiTipsTitle}>Sugestões da IA</Text>
+            {productivity.tips.map(tip => (
+              <Text key={tip} style={styles.aiTipText}>
+                {tip}
+              </Text>
+            ))}
+          </View>
+
+          {productivity.achievementMessage ? (
+            <View style={styles.achievementMessage}>
+              <Text style={styles.achievementText}>{productivity.achievementMessage}</Text>
+            </View>
+          ) : null}
+        </FadeInView>
+
+        {currentStop ? (
+          <TouchableOpacity
+            style={styles.nextNavigationButton}
+            onPress={() => handleNavigateAddress(currentStop.normalizedAddress)}
+            activeOpacity={0.8}
+            accessibilityRole="button"
+            accessibilityLabel="Navegar para a próxima parada"
+          >
+            <MapPin size={20} color={Colors.primary[900]} />
+            <Text style={styles.nextNavigationButtonText}>
+              Navegar para a próxima parada
+            </Text>
+          </TouchableOpacity>
+        ) : null}
 
         {completionFeedback ? (
           <AppCard variant="success" padding="medium" style={styles.completionFeedback}>
@@ -627,6 +847,7 @@ export default function RouteExecutionScreen() {
             onConfirmAddressGroup={handleConfirmAddressGroup}
             completedAddressGroupKeys={optimisticCompletedAddressGroupKeys}
             showNavigate={false}
+            deliveryActionDisabled={deliveryActionPending}
           />
         </View>
 
@@ -653,7 +874,7 @@ export default function RouteExecutionScreen() {
             <View style={styles.progressHeader}>
               <Text style={styles.progressTitle}>{currentRoute.name}</Text>
               <Text style={styles.progressCount}>
-                {completedStops}/{totalStops} paradas
+                {stopProgress}%
               </Text>
             </View>
 
@@ -662,12 +883,24 @@ export default function RouteExecutionScreen() {
               <View style={[styles.progressBarFill, { width: `${stopProgress}%`, backgroundColor: Colors.gold[500] }]} />
             </View>
 
-            <Text style={styles.progressLabel}>Pacotes entregues</Text>
+            <Text style={styles.progressLabel}>
+              {completedStops} entregues • {remainingStops} restantes
+            </Text>
+
+            <Text style={styles.progressLabel}>
+              {deliveredPackages} pacotes entregues • {remainingPackages} restantes
+            </Text>
             <View style={styles.progressBarBg}>
               <View style={[styles.progressBarFill, { width: `${packageProgress}%`, backgroundColor: Colors.success }]} />
             </View>
 
             <View style={styles.progressStats}>
+              <View style={styles.progressStat}>
+                <CheckCircle2 size={14} color={Colors.gold[400]} />
+                <Text style={styles.progressStatText}>
+                  {completedStops}/{totalStops} paradas
+                </Text>
+              </View>
               <View style={styles.progressStat}>
                 <Package size={14} color={Colors.gold[400]} />
                 <Text style={styles.progressStatText}>
@@ -761,17 +994,33 @@ export default function RouteExecutionScreen() {
                   </View>
                 </View>
 
+                <TouchableOpacity
+                  style={styles.stopNavigateButton}
+                  onPress={() => handleNavigateAddress(stop.normalizedAddress)}
+                  activeOpacity={0.75}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Navegar para ${stop.normalizedAddress}`}
+                >
+                  <MapPin size={15} color={Colors.gold[400]} />
+                  <Text style={styles.stopNavigateButtonText}>Navegar</Text>
+                </TouchableOpacity>
+
                 {stop.status === 'completed' && <CheckCircle2 size={24} color={Colors.success} />}
                 {stop.status === 'skipped' && <SkipForward size={20} color={Colors.gray} />}
               </View>
 
-              <TouchableOpacity
-                style={styles.expandButton}
-                onPress={() => {
-                  setOccurrencePackageFilter(null);
-                  setExpandedStop(isExpanded ? null : stop.id);
-                }}
-              >
+          <TouchableOpacity
+            style={styles.expandButton}
+            onPress={() => {
+              LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+              setOccurrencePackageFilter(null);
+              setExpandedStop(isExpanded ? null : stop.id);
+            }}
+            activeOpacity={0.78}
+            accessibilityRole="button"
+            accessibilityLabel={isExpanded ? 'Ocultar pacotes' : `Ver pacotes da parada ${stopBadge}`}
+            accessibilityState={{ expanded: isExpanded }}
+          >
                 {isExpanded ? (
                   <ChevronUp size={16} color={Colors.gold[400]} />
                 ) : (
@@ -1039,6 +1288,122 @@ const styles = StyleSheet.create({
   },
   routeNameContextLabel: { fontSize: FontSizes.sm, color: Colors.gray, fontWeight: '600' },
   routeNameContextValue: { flex: 1, fontSize: FontSizes.md, color: Colors.offWhite, fontWeight: '700' },
+  productivityCard: {
+    marginBottom: Spacing.lg,
+    padding: Spacing.md,
+    gap: Spacing.md,
+    borderRadius: BorderRadius.lg,
+    borderWidth: 1,
+    borderColor: Colors.cardBorder,
+    backgroundColor: Colors.cardBg,
+  },
+  productivityHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: Spacing.md,
+  },
+  productivityEyebrow: {
+    color: Colors.gold[400],
+    fontSize: FontSizes.xs,
+    fontWeight: '900',
+  },
+  productivityTitle: {
+    color: Colors.white,
+    fontSize: FontSizes.xl,
+    fontWeight: '800',
+    marginTop: 2,
+  },
+  paceBadge: {
+    minHeight: 34,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: Spacing.sm,
+    borderRadius: BorderRadius.full,
+    borderWidth: 1,
+  },
+  paceBadgeText: {
+    fontSize: FontSizes.xs,
+    fontWeight: '900',
+  },
+  productivityGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: Spacing.sm,
+  },
+  productivityMetric: {
+    minHeight: 76,
+    width: '31.5%',
+    justifyContent: 'center',
+    gap: 3,
+    padding: Spacing.sm,
+    borderRadius: BorderRadius.sm,
+    backgroundColor: Colors.overlay,
+  },
+  productivityMetricWide: {
+    width: '48.5%',
+  },
+  productivityValue: {
+    color: Colors.white,
+    fontSize: FontSizes.xl,
+    fontWeight: '900',
+  },
+  productivityLabel: {
+    color: Colors.gray,
+    fontSize: FontSizes.xs,
+    fontWeight: '700',
+  },
+  aiTipsPanel: {
+    gap: Spacing.xs,
+    padding: Spacing.sm,
+    borderRadius: BorderRadius.sm,
+    borderWidth: 1,
+    borderColor: Colors.primary[300],
+    backgroundColor: 'rgba(10,37,114,0.32)',
+  },
+  aiTipsTitle: {
+    color: Colors.gold[400],
+    fontSize: FontSizes.sm,
+    fontWeight: '900',
+  },
+  aiTipText: {
+    color: Colors.offWhite,
+    fontSize: FontSizes.sm,
+    lineHeight: 18,
+    fontWeight: '600',
+  },
+  achievementMessage: {
+    minHeight: 42,
+    justifyContent: 'center',
+    paddingHorizontal: Spacing.md,
+    borderRadius: BorderRadius.sm,
+    borderWidth: 1,
+    borderColor: Colors.successBorder,
+    backgroundColor: Colors.successBg,
+  },
+  achievementText: {
+    color: Colors.success,
+    fontSize: FontSizes.md,
+    fontWeight: '900',
+    textAlign: 'center',
+  },
+  nextNavigationButton: {
+    minHeight: 52,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: Spacing.sm,
+    marginBottom: Spacing.md,
+    paddingHorizontal: Spacing.md,
+    borderRadius: BorderRadius.md,
+    backgroundColor: Colors.gold[500],
+  },
+  nextNavigationButtonText: {
+    color: Colors.primary[900],
+    fontSize: FontSizes.md,
+    fontWeight: '900',
+    textAlign: 'center',
+  },
   progressCard: { borderRadius: BorderRadius.lg, overflow: 'hidden', marginBottom: Spacing.lg },
   progressGradient: { padding: Spacing.lg, gap: Spacing.sm },
   progressHeader: {
@@ -1050,7 +1415,7 @@ const styles = StyleSheet.create({
   progressLabel: { fontSize: FontSizes.xs, color: Colors.gray, fontWeight: '600', marginTop: 2 },
   progressBarBg: { height: 7, backgroundColor: Colors.primary[800], borderRadius: 4, overflow: 'hidden' },
   progressBarFill: { height: '100%', borderRadius: 4 },
-  progressStats: { flexDirection: 'row', gap: Spacing.lg, marginTop: Spacing.sm },
+  progressStats: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.lg, marginTop: Spacing.sm },
   progressStat: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   progressStatText: { fontSize: FontSizes.sm, color: Colors.gold[400], fontWeight: '600' },
   sectionTitle: { fontSize: FontSizes.lg, fontWeight: '700', color: Colors.white, marginBottom: Spacing.md },
@@ -1080,6 +1445,23 @@ const styles = StyleSheet.create({
   stopAddressDone: { textDecorationLine: 'line-through', color: Colors.gray },
   stopMetaRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, marginTop: 2, flexWrap: 'wrap' },
   stopMeta: { fontSize: FontSizes.sm, color: Colors.gray },
+  stopNavigateButton: {
+    minHeight: 40,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    paddingHorizontal: Spacing.sm,
+    borderRadius: BorderRadius.sm,
+    borderWidth: 1,
+    borderColor: Colors.gold[700],
+    backgroundColor: Colors.background,
+  },
+  stopNavigateButtonText: {
+    color: Colors.gold[400],
+    fontSize: FontSizes.xs,
+    fontWeight: '800',
+  },
   occurrenceBadge: {
     flexDirection: 'row', alignItems: 'center', gap: 3,
     backgroundColor: Colors.errorBg, borderRadius: 4,

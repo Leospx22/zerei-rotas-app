@@ -62,7 +62,7 @@ const COMPLEMENT_PATTERN =
 
 export class LocalRouteAssistantAnalyzer implements RouteAssistantAnalyzerProvider {
   readonly id = 'local';
-  readonly label = 'Local route assistant';
+  readonly label = 'Assistente local de rota';
   private readonly options: RouteAssistantAnalysisOptions;
 
   constructor(options: RouteAssistantAnalysisOptions = DEFAULT_ROUTE_ASSISTANT_OPTIONS) {
@@ -106,8 +106,8 @@ function detectDuplicateAddresses(stops: readonly GroupedStop[]): RouteAssistant
       id: `duplicate-address-${group.key}`,
       type: 'duplicate-address',
       severity: 'warning',
-      title: 'Endereco duplicado',
-      message: `${group.stops.length} paradas usam o mesmo endereco: ${group.stops[0].normalizedAddress}.`,
+      title: 'Endereço duplicado',
+      message: `${group.stops.length} paradas usam o mesmo endereço: ${group.stops[0].normalizedAddress}.`,
       recommendation: 'Conferir se os pacotes deveriam estar na mesma parada antes de iniciar a rota.',
       stopIds: group.stops.map(stop => stop.id),
       packageCount: sumPackages(group.stops),
@@ -121,9 +121,9 @@ function detectDuplicateStopNumbers(stops: readonly GroupedStop[]): RouteAssista
       id: `duplicate-stop-number-${group.key}`,
       type: 'duplicate-stop-number',
       severity: 'critical',
-      title: 'Numero de parada repetido',
-      message: `A parada #${group.key} aparece em ${group.stops.length} enderecos diferentes.`,
-      recommendation: 'Validar a planilha ou separar manualmente esses pontos antes da execucao.',
+      title: 'Número de parada repetido',
+      message: `A parada #${group.key} aparece em ${group.stops.length} endereços diferentes.`,
+      recommendation: 'Validar a planilha ou separar manualmente esses pontos antes da execução.',
       stopIds: group.stops.map(stop => stop.id),
       packageCount: sumPackages(group.stops),
     }));
@@ -149,7 +149,7 @@ function detectMissingComplements(
       severity: stop.packageCount >= options.largeStopPackageThreshold ? 'warning' : 'info',
       title: 'Complemento possivelmente ausente',
       message: `Parada #${stop.stopNumber} tem ${stop.packageCount} pacotes no mesmo ponto sem apartamento, bloco ou sala.`,
-      recommendation: 'Antes de sair do veiculo, confira se ha complemento no pacote fisico ou no app da transportadora.',
+      recommendation: 'Antes de sair do veículo, confira se há complemento no pacote físico ou no app da transportadora.',
       stopIds: [stop.id],
       packageCount: stop.packageCount,
     }));
@@ -192,8 +192,8 @@ function detectLongOptimizedLegs(
       type: 'long-optimized-leg',
       severity: distanceKm >= options.longLegDistanceKm * 1.8 ? 'critical' : 'warning',
       title: 'Trecho longo na ordem otimizada',
-      message: `Entre as paradas #${previous.stopNumber} e #${current.stopNumber} ha cerca de ${roundDistance(distanceKm)} km.`,
-      recommendation: 'Conferir se esse salto faz sentido antes de seguir a sequencia sugerida.',
+      message: `Entre as paradas #${previous.stopNumber} e #${current.stopNumber} há cerca de ${roundDistance(distanceKm)} km.`,
+      recommendation: 'Conferir se esse salto faz sentido antes de seguir a sequência sugerida.',
       stopIds: [previous.id, current.id],
       distanceKm: roundDistance(distanceKm),
     });
@@ -214,8 +214,8 @@ function detectPotentialAnomalies(stops: readonly GroupedStop[]): RouteAssistant
       type: 'potential-anomaly',
       severity: missingCoordinates.length / Math.max(stops.length, 1) > 0.35 ? 'warning' : 'info',
       title: 'Coordenadas incompletas',
-      message: `${missingCoordinates.length} paradas nao tem latitude/longitude importadas.`,
-      recommendation: 'Use o endereco manualmente no mapa se a navegacao abrir no ponto errado.',
+      message: `${missingCoordinates.length} paradas não têm latitude/longitude importadas.`,
+      recommendation: 'Use o endereço manualmente no mapa se a navegação abrir no ponto errado.',
       stopIds: missingCoordinates.map(stop => stop.id),
     });
   }
@@ -225,9 +225,9 @@ function detectPotentialAnomalies(stops: readonly GroupedStop[]): RouteAssistant
       id: `potential-anomaly-multi-address-${stop.id}`,
       type: 'potential-anomaly',
       severity: 'warning',
-      title: 'Parada com muitos enderecos internos',
-      message: `Parada #${stop.stopNumber} contem ${stop.addressCount} enderecos agrupados.`,
-      recommendation: 'Conferir se todos pertencem ao mesmo local antes de marcar a parada como concluida.',
+      title: 'Parada com muitos endereços internos',
+      message: `Parada #${stop.stopNumber} contém ${stop.addressCount} endereços agrupados.`,
+      recommendation: 'Conferir se todos pertencem ao mesmo local antes de marcar a parada como concluída.',
       stopIds: [stop.id],
       packageCount: stop.packageCount,
     });
@@ -238,9 +238,9 @@ function detectPotentialAnomalies(stops: readonly GroupedStop[]): RouteAssistant
       id: 'potential-anomaly-missing-stop-number',
       type: 'potential-anomaly',
       severity: 'info',
-      title: 'Paradas sem numero importado',
-      message: `${missingImportedStopNumbers.length} paradas foram criadas sem numero de Stop na planilha.`,
-      recommendation: 'Revise as prioridades Shopee e confira se a ordem exibida esta adequada.',
+      title: 'Paradas sem número importado',
+      message: `${missingImportedStopNumbers.length} paradas foram criadas sem número de Stop na planilha.`,
+      recommendation: 'Revise as prioridades Shopee e confira se a ordem exibida está adequada.',
       stopIds: missingImportedStopNumbers.map(stop => stop.id),
     });
   }

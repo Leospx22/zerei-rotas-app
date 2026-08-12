@@ -38,22 +38,22 @@ export function ZRIntelligenceCard({
           <BrainCircuit size={19} color={Colors.gold[400]} />
         </View>
         <View style={styles.headerCopy}>
-          <Text style={styles.eyebrow}>Premium offline intelligence</Text>
+          <Text style={styles.eyebrow}>Inteligência offline premium</Text>
           <Text style={styles.title}>ZR Intelligence™</Text>
         </View>
       </View>
 
       <ProgressiveSection delay={70}>
         <View style={styles.kpiGrid}>
-          <Kpi label="Optimization Score" value={`${report.score.score} / 100`} />
-          <Kpi label="Confidence" value={`${report.optimization.confidenceScore}%`} />
-          <Kpi label="Distance Saved" value={formatDistance(report.comparison.distanceSavedKm)} />
-          <Kpi label="Time Saved" value={formatMinutes(report.comparison.estimatedTimeSavedMinutes)} />
+          <Kpi label="Nota de otimização" value={`${report.score.score} / 100`} />
+          <Kpi label="Confiança" value={`${report.optimization.confidenceScore}%`} />
+          <Kpi label="Distância economizada" value={formatDistance(report.comparison.distanceSavedKm)} />
+          <Kpi label="Tempo economizado" value={formatMinutes(report.comparison.estimatedTimeSavedMinutes)} />
           <Kpi
-            label="Fuel Saved"
+            label="Combustível economizado"
             value={formatFuelCurrency(report.comparison.estimatedFuelSavedLiters, fuelPricePerLiter)}
           />
-          <Kpi label="Recommendation" value={report.recommendation.label} />
+          <Kpi label="Recomendação" value={report.recommendation.label} />
         </View>
       </ProgressiveSection>
 
@@ -140,8 +140,8 @@ function Kpi({ label, value }: { label: string; value: string }) {
 }
 
 function ZRLearningStatusCard({ status }: { status?: LearningStatus }) {
-  const label = status?.label ?? 'No history yet';
-  const detail = status?.detail ?? 'Complete routes to personalize ZR Intelligence™.';
+  const label = status?.label ?? 'Sem histórico ainda';
+  const detail = status?.detail ?? 'Conclua rotas para personalizar a ZR Intelligence™.';
   const routes = status?.routesAnalyzed ?? 0;
   const confidence = status?.confidence ?? 0;
   const color = status?.enabled === false
@@ -160,7 +160,7 @@ function ZRLearningStatusCard({ status }: { status?: LearningStatus }) {
         <Text style={[styles.learningStatus, { color }]}>{label}</Text>
       </View>
       <Text style={styles.learningDetail}>
-        {routes > 0 ? `${routes} routes analyzed. ` : ''}{detail}
+        {routes > 0 ? `${routes} rotas analisadas. ` : ''}{detail}
       </Text>
       <View style={styles.learningProgressTrack}>
         <View style={[styles.learningProgressFill, { width: `${Math.min(100, confidence)}%`, backgroundColor: color }]} />

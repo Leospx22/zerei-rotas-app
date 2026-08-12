@@ -1,6 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
-  ActivityIndicator,
   Alert,
   Linking,
   ScrollView,
@@ -12,7 +11,9 @@ import {
 } from 'react-native';
 import {
   CalendarDays,
+  BarChart3,
   CheckCircle2,
+  ClipboardList,
   FlaskConical,
   Headphones,
   LogOut,
@@ -20,9 +21,13 @@ import {
   Save,
   ShieldCheck,
   UserRound,
+  Users,
 } from 'lucide-react-native';
+import { useQuery } from '@tanstack/react-query';
+import { useRouter } from 'expo-router';
 import { Colors, Spacing, FontSizes, BorderRadius } from '@/constants/theme';
 import { HeaderBrandIcon } from '@/components/HeaderBrandIcon';
+import { AppButton, FadeInView, ScreenSkeleton } from '@/components/ui';
 import { useAuth } from '@/contexts/AuthContext';
 import {
   formatProfileDate,
@@ -35,6 +40,7 @@ import {
   shouldRecordProfileCompleted,
   updateUserProfile,
 } from '@/lib/userProfile';
+import { fetchFounderAdminAccess } from '@/lib/founderAccess';
 import {
   BETA_STATUS_TEXT,
   BETA_STATUS_TITLE,
@@ -70,7 +76,14 @@ const EMPTY_FORM: ProfileForm = {
   main_platform: '',
 };
 
+const ADMIN_LINKS = [
+  { label: 'Dashboard', href: '/(tabs)?admin=1' as const, icon: BarChart3 },
+  { label: 'Users', href: '/(tabs)/users' as const, icon: Users },
+  { label: 'Waitlist', href: '/(tabs)/waitlist' as const, icon: ClipboardList },
+];
+
 export default function ProfileScreen() {
+  const router = useRouter();
   const {
     configured,
     loading: authLoading,
@@ -104,6 +117,13 @@ export default function ProfileScreen() {
   const completion = useMemo(() => getProfileCompletion(form), [form]);
   const trial = useMemo(() => getTrialDisplay(profile), [profile]);
   const funnelLabel = profile ? FUNNEL_LABELS[getFunnelStage(profile)] : 'Cadastrado';
+  const founderAccessQuery = useQuery({
+    queryKey: ['founder-admin-access', session?.user.id],
+    queryFn: fetchFounderAdminAccess,
+    enabled: Boolean(session),
+    staleTime: 60_000,
+  });
+  const showFounderAdmin = Boolean(session) && founderAccessQuery.data === true;
 
   const runAction = async (action: () => Promise<void>) => {
     setBusy(true);
@@ -194,17 +214,12 @@ export default function ProfileScreen() {
   };
 
   if (authLoading) {
-    return (
-      <View style={styles.centered}>
-        <ActivityIndicator color={Colors.gold[400]} />
-        <Text style={styles.helper}>Carregando perfil...</Text>
-      </View>
-    );
+    return <ScreenSkeleton message="Carregando perfil..." rows={5} />;
   }
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <View style={styles.header}>
+      <FadeInView style={styles.header}>
         <View style={styles.avatar}>
           {session
             ? <HeaderBrandIcon size={24} containerSize={44} filled />
@@ -212,7 +227,7 @@ export default function ProfileScreen() {
         </View>
         <Text style={styles.title}>Perfil</Text>
         {session?.user.email && <Text style={styles.subtitle}>{session.user.email}</Text>}
-      </View>
+      </FadeInView>
 
       {!configured && (
         <View style={styles.infoCard}>
@@ -245,20 +260,8 @@ export default function ProfileScreen() {
             onChangeText={setPassword}
             secureTextEntry
           />
-          <TouchableOpacity
-            style={[styles.primaryButton, busy && styles.buttonDisabled]}
-            onPress={handleSignIn}
-            disabled={busy}
-          >
-            {busy ? <ActivityIndicator color={Colors.primary[900]} /> : <Text style={styles.primaryButtonText}>Entrar</Text>}
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.secondaryButton, busy && styles.buttonDisabled]}
-            onPress={handleSignUp}
-            disabled={busy}
-          >
-            <Text style={styles.secondaryButtonText}>Criar conta</Text>
-          </TouchableOpacity>
+          <AppButton label="Entrar" onPress={handleSignIn} loading={busy} />
+          <AppButton label="Criar conta" onPress={handleSignUp} disabled={busy} variant="secondary" />
         </View>
       )}
 
@@ -325,6 +328,33 @@ export default function ProfileScreen() {
             <StatusRow label="Etapa do funil" value={funnelLabel} />
           </View>
 
+          {showFounderAdmin ? (
+            <View style={styles.card}>
+              <View style={styles.sectionHeader}>
+                <ShieldCheck size={19} color={Colors.gold[400]} />
+                <Text style={styles.sectionTitle}>Admin</Text>
+              </View>
+              <View style={styles.adminLinks}>
+                {ADMIN_LINKS.map(item => {
+                  const Icon = item.icon;
+                  return (
+                    <TouchableOpacity
+                      key={item.label}
+                      style={styles.adminLink}
+                      onPress={() => router.push(item.href as never)}
+                      activeOpacity={0.78}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Abrir Admin ${item.label}`}
+                    >
+                      <Icon size={18} color={Colors.gold[400]} />
+                      <Text style={styles.adminLinkText}>{item.label}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </View>
+          ) : null}
+
           <View style={styles.card}>
             <View style={styles.sectionHeader}>
               <CalendarDays size={19} color={Colors.gold[400]} />
@@ -356,20 +386,12 @@ export default function ProfileScreen() {
             </View>
             <ProfileInput label="Tipo de veículo" value={form.vehicle_type} onChangeText={value => updateField('vehicle_type', value)} />
             <ProfileInput label="Plataforma principal" value={form.main_platform} onChangeText={value => updateField('main_platform', value)} />
-            <TouchableOpacity
-              style={[styles.primaryButton, busy && styles.buttonDisabled]}
+            <AppButton
+              label="Salvar perfil"
               onPress={handleSave}
-              disabled={busy}
-            >
-              {busy
-                ? <ActivityIndicator color={Colors.primary[900]} />
-                : (
-                  <>
-                    <Save size={18} color={Colors.primary[900]} />
-                    <Text style={styles.primaryButtonText}>Salvar perfil</Text>
-                  </>
-                )}
-            </TouchableOpacity>
+              loading={busy}
+              leftIcon={<Save size={18} color={Colors.primary[900]} />}
+            />
           </View>
 
           <View style={styles.card}>
@@ -480,6 +502,19 @@ const styles = StyleSheet.create({
   primaryButtonText: { color: Colors.primary[900], fontSize: FontSizes.lg, fontWeight: '800' },
   secondaryButton: { minHeight: 52, borderRadius: BorderRadius.md, borderWidth: 1, borderColor: Colors.gold[500], alignItems: 'center', justifyContent: 'center', paddingHorizontal: Spacing.md },
   secondaryButtonText: { color: Colors.gold[400], fontSize: FontSizes.lg, fontWeight: '800' },
+  adminLinks: { gap: Spacing.sm },
+  adminLink: {
+    minHeight: 50,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+    borderRadius: BorderRadius.md,
+    borderWidth: 1,
+    borderColor: Colors.gold[700],
+    backgroundColor: Colors.background,
+    paddingHorizontal: Spacing.md,
+  },
+  adminLinkText: { color: Colors.gold[400], fontSize: FontSizes.md, fontWeight: '800' },
   buttonDisabled: { opacity: 0.55 },
   statusRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: Spacing.md },
   statusLabel: { flex: 1, color: Colors.gray, fontSize: FontSizes.md },

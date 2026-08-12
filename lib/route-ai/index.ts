@@ -16,6 +16,7 @@ export * from './RouteAnalyzer.ts';
 export * from './RouteComparison.ts';
 export * from './RouteOptimizer.ts';
 export * from './RouteScorer.ts';
+export * from './ExecutionProductivityAssistant.ts';
 export * from './runtime/index.ts';
 export * from './learning/index.ts';
 
@@ -55,16 +56,16 @@ function buildRecommendation(
   if (percentageImprovement >= 6 && confidenceScore >= 55) {
     return {
       action: 'use-optimized-route',
-      label: 'Use Optimized Route',
-      reason: `Optimized route saves about ${percentageImprovement}% with ${confidenceScore}% confidence.`,
+      label: 'Usar rota otimizada',
+      reason: `A rota otimizada economiza cerca de ${percentageImprovement}% com ${confidenceScore}% de confiança.`,
     };
   }
 
   return {
     action: 'keep-original-route',
-    label: 'Keep Original Route',
+    label: 'Manter rota original',
     reason: confidenceScore < 55
-      ? 'Original order is safer because too many stops need estimated coordinates.'
-      : 'Original order is close to the optimized estimate.',
+      ? 'A ordem original é mais segura porque muitas paradas têm coordenadas estimadas.'
+      : 'A ordem original está próxima da estimativa otimizada.',
   };
 }

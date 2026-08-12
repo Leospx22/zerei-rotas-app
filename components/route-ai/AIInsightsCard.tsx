@@ -23,7 +23,7 @@ export function AIInsightsCard({ stops }: AIInsightsCardProps) {
     : analysis.insights.slice(0, MAX_VISIBLE_INSIGHTS);
 
   const statusLabel = analysis.summary.criticalCount > 0
-    ? `${analysis.summary.criticalCount} critico${analysis.summary.criticalCount > 1 ? 's' : ''}`
+    ? `${analysis.summary.criticalCount} crítico${analysis.summary.criticalCount > 1 ? 's' : ''}`
     : analysis.summary.warningCount > 0
       ? `${analysis.summary.warningCount} aviso${analysis.summary.warningCount > 1 ? 's' : ''}`
       : 'Rota sem alertas';
@@ -39,8 +39,8 @@ export function AIInsightsCard({ stops }: AIInsightsCardProps) {
           <BrainCircuit size={18} color={Colors.gold[400]} />
         </View>
         <View style={styles.headerCopy}>
-          <Text style={styles.eyebrow}>Analise local</Text>
-          <Text style={styles.title}>AI Insights</Text>
+          <Text style={styles.eyebrow}>Análise local</Text>
+          <Text style={styles.title}>Sugestões da IA</Text>
         </View>
         <View style={styles.statusPill}>
           <Text style={styles.statusText}>{statusLabel}</Text>

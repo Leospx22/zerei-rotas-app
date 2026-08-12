@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
   deleteRouteFromStorage,
+  deleteHistoryEntryFromStorage,
   KEY_CURRENT,
   KEY_CURRENT_CORRUPTED,
   KEY_HISTORY,
@@ -255,6 +256,27 @@ test('renames exact completed history entry when duplicate route ids exist', asy
   const history = await loadHistoryFromStorage(storage);
   assert.equal(history[0].name, 'Rota antiga');
   assert.equal(history[1].name, 'Rota mais recente renomeada');
+});
+
+test('deletes exact completed history entry when duplicate route ids exist', async () => {
+  const storage = new MemoryStorage();
+  await storage.setItem(KEY_HISTORY, JSON.stringify([
+    historyEntry('route-1', 'Rota antiga', '2026-06-24T10:00:00.000Z'),
+    historyEntry('route-1', 'Rota mais recente', '2026-06-24T11:00:00.000Z'),
+  ]));
+
+  assert.equal(
+    await deleteHistoryEntryFromStorage(
+      storage,
+      'route-1',
+      '2026-06-24T11:00:00.000Z'
+    ),
+    true
+  );
+
+  const history = await loadHistoryFromStorage(storage);
+  assert.equal(history.length, 1);
+  assert.equal(history[0].name, 'Rota antiga');
 });
 
 test('completed route identity takes precedence over a current route with the same id', async () => {

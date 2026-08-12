@@ -261,7 +261,7 @@ export default function DeliveryPreparationScreen() {
         </TouchableOpacity>
         <View style={styles.headerTitleRow}>
           <HeaderBrandIcon size={20} />
-          <Text style={styles.headerTitle}>Revisar Rota</Text>
+          <Text style={styles.headerTitle}>Revisar rota</Text>
         </View>
         <View style={{ width: 40 }} />
       </View>
@@ -637,7 +637,7 @@ export default function DeliveryPreparationScreen() {
       <View style={styles.optimizationNote}>
         <MapPin size={16} color={Colors.gray} />
         <Text style={styles.optimizationText}>
-          Use Subir e Descer para ajustar a sequência antes de começar a entrega.
+          Use Subir e Descer para ajustar a sequência antes de começar as entregas.
         </Text>
       </View>
 

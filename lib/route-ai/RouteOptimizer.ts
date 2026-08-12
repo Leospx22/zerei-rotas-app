@@ -17,22 +17,22 @@ import type {
 } from './OptimizationTypes.ts';
 
 const STRATEGY_LABELS: Record<OptimizationStrategy, string> = {
-  fastest: 'Fastest',
-  'shortest-distance': 'Shortest Distance',
-  balanced: 'Balanced',
-  cluster: 'Cluster',
-  'traffic-aware': 'Traffic Aware',
-  'driver-preference': 'Driver Preference',
-  'historical-learning': 'Historical Learning',
-  traffic: 'Traffic',
-  learning: 'Learning',
-  ai: 'AI',
-  'driver-profile': 'Driver Profile',
+  fastest: 'Mais rápida',
+  'shortest-distance': 'Menor distância',
+  balanced: 'Equilibrada',
+  cluster: 'Agrupada',
+  'traffic-aware': 'Com trânsito',
+  'driver-preference': 'Preferência do motorista',
+  'historical-learning': 'Aprendizado histórico',
+  traffic: 'Trânsito',
+  learning: 'Aprendizado',
+  ai: 'IA',
+  'driver-profile': 'Perfil do motorista',
 };
 
 export class DeterministicRouteOptimizer implements IRouteOptimizationProvider {
   readonly id = 'local';
-  readonly label = 'Local Deterministic Optimizer';
+  readonly label = 'Otimizador local determinístico';
 
   private readonly strategies: Record<string, IOptimizationStrategy> = {
     fastest: new LocalOptimizationStrategy('fastest'),

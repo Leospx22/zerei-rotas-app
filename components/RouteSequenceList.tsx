@@ -47,15 +47,15 @@ export default function RouteSequenceList({
                 stop.status === 'completed' && styles.numberCompleted,
               ]}>
                 <Text style={styles.numberText}>
-                  {stop.status === 'completed' ? 'âœ“' : stop.badge}
+                  {stop.status === 'completed' ? '✓' : stop.badge}
                 </Text>
               </View>
               <View style={styles.stopCopy}>
                 <Text style={styles.address}>{stop.address}</Text>
                 <Text style={styles.meta}>
-                  {stop.packageCount} {stop.packageCount === 1 ? 'pacote' : 'pacotes'} Â· {mapStopStatusLabel(stop.status)}
+                  {stop.packageCount} {stop.packageCount === 1 ? 'pacote' : 'pacotes'} · {mapStopStatusLabel(stop.status)}
                   {stop.missingSpreadsheetStop ? ` · ${SHOPEE_PRIORITY_LABEL}` : ''}
-                  {unresolved ? ` Â· ${UNRESOLVED_COORDINATE_LABEL}` : ''}
+                  {unresolved ? ` · ${UNRESOLVED_COORDINATE_LABEL}` : ''}
                 </Text>
               </View>
             </TouchableOpacity>
@@ -65,7 +65,7 @@ export default function RouteSequenceList({
                 onPress={() => onCopyStop(stop)}
                 activeOpacity={0.72}
                 accessibilityRole="button"
-                accessibilityLabel={`Copiar endereÃ§o desta parada: ${stop.address}`}
+                accessibilityLabel={`Copiar endereço desta parada: ${stop.address}`}
               >
                 <Copy size={18} color={Colors.warning} />
               </TouchableOpacity>
@@ -88,7 +88,7 @@ export default function RouteSequenceList({
                 onPress={() => onNavigateStop(stop)}
                 activeOpacity={0.72}
                 accessibilityRole="button"
-                accessibilityLabel={`Navegar atÃ© esta parada: ${stop.address}`}
+                accessibilityLabel={`Navegar até esta parada: ${stop.address}`}
               >
                 <MapPin size={20} color={Colors.gold[400]} />
               </TouchableOpacity>

@@ -50,6 +50,7 @@ interface RouteContextType {
   setCurrentRoute: (route: RouteData | null) => void;
   clearRestoreNotice: () => void;
   reloadHistory: () => Promise<void>;
+  deleteHistoryRecord: (id: string, completedAt: string) => Promise<boolean>;
   renameCurrentRoute: (name: string) => Promise<boolean>;
   updateStopStatus: (stopId: string, status: GroupedStop['status']) => void;
   updatePackageStatus: (stopId: string, packageId: string, status: PackageItem['status']) => void;
@@ -98,10 +99,12 @@ export function RouteProvider({ children }: { children: ReactNode }) {
     clearCurrentRoute,
     saveToHistory,
     getHistory,
+    deleteHistoryEntry,
   } = usePersistence();
   const currentRouteRef = useRef<RouteData | null>(null);
   const restoreNoticeShownRef = useRef(false);
   const persistQueueRef = useRef<Promise<void>>(Promise.resolve());
+  const savedCompletedRouteIdsRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     currentRouteRef.current = currentRoute;
@@ -190,8 +193,14 @@ export function RouteProvider({ children }: { children: ReactNode }) {
   // Save to history when route auto-completes via checkCompletion
   useEffect(() => {
     if (currentRoute?.status === 'completed') {
+      if (savedCompletedRouteIdsRef.current.has(currentRoute.id)) return;
+      savedCompletedRouteIdsRef.current.add(currentRoute.id);
       saveToHistory(currentRoute)
         .then(saved => {
+          if (!saved) {
+            savedCompletedRouteIdsRef.current.delete(currentRoute.id);
+            return;
+          }
           if (saved) {
             setTimeout(() => {
               learnFromCompletedRoute({ route: currentRoute }).catch(() => {});
@@ -199,7 +208,9 @@ export function RouteProvider({ children }: { children: ReactNode }) {
           }
           return reloadHistory();
         })
-        .catch(() => {});
+        .catch(() => {
+          savedCompletedRouteIdsRef.current.delete(currentRoute.id);
+        });
     }
   }, [currentRoute?.status, currentRoute, saveToHistory, reloadHistory]);
 
@@ -211,6 +222,15 @@ export function RouteProvider({ children }: { children: ReactNode }) {
   const clearRestoreNotice = useCallback(() => {
     setRestoreNotice(null);
   }, []);
+
+  const deleteHistoryRecord = useCallback(async (
+    id: string,
+    completedAt: string
+  ): Promise<boolean> => {
+    const deleted = await deleteHistoryEntry(id, completedAt);
+    if (deleted) await reloadHistory();
+    return deleted;
+  }, [deleteHistoryEntry, reloadHistory]);
 
   const renameCurrentRoute = useCallback(async (name: string): Promise<boolean> => {
     const trimmed = name.trim();
@@ -421,8 +441,13 @@ export function RouteProvider({ children }: { children: ReactNode }) {
       ? Math.round((Date.now() - currentRoute.startTime) / 60000)
       : 0;
     const completedRoute = { ...currentRoute, status: 'completed' as const, durationMinutes: elapsed };
+    if (savedCompletedRouteIdsRef.current.has(completedRoute.id)) return;
+    savedCompletedRouteIdsRef.current.add(completedRoute.id);
     const saved = await saveToHistory(completedRoute);
-    if (!saved) return;
+    if (!saved) {
+      savedCompletedRouteIdsRef.current.delete(completedRoute.id);
+      return;
+    }
     setTimeout(() => {
       learnFromCompletedRoute({ route: completedRoute }).catch(() => {});
     }, 0);
@@ -441,6 +466,7 @@ export function RouteProvider({ children }: { children: ReactNode }) {
       setCurrentRoute,
       clearRestoreNotice,
       reloadHistory,
+      deleteHistoryRecord,
       renameCurrentRoute,
       updateStopStatus,
       updatePackageStatus,

@@ -17,28 +17,28 @@ export function ZROptimizationSummary({
 }: ZROptimizationSummaryProps) {
   const rows = [
     {
-      label: 'Distance',
+      label: 'Distância',
       original: formatDistance(report.comparison.originalDistanceKm),
       optimized: formatDistance(report.comparison.optimizedDistanceKm),
       savings: formatDistance(report.comparison.distanceSavedKm),
     },
     {
-      label: 'Duration',
+      label: 'Duração',
       original: formatMinutes(report.analysis.estimatedOriginalDurationMinutes),
       optimized: formatMinutes(report.optimization.estimatedDurationMinutes),
       savings: formatMinutes(report.comparison.estimatedTimeSavedMinutes),
     },
     {
-      label: 'Fuel',
+      label: 'Combustível',
       original: '-',
       optimized: '-',
       savings: formatFuelCurrency(report.comparison.estimatedFuelSavedLiters, fuelPricePerLiter),
     },
     {
-      label: 'Stops',
+      label: 'Paradas',
       original: String(totalStops),
       optimized: String(totalStops),
-      savings: `${report.comparison.percentageImprovement}% better`,
+      savings: `${report.comparison.percentageImprovement}% melhor`,
     },
   ];
 
@@ -46,14 +46,14 @@ export function ZROptimizationSummary({
     <View style={styles.card}>
       <View style={styles.headerRow}>
         <Text style={styles.brand}>ZR Optimize™</Text>
-        <Text style={styles.improvement}>{report.comparison.percentageImprovement}% improvement</Text>
+        <Text style={styles.improvement}>{report.comparison.percentageImprovement}% de melhoria</Text>
       </View>
       <View style={styles.table}>
         <View style={styles.tableHeader}>
-          <Text style={[styles.headerCell, styles.metricCell]}>Metric</Text>
+          <Text style={[styles.headerCell, styles.metricCell]}>Métrica</Text>
           <Text style={styles.headerCell}>Original</Text>
-          <Text style={styles.headerCell}>Optimized</Text>
-          <Text style={styles.headerCell}>Savings</Text>
+          <Text style={styles.headerCell}>Otimizada</Text>
+          <Text style={styles.headerCell}>Economia</Text>
         </View>
         {rows.map(row => (
           <View key={row.label} style={styles.tableRow}>

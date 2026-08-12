@@ -1,6 +1,6 @@
 import type { RouteScoreFactor } from '@/lib/route-ai';
 
-export type ZRScoreBand = 'Excellent' | 'Good' | 'Fair' | 'Poor';
+export type ZRScoreBand = 'Excelente' | 'Boa' | 'Regular' | 'Ruim';
 
 export interface ZRExplanationItem {
   label: string;
@@ -8,51 +8,51 @@ export interface ZRExplanationItem {
 }
 
 export function getZRScoreBand(score: number): ZRScoreBand {
-  if (score >= 85) return 'Excellent';
-  if (score >= 70) return 'Good';
-  if (score >= 50) return 'Fair';
-  return 'Poor';
+  if (score >= 85) return 'Excelente';
+  if (score >= 70) return 'Boa';
+  if (score >= 50) return 'Regular';
+  return 'Ruim';
 }
 
 export function buildZRExplanations(factors: readonly RouteScoreFactor[]): ZRExplanationItem[] {
   const explanations: ZRExplanationItem[] = [];
-  const clusterQuality = factors.find(factor => factor.label === 'Cluster quality');
-  const routeContinuity = factors.find(factor => factor.label === 'Route continuity');
-  const neighborhoodReturns = factors.find(factor => factor.label === 'Neighborhood returns');
-  const streetRevisits = factors.find(factor => factor.label === 'Street revisits');
-  const averageSpacing = factors.find(factor => factor.label === 'Average stop spacing');
+  const clusterQuality = factors.find(factor => factor.label === 'Qualidade do agrupamento');
+  const routeContinuity = factors.find(factor => factor.label === 'Continuidade da rota');
+  const neighborhoodReturns = factors.find(factor => factor.label === 'Retornos ao bairro');
+  const streetRevisits = factors.find(factor => factor.label === 'Retornos à rua');
+  const averageSpacing = factors.find(factor => factor.label === 'Distância média entre paradas');
 
   if (clusterQuality && clusterQuality.impact > 0) {
     explanations.push({
-      label: 'Better clustering',
+      label: 'Agrupamento melhor',
       detail: clusterQuality.message,
     });
   }
 
   if (routeContinuity && routeContinuity.impact >= -4) {
     explanations.push({
-      label: 'Improved stop continuity',
+      label: 'Continuidade melhor entre paradas',
       detail: routeContinuity.message,
     });
   }
 
   if (streetRevisits && streetRevisits.impact >= -3) {
     explanations.push({
-      label: 'Fewer street revisits',
+      label: 'Menos retornos à rua',
       detail: streetRevisits.message,
     });
   }
 
   if (neighborhoodReturns && neighborhoodReturns.impact >= -4) {
     explanations.push({
-      label: 'Fewer neighborhood returns',
+      label: 'Menos retornos ao bairro',
       detail: neighborhoodReturns.message,
     });
   }
 
   if (averageSpacing) {
     explanations.push({
-      label: 'Lower average stop distance',
+      label: 'Menor distância média entre paradas',
       detail: averageSpacing.message,
     });
   }

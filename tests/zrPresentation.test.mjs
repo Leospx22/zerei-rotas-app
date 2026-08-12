@@ -9,31 +9,31 @@ import {
 } from '../components/route-ai/zrPresentation.ts';
 
 test('ZR score bands map score values to premium labels', () => {
-  assert.equal(getZRScoreBand(91), 'Excellent');
-  assert.equal(getZRScoreBand(75), 'Good');
-  assert.equal(getZRScoreBand(55), 'Fair');
-  assert.equal(getZRScoreBand(40), 'Poor');
+  assert.equal(getZRScoreBand(91), 'Excelente');
+  assert.equal(getZRScoreBand(75), 'Boa');
+  assert.equal(getZRScoreBand(55), 'Regular');
+  assert.equal(getZRScoreBand(40), 'Ruim');
 });
 
 test('ZR explanations are derived from route score factors', () => {
   const explanations = buildZRExplanations([
-    { label: 'Cluster quality', impact: 16, message: 'Excellent clustering.' },
-    { label: 'Route continuity', impact: 0, message: '0 sinais de retorno ou zigue-zague detectados.' },
-    { label: 'Street revisits', impact: 0, message: '0 retornos para ruas ja visitadas.' },
-    { label: 'Neighborhood returns', impact: -4, message: '1 retornos para bairros ja visitados.' },
-    { label: 'Average stop spacing', impact: 0, message: 'Espacamento medio de 1.2 km por trecho.' },
+    { label: 'Qualidade do agrupamento', impact: 16, message: 'Agrupamento excelente.' },
+    { label: 'Continuidade da rota', impact: 0, message: '0 sinais de retorno ou zigue-zague detectados.' },
+    { label: 'Retornos à rua', impact: 0, message: '0 retornos para ruas já visitadas.' },
+    { label: 'Retornos ao bairro', impact: -4, message: '1 retornos para bairros já visitados.' },
+    { label: 'Distância média entre paradas', impact: 0, message: 'Espaçamento médio de 1.2 km por trecho.' },
   ]);
 
   assert.deepEqual(
     explanations.map(item => item.label),
     [
-      'Better clustering',
-      'Improved stop continuity',
-      'Fewer street revisits',
-      'Fewer neighborhood returns',
+      'Agrupamento melhor',
+      'Continuidade melhor entre paradas',
+      'Menos retornos à rua',
+      'Menos retornos ao bairro',
     ]
   );
-  assert.equal(explanations[0].detail, 'Excellent clustering.');
+  assert.equal(explanations[0].detail, 'Agrupamento excelente.');
 });
 
 test('ZR presentation formatters keep route AI metrics display-ready', () => {

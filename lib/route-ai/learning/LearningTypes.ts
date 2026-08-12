@@ -81,7 +81,7 @@ export interface LearningRecommendation {
 
 export interface LearningStatus {
   enabled: boolean;
-  label: 'Learning' | 'Learning disabled' | 'No history yet';
+  label: string;
   routesAnalyzed: number;
   detail: string;
   confidence: number;

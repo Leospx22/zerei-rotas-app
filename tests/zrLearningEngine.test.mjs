@@ -108,7 +108,7 @@ test('records accepted and ignored AI recommendation events locally', async () =
 
   assert.equal(state.strategyPreferences.balanced?.accepted, 1);
   assert.equal(state.strategyPreferences.fastest?.ignored, 1);
-  assert.equal(status.label, 'Learning');
+  assert.equal(status.label, 'Aprendendo');
   assert.equal(status.recommendation?.suggestedStrategy, 'balanced');
 });
 

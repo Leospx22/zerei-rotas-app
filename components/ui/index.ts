@@ -1,3 +1,4 @@
+export * from '@/components/ui/AnimatedValueText';
 export * from '@/components/ui/AppButton';
 export * from '@/components/ui/AppCard';
 export * from '@/components/ui/AppChip';

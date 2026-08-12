@@ -1,6 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { deriveExecutionState } from '../lib/executionState.ts';
+import {
+  deriveExecutionProgress,
+  deriveExecutionState,
+  formatExecutionDuration,
+  formatExecutionTime,
+} from '../lib/executionState.ts';
 
 function packageItem(id, status = 'pending') {
   return {
@@ -92,4 +97,37 @@ test('returns stable empty execution state without a route', () => {
     remainingStopsCount: 0,
     executionStep: 'separacao',
   });
+});
+
+test('derives execution progress with remaining stops and packages', () => {
+  const completed = stop('stop-1', 'completed', [
+    packageItem('pkg-1', 'delivered'),
+    packageItem('pkg-2', 'delivered'),
+  ]);
+  const current = stop('stop-2', 'pending', [
+    packageItem('pkg-3', 'delivered'),
+    packageItem('pkg-4'),
+  ]);
+  const pending = stop('stop-3', 'pending', [packageItem('pkg-5')]);
+  const data = route([completed, current, pending]);
+  data.deliveredPackages = 3;
+
+  assert.deepEqual(deriveExecutionProgress(data), {
+    deliveredStops: 1,
+    remainingStops: 2,
+    completionPercent: 33,
+    deliveredPackages: 3,
+    remainingPackages: 2,
+    totalStops: 3,
+    totalPackages: 5,
+    successRate: 60,
+  });
+});
+
+test('formats execution duration and missing times for summaries', () => {
+  assert.equal(formatExecutionDuration(0), '0 min');
+  assert.equal(formatExecutionDuration(45), '45 min');
+  assert.equal(formatExecutionDuration(60), '1h');
+  assert.equal(formatExecutionDuration(75), '1h 15min');
+  assert.equal(formatExecutionTime(null), '--:--');
 });

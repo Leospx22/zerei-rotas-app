@@ -30,10 +30,10 @@ export function ZRScoreCard({ score }: ZRScoreCardProps) {
 }
 
 const scoreColors = {
-  Excellent: Colors.success,
-  Good: Colors.gold[400],
-  Fair: Colors.warning,
-  Poor: Colors.error,
+  Excelente: Colors.success,
+  Boa: Colors.gold[400],
+  Regular: Colors.warning,
+  Ruim: Colors.error,
 } as const;
 
 const styles = StyleSheet.create({

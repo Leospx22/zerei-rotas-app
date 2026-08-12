@@ -16,8 +16,8 @@ export function ZRExplanationCard({ factors }: ZRExplanationCardProps) {
 
   return (
     <View style={styles.card}>
-      <Text style={styles.title}>ZR Insights™</Text>
-      <Text style={styles.subtitle}>Why?</Text>
+      <Text style={styles.title}>Sugestões ZR™</Text>
+      <Text style={styles.subtitle}>Por quê?</Text>
       <View style={styles.list}>
         {explanations.map(item => (
           <View key={item.label} style={styles.item}>

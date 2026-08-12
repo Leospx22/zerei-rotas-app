@@ -1,6 +1,7 @@
-import React, { type ReactNode } from 'react';
+import React, { type ReactNode, useRef } from 'react';
 import {
   ActivityIndicator,
+  Animated,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -34,40 +35,59 @@ export function AppButton({
 }: AppButtonProps) {
   const isDisabled = disabled || loading;
   const colors = buttonColors[variant];
+  const pressScale = useRef(new Animated.Value(1)).current;
+  const animatePress = (toValue: number) => {
+    Animated.spring(pressScale, {
+      toValue,
+      friction: 6,
+      tension: 180,
+      useNativeDriver: true,
+    }).start();
+  };
 
   return (
-    <TouchableOpacity
-      {...props}
-      disabled={isDisabled}
-      activeOpacity={Motion.pressOpacity}
-      accessibilityRole="button"
-      accessibilityLabel={props.accessibilityLabel ?? label}
-      accessibilityState={{ disabled: isDisabled, busy: loading }}
-      style={[
-        styles.base,
-        { minHeight: ComponentSize.button[size] },
-        fullWidth && styles.fullWidth,
-        { backgroundColor: colors.background, borderColor: colors.border },
-        isDisabled && styles.disabled,
-        style,
-      ]}
-    >
-      {loading ? (
-        <ActivityIndicator color={colors.foreground} />
-      ) : (
-        <>
-          {leftIcon}
-          <Text
-            style={[
-              size === 'large' ? Typography.buttonLarge : Typography.button,
-              { color: colors.foreground },
-            ]}
-          >
-            {label}
-          </Text>
-        </>
-      )}
-    </TouchableOpacity>
+    <Animated.View style={[fullWidth && styles.fullWidth, { transform: [{ scale: pressScale }] }]}>
+      <TouchableOpacity
+        {...props}
+        disabled={isDisabled}
+        activeOpacity={Motion.pressOpacity}
+        onPressIn={event => {
+          animatePress(0.98);
+          props.onPressIn?.(event);
+        }}
+        onPressOut={event => {
+          animatePress(1);
+          props.onPressOut?.(event);
+        }}
+        accessibilityRole="button"
+        accessibilityLabel={props.accessibilityLabel ?? label}
+        accessibilityState={{ disabled: isDisabled, busy: loading }}
+        style={[
+          styles.base,
+          { minHeight: ComponentSize.button[size] },
+          fullWidth && styles.fullWidth,
+          { backgroundColor: colors.background, borderColor: colors.border },
+          isDisabled && styles.disabled,
+          style,
+        ]}
+      >
+        {loading ? (
+          <ActivityIndicator color={colors.foreground} />
+        ) : (
+          <>
+            {leftIcon}
+            <Text
+              style={[
+                size === 'large' ? Typography.buttonLarge : Typography.button,
+                { color: colors.foreground },
+              ]}
+            >
+              {label}
+            </Text>
+          </>
+        )}
+      </TouchableOpacity>
+    </Animated.View>
   );
 }
 

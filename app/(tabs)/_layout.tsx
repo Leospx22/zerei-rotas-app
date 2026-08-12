@@ -1,10 +1,7 @@
 import { Tabs } from 'expo-router';
 import { getFocusedRouteNameFromRoute } from '@react-navigation/native';
-import { useQuery } from '@tanstack/react-query';
-import { AlertTriangle, Home, Map, BarChart3, User, Users, ClipboardList } from 'lucide-react-native';
+import { AlertTriangle, Home, Map, BarChart3, User } from 'lucide-react-native';
 import { Colors } from '@/constants/theme';
-import { useAuth } from '@/contexts/AuthContext';
-import { fetchFounderAdminAccess } from '@/lib/founderAccess';
 
 const TAB_BAR_STYLE = {
   backgroundColor: Colors.cardBg,
@@ -25,15 +22,6 @@ const ROUTE_LIFECYCLE_SCREENS = new Set([
 ]);
 
 export default function TabLayout() {
-  const { session } = useAuth();
-  const founderAccessQuery = useQuery({
-    queryKey: ['founder-admin-access', session?.user.id],
-    queryFn: fetchFounderAdminAccess,
-    enabled: Boolean(session),
-    staleTime: 60_000,
-  });
-  const showFounderAdmin = Boolean(session) && founderAccessQuery.data === true;
-
   return (
     <Tabs
       screenOptions={{
@@ -87,16 +75,14 @@ export default function TabLayout() {
         name="users"
         options={{
           title: 'Users',
-          href: showFounderAdmin ? undefined : null,
-          tabBarIcon: ({ size, color }) => <Users size={size} color={color} />,
+          href: null,
         }}
       />
       <Tabs.Screen
         name="waitlist"
         options={{
           title: 'Waitlist',
-          href: showFounderAdmin ? undefined : null,
-          tabBarIcon: ({ size, color }) => <ClipboardList size={size} color={color} />,
+          href: null,
         }}
       />
       <Tabs.Screen

@@ -129,9 +129,9 @@ export function buildLearningStatus(state: RouteLearningState): LearningStatus {
   if (!state.enabled) {
     return {
       enabled: false,
-      label: 'Learning disabled',
+      label: 'Aprendizado desativado',
       routesAnalyzed: state.routesAnalyzed,
-      detail: 'Local learning is paused.',
+      detail: 'O aprendizado local está pausado.',
       confidence: 0,
       recommendation: null,
     };
@@ -140,9 +140,9 @@ export function buildLearningStatus(state: RouteLearningState): LearningStatus {
   if (state.routesAnalyzed === 0) {
     return {
       enabled: true,
-      label: 'No history yet',
+      label: 'Sem histórico ainda',
       routesAnalyzed: 0,
-      detail: 'Complete routes to personalize ZR Intelligence™.',
+      detail: 'Conclua rotas para personalizar a ZR Intelligence™.',
       confidence: 0,
       recommendation: null,
     };
@@ -150,11 +150,11 @@ export function buildLearningStatus(state: RouteLearningState): LearningStatus {
 
   return {
     enabled: true,
-    label: 'Learning',
+    label: 'Aprendendo',
     routesAnalyzed: state.routesAnalyzed,
     detail: recommendation
-      ? `Confidence improving. Suggested strategy: ${recommendation.suggestedStrategy}.`
-      : 'Confidence improving from local delivery history.',
+      ? `Confiança melhorando. Estratégia sugerida: ${formatStrategyLabel(recommendation.suggestedStrategy)}.`
+      : 'Confiança melhorando com o histórico local de entregas.',
     confidence: recommendation?.confidence ?? Math.min(90, 25 + state.routesAnalyzed * 5),
     recommendation,
   };
@@ -209,6 +209,18 @@ function updateStrategyDecision(
       ignored: current.ignored + Number(type === 'ignored-ai-recommendation'),
     },
   };
+}
+
+function formatStrategyLabel(strategy: OptimizationStrategy): string {
+  if (strategy === 'fastest') return 'mais rápida';
+  if (strategy === 'shortest-distance') return 'mais curta';
+  if (strategy === 'balanced') return 'equilibrada';
+  if (strategy === 'cluster') return 'agrupada';
+  if (strategy === 'traffic-aware' || strategy === 'traffic') return 'com trânsito';
+  if (strategy === 'driver-preference' || strategy === 'driver-profile') return 'perfil do motorista';
+  if (strategy === 'historical-learning' || strategy === 'learning') return 'aprendizado histórico';
+  if (strategy === 'ai') return 'IA';
+  return strategy;
 }
 
 function createLearningEvent(

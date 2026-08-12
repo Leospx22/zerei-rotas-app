@@ -181,7 +181,7 @@ export function detectColumns(headers: string[]): Record<keyof RawPackage, numbe
       'rastreio', 'número rastreio', 'numero rastreio',
       'package id', 'package_id', 'código', 'codigo', 'id pacote',
     ],
-    sequence: ['sequence', 'sequÃªncia', 'sequencia', 'seq'],
+    sequence: ['sequence', 'sequência', 'sequencia', 'seq'],
     destinationAddress: [
       'destination address', 'destination_address',
       'endereço', 'endereco', 'address', 'destino', 'destination',
@@ -191,7 +191,7 @@ export function detectColumns(headers: string[]): Record<keyof RawPackage, numbe
       'postal code', 'postal_code', 'cep', 'zip', 'zip code', 'zip_code',
       'código postal', 'codigo postal', 'postcode', 'post code',
     ],
-    city: ['city', 'cidade', 'municipio', 'municÃ­pio'],
+    city: ['city', 'cidade', 'municipio', 'município'],
     state: ['state', 'estado', 'uf'],
     latitude: ['latitude', 'lat'],
     longitude: ['longitude', 'lng', 'long'],
@@ -205,7 +205,7 @@ export function detectColumns(headers: string[]): Record<keyof RawPackage, numbe
   // Fuzzy fallback (only applied when exact match fails)
   // stopNumber fuzzy: only /\bstop\b/i or /\bparada\b/i — not seq/order
   const fuzzyPatterns: Record<keyof RawPackage, RegExp[]> = {
-    sequence: [/sequ[eÃª]ncia/i, /^sequence$/i, /^seq$/i],
+    sequence: [/sequ[eê]ncia/i, /^sequence$/i, /^seq$/i],
     trackingNumber: [/track/i, /rastreio/i, /cod[ií]go/i, /id[_\s]?pacote/i, /package[_\s]?id/i, /spx/i, /\btn\b/i],
     destinationAddress: [/endere[cç]o/i, /address/i, /destin/i, /logradouro/i],
     zipCode: [/cep/i, /zip/i, /postal/i],

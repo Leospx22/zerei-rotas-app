@@ -19,3 +19,21 @@ test('removes delivery complements from the map query', () => {
   assert.equal(url.includes('ANDAR'), false);
   assert.equal(url.includes('INTERFONE'), false);
 });
+
+test('builds a Waze navigation URL for the selected stop', () => {
+  const url = buildGoogleMapsSearchUrl('Rua Coronel Trancoso, 20', 'waze');
+
+  assert.equal(
+    url,
+    'https://waze.com/ul?navigate=yes&q=Rua%20Coronel%20Trancoso%2C%2020'
+  );
+});
+
+test('removes delivery complements from the Waze query', () => {
+  const url = buildGoogleMapsSearchUrl(
+    'Rua Coronel Trancoso, 20, APTO 31, ANDAR 2, INTERFONE 4',
+    'waze'
+  );
+
+  assert.equal(decodeURIComponent(url.split('q=')[1]), 'Rua Coronel Trancoso, 20');
+});

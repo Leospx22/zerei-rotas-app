@@ -174,7 +174,7 @@ export default function RoutesScreen() {
       <ScrollView style={styles.container} contentContainerStyle={styles.content}>
         <View style={styles.headerRow}>
           <HeaderBrandIcon size={22} />
-          <Text style={styles.pageTitle}>Minhas Rotas</Text>
+          <Text style={styles.pageTitle}>Minhas rotas</Text>
         </View>
 
         {routes.length === 0 ? (
@@ -279,7 +279,7 @@ export default function RoutesScreen() {
                     accessibilityLabel={`Revisar rota ${route.name}`}
                   >
                     <MapPin size={15} color={Colors.gold[400]} />
-                    <Text style={styles.reviewActionText}>Revisar Rota</Text>
+                    <Text style={styles.reviewActionText}>Revisar rota</Text>
                   </TouchableOpacity>
                 </View>
               ) : null}
@@ -304,7 +304,7 @@ export default function RoutesScreen() {
                     accessibilityLabel={`Revisar rota ${route.name}`}
                   >
                     <MapPin size={15} color={Colors.gold[400]} />
-                    <Text style={styles.reviewActionText}>Revisar Rota</Text>
+                    <Text style={styles.reviewActionText}>Revisar rota</Text>
                   </TouchableOpacity>
                 </View>
               ) : null}

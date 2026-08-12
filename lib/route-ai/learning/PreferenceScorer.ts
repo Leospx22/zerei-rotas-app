@@ -18,8 +18,8 @@ export function scoreLearningPreferences(state: RouteLearningState): LearningRec
     suggestedStrategy: preferred.strategy,
     confidence,
     reason: preferred.accepted > 0
-      ? `You accepted this strategy on ${preferred.accepted} of your last ${acceptanceTotal} recorded recommendation decisions.`
-      : `Based on ${state.routesAnalyzed} completed route${state.routesAnalyzed === 1 ? '' : 's'}, this strategy best matches your local delivery pattern.`,
+      ? `Você aceitou esta estratégia em ${preferred.accepted} de ${acceptanceTotal} recomendações registradas.`
+      : `Com base em ${state.routesAnalyzed} rota${state.routesAnalyzed === 1 ? '' : 's'} concluída${state.routesAnalyzed === 1 ? '' : 's'}, esta estratégia combina melhor com seu padrão local de entrega.`,
   };
 }
 

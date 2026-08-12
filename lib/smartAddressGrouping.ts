@@ -73,8 +73,8 @@ const STREET_DICTIONARY: Readonly<Record<string, string>> = {
   estrada: 'Estrada',
   al: 'Alameda',
   alameda: 'Alameda',
-  praca: 'Praca',
-  pc: 'Praca',
+  praca: 'Praça',
+  pc: 'Praça',
   rod: 'Rodovia',
   rodovia: 'Rodovia',
   blvd: 'Boulevard',
@@ -91,7 +91,7 @@ const LOWERCASE_STREET_WORDS = new Set(['da', 'das', 'de', 'do', 'dos', 'e']);
 const WITHOUT_BLOCK_KEY = '__sem_bloco__';
 export const WITHOUT_BLOCK_LABEL = 'Sem bloco';
 const WITHOUT_UNIT_KEY = '__sem_unidade__';
-export const WITHOUT_UNIT_LABEL = 'Endereco principal';
+export const WITHOUT_UNIT_LABEL = 'Endereço principal';
 
 function comparisonText(value: string): string {
   return value
@@ -136,7 +136,7 @@ function parseStreetAndNumber(cleaned: string) {
     .split(/\s+/)
     .filter(Boolean)
     .map(normalizeStreetToken);
-  const streetType = ['Rua', 'Avenida', 'Travessa', 'Estrada', 'Alameda', 'Praca', 'Rodovia', 'Boulevard']
+  const streetType = ['Rua', 'Avenida', 'Travessa', 'Estrada', 'Alameda', 'Praça', 'Rodovia', 'Boulevard']
     .includes(streetTokens[0] ?? '')
     ? streetTokens[0]
     : '';

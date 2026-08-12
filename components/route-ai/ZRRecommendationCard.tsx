@@ -26,7 +26,7 @@ export function ZRRecommendationCard({
         <Text style={styles.brand}>ZR Runtime™</Text>
         <View style={styles.confidencePill}>
           <ShieldCheck size={13} color={Colors.success} />
-          <Text style={styles.confidenceText}>{report.optimization.confidenceScore}% confidence</Text>
+          <Text style={styles.confidenceText}>{report.optimization.confidenceScore}% de confiança</Text>
         </View>
       </View>
       <Text style={styles.title}>{report.recommendation.label}</Text>
@@ -41,14 +41,14 @@ export function ZRRecommendationCard({
       <View style={styles.actions}>
         <TouchableOpacity style={styles.secondaryButton} onPress={onPreview} accessibilityRole="button">
           <Eye size={15} color={Colors.gold[400]} />
-          <Text style={styles.secondaryButtonText}>Preview</Text>
+          <Text style={styles.secondaryButtonText}>Prévia</Text>
         </TouchableOpacity>
         <TouchableOpacity style={styles.primaryButton} onPress={onUse} accessibilityRole="button">
           <Route size={15} color={Colors.primary[900]} />
-          <Text style={styles.primaryButtonText}>Use</Text>
+          <Text style={styles.primaryButtonText}>Usar</Text>
         </TouchableOpacity>
         <TouchableOpacity style={styles.ghostButton} onPress={onKeep} accessibilityRole="button">
-          <Text style={styles.ghostButtonText}>Keep Current</Text>
+          <Text style={styles.ghostButtonText}>Manter atual</Text>
         </TouchableOpacity>
       </View>
     </View>

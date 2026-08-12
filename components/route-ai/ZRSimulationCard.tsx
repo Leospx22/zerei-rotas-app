@@ -20,7 +20,7 @@ export function ZRSimulationCard({ simulation }: ZRSimulationCardProps) {
 
   return (
     <View style={styles.card}>
-      <Text style={styles.brand}>ZR Runtime™ Simulation</Text>
+      <Text style={styles.brand}>Simulação ZR Runtime™</Text>
       <View style={styles.rows}>
         {rows.map(row => {
           const isWinner = row.strategy === simulation.winner.strategy;
@@ -47,8 +47,12 @@ export function ZRSimulationCard({ simulation }: ZRSimulationCardProps) {
 }
 
 function formatStrategy(strategy: string): string {
-  if (strategy === 'shortest-distance') return 'Shortest';
-  return strategy[0].toUpperCase() + strategy.slice(1);
+  if (strategy === 'current') return 'Atual';
+  if (strategy === 'fastest') return 'Mais rápida';
+  if (strategy === 'shortest-distance') return 'Mais curta';
+  if (strategy === 'balanced') return 'Equilibrada';
+  if (strategy === 'cluster') return 'Agrupada';
+  return strategy;
 }
 
 const styles = StyleSheet.create({

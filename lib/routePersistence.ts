@@ -440,3 +440,17 @@ export async function deleteRouteFromStorage(storage: RouteStorage, id: string):
   await writeJSON(storage, KEY_HISTORY, next);
   return true;
 }
+
+export async function deleteHistoryEntryFromStorage(
+  storage: RouteStorage,
+  id: string,
+  completedAt: string
+): Promise<boolean> {
+  const history = await loadHistoryFromStorage(storage);
+  const next = history.filter(
+    entry => !(entry.id === id && entry.completedAt === completedAt)
+  );
+  if (next.length === history.length) return false;
+  await writeJSON(storage, KEY_HISTORY, next);
+  return true;
+}

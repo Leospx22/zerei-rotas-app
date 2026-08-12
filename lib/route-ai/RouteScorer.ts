@@ -12,27 +12,27 @@ export function scoreRoute(stops: readonly GroupedStop[], analysis: RouteAnalysi
 
   const factors: RouteScoreFactor[] = [
     {
-      label: 'Street revisits',
+      label: 'Retornos à rua',
       impact: -Math.min(18, streetRevisits * 3),
-      message: `${streetRevisits} retornos para ruas ja visitadas.`,
+      message: `${streetRevisits} retornos para ruas já visitadas.`,
     },
     {
-      label: 'Neighborhood returns',
+      label: 'Retornos ao bairro',
       impact: -Math.min(16, neighborhoodReturns * 4),
-      message: `${neighborhoodReturns} retornos para bairros ja visitados.`,
+      message: `${neighborhoodReturns} retornos para bairros já visitados.`,
     },
     {
-      label: 'Cluster quality',
+      label: 'Qualidade do agrupamento',
       impact: Math.round(clusterQuality * 18),
-      message: clusterQuality >= 0.7 ? 'Excellent clustering.' : 'Clusters can be tighter.',
+      message: clusterQuality >= 0.7 ? 'Agrupamento excelente.' : 'Os agrupamentos podem ficar mais próximos.',
     },
     {
-      label: 'Average stop spacing',
+      label: 'Distância média entre paradas',
       impact: -spacingPenalty,
-      message: `Espacamento medio de ${analysis.averageStopDistanceKm.toFixed(1)} km por trecho.`,
+      message: `Espaçamento médio de ${analysis.averageStopDistanceKm.toFixed(1)} km por trecho.`,
     },
     {
-      label: 'Route continuity',
+      label: 'Continuidade da rota',
       impact: -continuityPenalty,
       message: `${backtracking} sinais de retorno ou zigue-zague detectados.`,
     },
@@ -44,7 +44,7 @@ export function scoreRoute(stops: readonly GroupedStop[], analysis: RouteAnalysi
 
   return {
     score,
-    summary: `Score: ${score}`,
+    summary: `Nota: ${score}`,
     reasons,
     potentialImprovementPercentage: Math.max(0, Math.min(35, Math.round((100 - score) * 0.42))),
     factors,
@@ -94,13 +94,13 @@ function buildReasons(
   factors: readonly RouteScoreFactor[],
   neighborhoodReturns: number
 ): string[] {
-  const positive = factors.find(factor => factor.label === 'Cluster quality')?.message ?? 'Cluster quality calculated.';
+  const positive = factors.find(factor => factor.label === 'Qualidade do agrupamento')?.message ?? 'Agrupamento calculado.';
   const reasons = [positive];
   if (neighborhoodReturns > 0) {
-    reasons.push(`${neighborhoodReturns} unnecessary neighborhood return${neighborhoodReturns === 1 ? '' : 's'} detected.`);
+    reasons.push(`${neighborhoodReturns} retorno${neighborhoodReturns === 1 ? '' : 's'} desnecessário${neighborhoodReturns === 1 ? '' : 's'} ao bairro detectado${neighborhoodReturns === 1 ? '' : 's'}.`);
   }
   if (score < 85) {
-    reasons.push(`Potential improvement: ${Math.max(5, Math.round((100 - score) * 0.42))}%`);
+    reasons.push(`Melhoria possível: ${Math.max(5, Math.round((100 - score) * 0.42))}%`);
   }
   return reasons;
 }

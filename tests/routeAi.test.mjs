@@ -72,7 +72,18 @@ test('deterministic optimizer returns stable optimized order and savings estimat
 
 test('comparison and score explain the route quality', () => {
   const analysis = analyzeRoute(stops);
-  const comparison = compareRoutes(analysis.originalDistanceKm, 1, analysis.estimatedOriginalDurationMinutes, 20);
+  const comparison = compareRoutes(
+    analysis.originalDistanceKm,
+    1,
+    analysis.estimatedOriginalDurationMinutes,
+    20,
+    {},
+    {
+      originalMetricConfidence: analysis.metricConfidence,
+      optimizedMetricConfidence: 'reliable',
+      metricProvenance: analysis.metricProvenance,
+    }
+  );
   const score = scoreRoute(stops, analysis);
 
   assert.ok(comparison.distanceSavedKm > 0);

@@ -1,4 +1,4 @@
-import type { GroupedStop } from '@/lib/packageUtils';
+import type { GroupedStop } from '../../packageUtils.ts';
 import type {
   CategoryLearningMetrics,
   DeliveryCategory,

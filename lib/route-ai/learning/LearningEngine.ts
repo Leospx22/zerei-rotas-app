@@ -1,5 +1,5 @@
 import type { RouteData } from '@/contexts/RouteContext';
-import type { OptimizationStrategy } from '@/lib/route-ai/OptimizationTypes.ts';
+import type { OptimizationStrategy } from '../OptimizationTypes.ts';
 import { updateAverage } from './DriverProfile.ts';
 import {
   mergeCategoryMetrics,

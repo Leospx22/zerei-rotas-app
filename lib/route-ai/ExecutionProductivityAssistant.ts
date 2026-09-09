@@ -1,5 +1,5 @@
 import type { RouteData } from '@/contexts/RouteContext';
-import type { GroupedStop } from '@/lib/packageUtils';
+import type { GroupedStop } from '../packageUtils.ts';
 import { calculateDistanceKm, roundDistance } from './RouteAnalyzer.ts';
 import { analyzeRouteAssistantInsights } from './RouteAssistantAnalyzer.ts';
 

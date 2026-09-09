@@ -1,5 +1,5 @@
-import type { GroupedStop } from '@/lib/packageUtils';
-import { calculateDistanceKm, roundDistance } from './RouteAnalyzer.ts';
+import type { GroupedStop } from '../packageUtils.ts';
+import { calculateDistanceKm, hasCoordinate, roundDistance } from './RouteAnalyzer.ts';
 
 export type RouteAssistantInsightType =
   | 'duplicate-address'
@@ -204,7 +204,7 @@ function detectLongOptimizedLegs(
 
 function detectPotentialAnomalies(stops: readonly GroupedStop[]): RouteAssistantInsight[] {
   const insights: RouteAssistantInsight[] = [];
-  const missingCoordinates = stops.filter(stop => stop.latitude === null || stop.longitude === null);
+  const missingCoordinates = stops.filter(stop => !hasCoordinate(stop));
   const multiAddressStops = stops.filter(stop => stop.addressCount >= 3);
   const missingImportedStopNumbers = stops.filter(stop => stop.originalStopNumber === null);
 

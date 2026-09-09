@@ -129,3 +129,26 @@ test('migration grants anonymous inserts only to public form columns', () => {
   assert.match(migration, /alter table public\.waitlist_lead_events enable row level security;/);
   assert.doesNotMatch(migration, /for (select|update|delete)\s+to anon/i);
 });
+
+test('hardening migration replaces broad anonymous insert with five form columns', () => {
+  const migration = readFileSync(
+    new URL(
+      '../supabase/migrations/20260908000000_009_harden_waitlist_leads_anon_insert.sql',
+      import.meta.url
+    ),
+    'utf8'
+  );
+
+  assert.match(migration, /^begin;/i);
+  assert.match(migration, /revoke insert on table public\.waitlist_leads from anon;/i);
+  assert.match(
+    migration,
+    /grant insert \(\s*name,\s*whatsapp,\s*main_platform,\s*email,\s*city\s*\)\s*on table public\.waitlist_leads\s*to anon;/i
+  );
+  assert.doesNotMatch(
+    migration,
+    /grant\s+(select|update|delete|truncate|references|trigger)|grant insert[^;]*\b(id|status|source|notes|contacted_at|invited_at|converted_user_id|metadata|created_at|updated_at|whatsapp_normalized)\b/is
+  );
+  assert.doesNotMatch(migration, /alter table|create policy|drop policy|create trigger|drop trigger/i);
+  assert.match(migration, /commit;\s*$/i);
+});

@@ -1,4 +1,4 @@
-import type { GroupedStop } from '@/lib/packageUtils';
+import type { GroupedStop } from '../packageUtils.ts';
 import { calculateDistanceKm, getNeighborhood, getStreetName } from './RouteAnalyzer.ts';
 import type { RouteAnalysis, RouteScoreFactor, RouteScoreResult } from './OptimizationTypes.ts';
 
@@ -9,6 +9,11 @@ export function scoreRoute(stops: readonly GroupedStop[], analysis: RouteAnalysi
   const clusterQuality = calculateClusterQuality(stops);
   const spacingPenalty = analysis.averageStopDistanceKm > 4 ? 8 : analysis.averageStopDistanceKm > 2.5 ? 4 : 0;
   const continuityPenalty = Math.min(18, backtracking * 4);
+  const metricPenalty = analysis.metricConfidence === 'unreliable'
+    ? 22
+    : analysis.metricConfidence === 'degraded'
+      ? 10
+      : 0;
 
   const factors: RouteScoreFactor[] = [
     {
@@ -35,6 +40,15 @@ export function scoreRoute(stops: readonly GroupedStop[], analysis: RouteAnalysi
       label: 'Continuidade da rota',
       impact: -continuityPenalty,
       message: `${backtracking} sinais de retorno ou zigue-zague detectados.`,
+    },
+    {
+      label: 'Confiança dos dados',
+      impact: -metricPenalty,
+      message: analysis.metricConfidence === 'reliable'
+        ? 'Coordenadas consistentes para estimativa local.'
+        : analysis.metricConfidence === 'degraded'
+          ? 'Alguns pontos da rota precisam de confirmação.'
+          : 'Estimativa de distância indisponível para alguns trechos.',
     },
   ];
 

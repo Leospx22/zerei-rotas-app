@@ -1,5 +1,6 @@
 import type { GroupedStop } from '../../packageUtils.ts';
-import { getNeighborhood } from '../RouteAnalyzer.ts';
+import { getNeighborhood, hasCoordinate } from '../RouteAnalyzer.ts';
+import type { RouteAnalysis } from '../OptimizationTypes.ts';
 
 export interface RuntimeOptimizationReason {
   title: string;
@@ -36,13 +37,17 @@ export function explainRecommendedMove(
 export function calculateRuntimeConfidence(
   remainingStops: readonly GroupedStop[],
   savingsMinutes: number,
-  lockedStopCount: number
+  lockedStopCount: number,
+  metricConfidence: RouteAnalysis['metricConfidence'] = 'unreliable'
 ): number {
-  const missingCoordinates = remainingStops.filter(stop => stop.latitude === null || stop.longitude === null).length;
+  if (metricConfidence === 'unreliable') return 0;
+
+  const missingCoordinates = remainingStops.filter(stop => !hasCoordinate(stop)).length;
   const coordinatePenalty = Math.round((missingCoordinates / Math.max(remainingStops.length, 1)) * 24);
   const lockedPenalty = Math.min(12, lockedStopCount * 3);
   const savingsSignal = Math.min(20, savingsMinutes * 2);
-  return Math.max(0, Math.min(100, Math.round(74 + savingsSignal - coordinatePenalty - lockedPenalty)));
+  const score = Math.max(0, Math.min(100, Math.round(74 + savingsSignal - coordinatePenalty - lockedPenalty)));
+  return metricConfidence === 'degraded' ? Math.min(54, score) : score;
 }
 
 export function findFirstMove(

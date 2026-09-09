@@ -1,5 +1,15 @@
 export type StopMoveDirection = -1 | 1;
 
+export interface OptimizedRouteOrderDecision {
+  recommendationAction?: 'use-optimized-route' | 'keep-original-route';
+  metricConfidence?: 'reliable' | 'degraded' | 'unreliable';
+}
+
+export interface OptimizedRouteOrderResult<T> {
+  stops: T[];
+  applied: boolean;
+}
+
 export function moveRouteStop<T extends { orderIndex: number }>(
   stops: readonly T[],
   fromIndex: number,
@@ -29,4 +39,41 @@ export function moveRouteStopToIndex<T extends { orderIndex: number }>(
   reordered.splice(toIndex, 0, movedStop);
 
   return reordered.map((stop, orderIndex) => ({ ...stop, orderIndex }));
+}
+
+export function applyOptimizedRouteOrder<T extends { id: string; orderIndex: number }>(
+  stops: readonly T[],
+  optimizedStopIds: readonly string[] | null | undefined,
+  decision: OptimizedRouteOrderDecision
+): OptimizedRouteOrderResult<T> {
+  if (
+    decision.recommendationAction !== 'use-optimized-route' ||
+    decision.metricConfidence !== 'reliable' ||
+    !optimizedStopIds ||
+    optimizedStopIds.length !== stops.length
+  ) {
+    return { stops: [...stops], applied: false };
+  }
+
+  const stopsById = new Map(stops.map(stop => [stop.id, stop]));
+  const seen = new Set<string>();
+  const reordered: T[] = [];
+
+  for (const stopId of optimizedStopIds) {
+    const stop = stopsById.get(stopId);
+    if (!stop || seen.has(stopId)) {
+      return { stops: [...stops], applied: false };
+    }
+    seen.add(stopId);
+    reordered.push(stop);
+  }
+
+  if (seen.size !== stops.length) {
+    return { stops: [...stops], applied: false };
+  }
+
+  return {
+    stops: reordered.map((stop, orderIndex) => ({ ...stop, orderIndex })),
+    applied: true,
+  };
 }

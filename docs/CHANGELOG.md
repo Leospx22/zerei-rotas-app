@@ -29,6 +29,7 @@ All notable product and architecture changes are recorded here. Versions follow 
 - Manual unresolved-address support with "Insira o endereço manualmente" messaging and "Copiar endereço" actions in map/review surfaces.
 
 - Supabase waitlist lead/event schema, anonymous insert-only RLS boundary, safe lead helper, integration guide, and regression tests.
+- Forward-only Supabase waitlist hardening that limits anonymous inserts to the five deployed Landing Page fields while preserving database-generated workflow fields.
 
 - Closed-beta status, support and feedback actions, build label, beta tester checklist, and optional `feedback_opened` funnel tracking.
 

@@ -3,7 +3,7 @@ import { StyleSheet, Text, View } from 'react-native';
 import { Trophy } from 'lucide-react-native';
 import { BorderRadius, Colors, FontSizes, Spacing } from '@/constants/theme';
 import type { RouteSimulationSummary } from '@/lib/route-ai';
-import { formatDistance, formatMinutes } from './zrPresentation';
+import { formatDistance, formatMetricConfidence, formatMetricSavings, formatMinutes } from './zrPresentation';
 
 interface ZRSimulationCardProps {
   simulation: RouteSimulationSummary;
@@ -34,9 +34,9 @@ export function ZRSimulationCard({ simulation }: ZRSimulationCardProps) {
               </View>
               <Text style={styles.value}>{formatDistance(row.distanceKm)}</Text>
               <Text style={styles.value}>{formatMinutes(row.durationMinutes)}</Text>
-              <Text style={styles.value}>{row.confidence}%</Text>
+              <Text style={styles.value}>{formatMetricConfidence(row.confidence, row.metricConfidence)}</Text>
               <Text style={[styles.value, row.savingsMinutes > 0 && styles.savings]}>
-                {formatMinutes(row.savingsMinutes)}
+                {formatMetricSavings(formatMinutes(row.savingsMinutes), row.metricConfidence)}
               </Text>
             </View>
           );

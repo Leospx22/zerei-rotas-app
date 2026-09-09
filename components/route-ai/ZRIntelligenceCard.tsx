@@ -8,7 +8,7 @@ import { ZROptimizationSummary } from './ZROptimizationSummary';
 import { ZRRecommendationCard } from './ZRRecommendationCard';
 import { ZRScoreCard } from './ZRScoreCard';
 import { ZRSimulationCard } from './ZRSimulationCard';
-import { formatDistance, formatFuelCurrency, formatMinutes } from './zrPresentation';
+import { formatDistance, formatFuelCurrency, formatMetricConfidence, formatMetricSavings, formatMinutes } from './zrPresentation';
 
 interface ZRIntelligenceCardProps {
   report: RouteAIReport;
@@ -46,12 +46,24 @@ export function ZRIntelligenceCard({
       <ProgressiveSection delay={70}>
         <View style={styles.kpiGrid}>
           <Kpi label="Nota de otimização" value={`${report.score.score} / 100`} />
-          <Kpi label="Confiança" value={`${report.optimization.confidenceScore}%`} />
-          <Kpi label="Distância economizada" value={formatDistance(report.comparison.distanceSavedKm)} />
-          <Kpi label="Tempo economizado" value={formatMinutes(report.comparison.estimatedTimeSavedMinutes)} />
+          <Kpi
+            label="Confiança"
+            value={formatMetricConfidence(report.optimization.confidenceScore, report.optimization.metricConfidence)}
+          />
+          <Kpi
+            label="Distância economizada"
+            value={formatMetricSavings(formatDistance(report.comparison.distanceSavedKm), report.comparison.metricConfidence)}
+          />
+          <Kpi
+            label="Tempo economizado"
+            value={formatMetricSavings(formatMinutes(report.comparison.estimatedTimeSavedMinutes), report.comparison.metricConfidence)}
+          />
           <Kpi
             label="Combustível economizado"
-            value={formatFuelCurrency(report.comparison.estimatedFuelSavedLiters, fuelPricePerLiter)}
+            value={formatMetricSavings(
+              formatFuelCurrency(report.comparison.estimatedFuelSavedLiters, fuelPricePerLiter),
+              report.comparison.metricConfidence
+            )}
           />
           <Kpi label="Recomendação" value={report.recommendation.label} />
         </View>

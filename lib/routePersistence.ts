@@ -7,6 +7,7 @@ import {
   type OccurrenceRecord,
   type OccurrenceResolution,
 } from './occurrenceRecords.ts';
+import { sanitizeCoordinatePair, sanitizeRouteCoordinates } from './coordinateIntegrity.ts';
 
 export interface HistoryEntry {
   id: string;
@@ -93,10 +94,11 @@ export function validatePersistedRoute(data: unknown): RouteData | null {
   const status = isRouteStatus(data.status) ? data.status : 'planning';
   const stops = data.stops
     .filter(isObject)
-    .map((stop, stopIndex) => {
+    .map((stop, stopIndex): RouteData['stops'][number] | null => {
       const rawPackages = Array.isArray(stop.packages) ? stop.packages.filter(isObject) : [];
       const packages: RouteData['stops'][number]['packages'] = rawPackages.map((pkg, packageIndex) => {
         const sequence = typeof pkg.sequence === 'string' && pkg.sequence.trim() ? pkg.sequence : undefined;
+        const coordinate = sanitizeCoordinatePair(pkg.latitude, pkg.longitude);
         return {
           ...pkg,
           id: stringOrFallback(pkg.id, `pkg-${stopIndex + 1}-${packageIndex + 1}`),
@@ -106,8 +108,12 @@ export function validatePersistedRoute(data: unknown): RouteData | null {
           zipCode: stringOrFallback(pkg.zipCode, stringOrFallback(stop.zipCode, '')),
           city: typeof pkg.city === 'string' && pkg.city.trim() ? pkg.city : undefined,
           state: typeof pkg.state === 'string' && pkg.state.trim() ? pkg.state : undefined,
-          latitude: typeof pkg.latitude === 'number' ? pkg.latitude : null,
-          longitude: typeof pkg.longitude === 'number' ? pkg.longitude : null,
+          latitude: coordinate.latitude,
+          longitude: coordinate.longitude,
+          coordinateConfidence: coordinate.confidence,
+          originalLatitude: coordinate.originalLatitude,
+          originalLongitude: coordinate.originalLongitude,
+          coordinateIssue: coordinate.reason,
           stopNumber: typeof pkg.stopNumber === 'number' ? pkg.stopNumber : null,
           status: isPackageStatus(pkg.status) ? pkg.status : 'pending',
         };
@@ -120,6 +126,7 @@ export function validatePersistedRoute(data: unknown): RouteData | null {
           ? 'completed'
           : 'pending';
       const firstPackage = packages[0];
+      const stopCoordinate = sanitizeCoordinatePair(stop.latitude, stop.longitude);
       const addressGroups = Array.isArray(stop.addressGroups) ? stop.addressGroups : [];
       return {
         ...stop,
@@ -133,8 +140,12 @@ export function validatePersistedRoute(data: unknown): RouteData | null {
         normalizedAddress: stringOrFallback(stop.normalizedAddress, firstPackage.destinationAddress),
         originalAddress: stringOrFallback(stop.originalAddress, firstPackage.destinationAddress),
         zipCode: stringOrFallback(stop.zipCode, firstPackage.zipCode),
-        latitude: typeof stop.latitude === 'number' ? stop.latitude : null,
-        longitude: typeof stop.longitude === 'number' ? stop.longitude : null,
+        latitude: stopCoordinate.latitude,
+        longitude: stopCoordinate.longitude,
+        coordinateConfidence: stopCoordinate.confidence,
+        originalLatitude: stopCoordinate.originalLatitude,
+        originalLongitude: stopCoordinate.originalLongitude,
+        coordinateIssue: stopCoordinate.reason,
         packages,
         packageCount: packages.length,
         addressGroups,
@@ -149,18 +160,28 @@ export function validatePersistedRoute(data: unknown): RouteData | null {
 
   if (stops.length === 0) return null;
 
-  const deliveredPackages = stops.reduce(
+  const routeAwareStops = sanitizeRouteCoordinates(stops).map(stop => ({
+    ...stop,
+    latitude: stop.coordinateIntegrity.latitude,
+    longitude: stop.coordinateIntegrity.longitude,
+    coordinateConfidence: stop.coordinateIntegrity.confidence,
+    originalLatitude: stop.coordinateIntegrity.originalLatitude,
+    originalLongitude: stop.coordinateIntegrity.originalLongitude,
+    coordinateIssue: stop.coordinateIntegrity.reason,
+  }));
+
+  const deliveredPackages = routeAwareStops.reduce(
     (sum, stop) => sum + stop.packages.filter(pkg => pkg.status === 'delivered').length,
     0
   );
-  const completedStops = stops.filter(stop => stop.status === 'completed').length;
-  const totalPackages = stops.reduce((sum, stop) => sum + stop.packages.length, 0);
+  const completedStops = routeAwareStops.filter(stop => stop.status === 'completed').length;
+  const totalPackages = routeAwareStops.reduce((sum, stop) => sum + stop.packages.length, 0);
 
   return {
     ...data,
     id: data.id,
     name: stringOrFallback(data.name, 'Rota atual'),
-    stops,
+    stops: routeAwareStops,
     status,
     estimatedDistanceKm: numberOrFallback(data.estimatedDistanceKm, 0),
     completedStops,

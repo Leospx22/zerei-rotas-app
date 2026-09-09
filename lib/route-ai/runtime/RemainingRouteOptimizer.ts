@@ -10,6 +10,7 @@ import {
 import {
   analyzeRemainingRoute,
   calculateRemainingDistanceKm,
+  calculateRemainingRouteMetricSummary,
   type RemainingRouteAnalysis,
 } from './RemainingRouteAnalyzer.ts';
 import {
@@ -80,10 +81,17 @@ export async function optimizeRemainingRoute(
     optimizedMovableStops,
     input.lockedStops
   );
-  const proposedDistance = calculateRemainingDistanceKm(input.currentPosition, proposedRemainingStops);
+  const proposedMetricSummary = calculateRemainingRouteMetricSummary(input.currentPosition, proposedRemainingStops);
+  const proposedDistance = proposedMetricSummary.distanceKm;
   const proposedDuration = estimateDurationMinutes(proposedDistance, proposedRemainingStops.length, context);
-  const savingsMinutes = Math.max(0, analysis.remainingDurationMinutes - proposedDuration);
-  const savingsKm = Math.max(0, analysis.remainingDistanceKm - proposedDistance);
+  const canTrustSavings = analysis.metricConfidence === 'reliable'
+    && proposedMetricSummary.metricConfidence === 'reliable';
+  const savingsMinutes = canTrustSavings
+    ? Math.max(0, analysis.remainingDurationMinutes - proposedDuration)
+    : 0;
+  const savingsKm = canTrustSavings
+    ? Math.max(0, analysis.remainingDistanceKm - proposedDistance)
+    : 0;
 
   if (savingsMinutes < 2 && savingsKm < 0.5) {
     return { analysis, recommendation: null };
@@ -106,11 +114,21 @@ export async function optimizeRemainingRoute(
       confidence: calculateRuntimeConfidence(
         partitions.remainingStops,
         savingsMinutes,
-        partitions.lockedRemainingStops.length
+        partitions.lockedRemainingStops.length,
+        resolveMetricConfidence(analysis.metricConfidence, proposedMetricSummary.metricConfidence)
       ),
       driverAction: 'preview-changes',
     },
   };
+}
+
+function resolveMetricConfidence(
+  current: RemainingRouteAnalysis['metricConfidence'],
+  proposed: RemainingRouteAnalysis['metricConfidence']
+): RemainingRouteAnalysis['metricConfidence'] {
+  if (current === 'unreliable' || proposed === 'unreliable') return 'unreliable';
+  if (current === 'degraded' || proposed === 'degraded') return 'degraded';
+  return 'reliable';
 }
 
 function normalizeStrategy(strategy: RuntimeOptimizationStrategy): OptimizationStrategy {

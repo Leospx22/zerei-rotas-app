@@ -1,4 +1,5 @@
 import type { RouteScoreFactor } from '@/lib/route-ai';
+import type { RouteComparisonResult } from '@/lib/route-ai';
 
 export type ZRScoreBand = 'Excelente' | 'Boa' | 'Regular' | 'Ruim';
 
@@ -73,5 +74,31 @@ export function formatFuelCurrency(liters: number, fuelPricePerLiter = 6.1): str
     style: 'currency',
     currency: 'BRL',
   });
+}
+
+export function formatMetricSavings(
+  value: string,
+  metricConfidence: RouteComparisonResult['metricConfidence']
+): string {
+  return metricConfidence === 'reliable' ? value : 'Indisponível';
+}
+
+export function formatMetricImprovement(
+  percentage: number,
+  metricConfidence: RouteComparisonResult['metricConfidence'],
+  suffix: 'de melhoria' | 'melhor'
+): string {
+  return metricConfidence === 'reliable'
+    ? `${percentage}% ${suffix}`
+    : 'Estimativa indisponível';
+}
+
+export function formatMetricConfidence(
+  confidence: number,
+  metricConfidence: RouteComparisonResult['metricConfidence']
+): string {
+  if (metricConfidence === 'reliable') return `${confidence}%`;
+  if (metricConfidence === 'degraded') return 'Confiança parcial';
+  return 'Indisponível';
 }
 

@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { normalizeAddress } from './executionPresentation.ts';
 import type { GroupedStop } from './packageUtils.ts';
+import { isStructurallyValidCoordinatePair } from './coordinateIntegrity.ts';
 
 export interface GeocodingAddressInput {
   address: string;
@@ -51,12 +52,7 @@ export const KEY_GEOCODE_CACHE = 'ZR_GEOCODE_CACHE';
 const EXCLUDED_COMPLEMENT = /\b(apartamento|apto|ap|bloco|andar|portaria|loja|fundos|interfone|campainha|recep[cç][aã]o|entregar|entrega|delivery|instru[cç][aã]o)\b/i;
 
 function isValidCoordinatePair(latitude: number, longitude: number): boolean {
-  return Number.isFinite(latitude)
-    && latitude >= -90
-    && latitude <= 90
-    && Number.isFinite(longitude)
-    && longitude >= -180
-    && longitude <= 180;
+  return isStructurallyValidCoordinatePair(latitude, longitude);
 }
 
 function normalizedZipCode(zipCode?: string): string {

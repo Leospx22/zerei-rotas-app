@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   analyzeRemainingRoute,
+  calculateRemainingRouteMetricSummary,
   createOptimizationSessionSnapshot,
   optimizeRemainingRoute,
   partitionRouteStops,
@@ -128,4 +129,35 @@ test('optimization session composes analysis, recommendation, and simulation sna
   assert.equal(snapshot.analysis.remainingStops.length, 4);
   assert.equal(snapshot.simulation.current.stopIds.length, 4);
   assert.equal(snapshot.optimization.analysis.remainingStops.length, 4);
+});
+
+test('runtime metrics mark invalid remaining segments as unreliable without trusted distance', () => {
+  const runtimeStops = [
+    stop('a', 0, 'Rua Alfa, 10 - Centro', -23.5505, -46.6333),
+    stop('bad', 1, 'Rua Ruim, 20 - Centro', 0, 0),
+    stop('b', 2, 'Rua Beta, 30 - Centro', -23.5510, -46.6340),
+  ];
+  const summary = calculateRemainingRouteMetricSummary(null, runtimeStops);
+
+  assert.equal(summary.metricConfidence, 'unreliable');
+  assert.equal(summary.metricProvenance, 'estimated');
+  assert.equal(summary.unreliableSegmentCount, 2);
+  assert.equal(summary.segments.find(segment => segment.toStopId === 'bad')?.distanceKm, 0);
+});
+
+test('runtime simulation does not report full confidence or savings for unreliable coordinates', () => {
+  const simulation = simulateRemainingRouteStrategies({
+    currentPosition: null,
+    stops: [
+      stop('a', 0, 'Rua Alfa, 10 - Centro', -23.5505, -46.6333),
+      stop('bad', 1, 'Rua Ruim, 20 - Centro', 0, 0),
+      stop('b', 2, 'Rua Beta, 30 - Centro', -23.5510, -46.6340),
+    ],
+  });
+
+  assert.equal(simulation.current.metricConfidence, 'unreliable');
+  assert.equal(simulation.current.confidence, 0);
+  assert.equal(simulation.winner.confidence, 0);
+  assert.equal(simulation.winner.savingsMinutes, 0);
+  assert.equal(simulation.winner.savingsKm, 0);
 });

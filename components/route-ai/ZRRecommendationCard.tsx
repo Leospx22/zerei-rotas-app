@@ -3,7 +3,7 @@ import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Eye, Route, ShieldCheck } from 'lucide-react-native';
 import { BorderRadius, Colors, FontSizes, Spacing } from '@/constants/theme';
 import type { RouteAIReport } from '@/lib/route-ai';
-import { formatDistance, formatFuelCurrency, formatMinutes } from './zrPresentation';
+import { formatDistance, formatFuelCurrency, formatMetricConfidence, formatMetricSavings, formatMinutes } from './zrPresentation';
 
 interface ZRRecommendationCardProps {
   report: RouteAIReport;
@@ -26,16 +26,25 @@ export function ZRRecommendationCard({
         <Text style={styles.brand}>ZR Runtime™</Text>
         <View style={styles.confidencePill}>
           <ShieldCheck size={13} color={Colors.success} />
-          <Text style={styles.confidenceText}>{report.optimization.confidenceScore}% de confiança</Text>
+          <Text style={styles.confidenceText}>
+            {formatMetricConfidence(report.optimization.confidenceScore, report.optimization.metricConfidence)}
+          </Text>
         </View>
       </View>
       <Text style={styles.title}>{report.recommendation.label}</Text>
       <Text style={styles.reason}>{report.recommendation.reason}</Text>
       <View style={styles.gainRow}>
-        <Text style={styles.gain}>{formatDistance(report.comparison.distanceSavedKm)}</Text>
-        <Text style={styles.gain}>{formatMinutes(report.comparison.estimatedTimeSavedMinutes)}</Text>
         <Text style={styles.gain}>
-          {formatFuelCurrency(report.comparison.estimatedFuelSavedLiters, fuelPricePerLiter)}
+          {formatMetricSavings(formatDistance(report.comparison.distanceSavedKm), report.comparison.metricConfidence)}
+        </Text>
+        <Text style={styles.gain}>
+          {formatMetricSavings(formatMinutes(report.comparison.estimatedTimeSavedMinutes), report.comparison.metricConfidence)}
+        </Text>
+        <Text style={styles.gain}>
+          {formatMetricSavings(
+            formatFuelCurrency(report.comparison.estimatedFuelSavedLiters, fuelPricePerLiter),
+            report.comparison.metricConfidence
+          )}
         </Text>
       </View>
       <View style={styles.actions}>

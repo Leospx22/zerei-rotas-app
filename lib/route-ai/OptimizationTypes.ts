@@ -1,4 +1,9 @@
-import type { GroupedStop } from '@/lib/packageUtils';
+import type { GroupedStop } from '../packageUtils.ts';
+import type {
+  CoordinateConfidence,
+  CoordinateIntegritySummary,
+  MetricProvenance,
+} from '../coordinateIntegrity.ts';
 
 export type OptimizationStrategy =
   | 'fastest'
@@ -34,6 +39,18 @@ export interface RouteBottleneck {
   stopIds: string[];
 }
 
+export interface RouteSegmentMetric {
+  fromStopId: string;
+  toStopId: string;
+  distanceKm: number;
+  provenance: MetricProvenance;
+  confidence: 'reliable' | 'degraded' | 'unreliable';
+  coordinateConfidence: {
+    from: CoordinateConfidence;
+    to: CoordinateConfidence;
+  };
+}
+
 export interface DuplicateGroup {
   key: string;
   label: string;
@@ -46,6 +63,11 @@ export interface RouteAnalysis {
   originalDistanceKm: number;
   estimatedOriginalDurationMinutes: number;
   averageStopDistanceKm: number;
+  metricProvenance: MetricProvenance;
+  metricConfidence: 'reliable' | 'degraded' | 'unreliable';
+  unreliableSegmentCount: number;
+  segments: RouteSegmentMetric[];
+  coordinateSummary: CoordinateIntegritySummary;
   clusters: RouteCluster[];
   potentialBottlenecks: RouteBottleneck[];
   duplicateStreets: DuplicateGroup[];
@@ -73,6 +95,10 @@ export interface RouteOptimizationResult {
   estimatedDurationMinutes: number;
   estimatedSavingsMinutes: number;
   estimatedDistanceSavingsKm: number;
+  metricProvenance: MetricProvenance;
+  metricConfidence: 'reliable' | 'degraded' | 'unreliable';
+  unreliableSegmentCount: number;
+  segments: RouteSegmentMetric[];
   confidenceScore: number;
 }
 
@@ -83,6 +109,8 @@ export interface RouteComparisonResult {
   estimatedTimeSavedMinutes: number;
   estimatedFuelSavedLiters: number;
   percentageImprovement: number;
+  metricProvenance: MetricProvenance;
+  metricConfidence: 'reliable' | 'degraded' | 'unreliable';
 }
 
 export interface RouteScoreFactor {

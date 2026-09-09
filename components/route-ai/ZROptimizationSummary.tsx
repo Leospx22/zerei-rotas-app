@@ -2,7 +2,7 @@ import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { BorderRadius, Colors, FontSizes, Spacing } from '@/constants/theme';
 import type { RouteAIReport } from '@/lib/route-ai';
-import { formatDistance, formatFuelCurrency, formatMinutes } from './zrPresentation';
+import { formatDistance, formatFuelCurrency, formatMetricImprovement, formatMetricSavings, formatMinutes } from './zrPresentation';
 
 interface ZROptimizationSummaryProps {
   report: RouteAIReport;
@@ -20,25 +20,28 @@ export function ZROptimizationSummary({
       label: 'Distância',
       original: formatDistance(report.comparison.originalDistanceKm),
       optimized: formatDistance(report.comparison.optimizedDistanceKm),
-      savings: formatDistance(report.comparison.distanceSavedKm),
+      savings: formatMetricSavings(formatDistance(report.comparison.distanceSavedKm), report.comparison.metricConfidence),
     },
     {
       label: 'Duração',
       original: formatMinutes(report.analysis.estimatedOriginalDurationMinutes),
       optimized: formatMinutes(report.optimization.estimatedDurationMinutes),
-      savings: formatMinutes(report.comparison.estimatedTimeSavedMinutes),
+      savings: formatMetricSavings(formatMinutes(report.comparison.estimatedTimeSavedMinutes), report.comparison.metricConfidence),
     },
     {
       label: 'Combustível',
       original: '-',
       optimized: '-',
-      savings: formatFuelCurrency(report.comparison.estimatedFuelSavedLiters, fuelPricePerLiter),
+      savings: formatMetricSavings(
+        formatFuelCurrency(report.comparison.estimatedFuelSavedLiters, fuelPricePerLiter),
+        report.comparison.metricConfidence
+      ),
     },
     {
       label: 'Paradas',
       original: String(totalStops),
       optimized: String(totalStops),
-      savings: `${report.comparison.percentageImprovement}% melhor`,
+      savings: formatMetricImprovement(report.comparison.percentageImprovement, report.comparison.metricConfidence, 'melhor'),
     },
   ];
 
@@ -46,7 +49,9 @@ export function ZROptimizationSummary({
     <View style={styles.card}>
       <View style={styles.headerRow}>
         <Text style={styles.brand}>ZR Optimize™</Text>
-        <Text style={styles.improvement}>{report.comparison.percentageImprovement}% de melhoria</Text>
+        <Text style={styles.improvement}>
+          {formatMetricImprovement(report.comparison.percentageImprovement, report.comparison.metricConfidence, 'de melhoria')}
+        </Text>
       </View>
       <View style={styles.table}>
         <View style={styles.tableHeader}>

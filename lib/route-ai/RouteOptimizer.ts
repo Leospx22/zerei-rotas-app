@@ -1,12 +1,15 @@
-import type { GroupedStop } from '@/lib/packageUtils';
+import type { GroupedStop } from '../packageUtils.ts';
 import {
   analyzeRoute,
+  calculateRouteMetricSummary,
   calculateRouteDistanceKm,
   DEFAULT_OPTIMIZATION_CONTEXT,
   estimateDurationMinutes,
+  getStopCoordinate,
   getNeighborhood,
   getStreetName,
 } from './RouteAnalyzer.ts';
+import { sanitizeRouteCoordinates } from '../coordinateIntegrity.ts';
 import type {
   IOptimizationStrategy,
   IRouteOptimizationProvider,
@@ -48,9 +51,10 @@ export class DeterministicRouteOptimizer implements IRouteOptimizationProvider {
   ): Promise<RouteOptimizationResult> {
     await yieldToRuntime();
     const resolvedContext = { ...DEFAULT_OPTIMIZATION_CONTEXT, ...context };
-    const analysis = analyzeRoute(stops, resolvedContext);
+    const sanitizedStops = sanitizeRouteCoordinates(stops);
+    const analysis = analyzeRoute(sanitizedStops, resolvedContext);
     const optimizer = this.strategies[strategy] ?? this.strategies.balanced;
-    return optimizer.optimize(stops, analysis, resolvedContext);
+    return optimizer.optimize(sanitizedStops, analysis, resolvedContext);
   }
 }
 
@@ -70,10 +74,13 @@ class LocalOptimizationStrategy implements IOptimizationStrategy {
   ): RouteOptimizationResult {
     const orderedStops = optimizeStopOrder(stops, this.id);
     const originalDistance = analysis.originalDistanceKm;
-    const optimizedDistance = calculateRouteDistanceKm(orderedStops);
+    const optimizedMetricSummary = calculateRouteMetricSummary(orderedStops);
+    const optimizedDistance = optimizedMetricSummary.distanceKm;
     const estimatedDuration = estimateDurationMinutes(optimizedDistance, stops.length, context);
     const originalDuration = analysis.estimatedOriginalDurationMinutes;
-    const distanceSavings = Math.max(0, originalDistance - optimizedDistance);
+    const metricsReliable = analysis.metricConfidence === 'reliable'
+      && optimizedMetricSummary.metricConfidence === 'reliable';
+    const distanceSavings = metricsReliable ? Math.max(0, originalDistance - optimizedDistance) : 0;
 
     return {
       strategy: this.id,
@@ -85,8 +92,16 @@ class LocalOptimizationStrategy implements IOptimizationStrategy {
       optimizedStopIds: orderedStops.map(stop => stop.id),
       estimatedDistanceKm: optimizedDistance,
       estimatedDurationMinutes: estimatedDuration,
-      estimatedSavingsMinutes: Math.max(0, originalDuration - estimatedDuration),
+      estimatedSavingsMinutes: metricsReliable ? Math.max(0, originalDuration - estimatedDuration) : 0,
       estimatedDistanceSavingsKm: distanceSavings,
+      metricProvenance: optimizedMetricSummary.metricProvenance,
+      metricConfidence: optimizedMetricSummary.metricConfidence === 'unreliable' || analysis.metricConfidence === 'unreliable'
+        ? 'unreliable'
+        : optimizedMetricSummary.metricConfidence === 'degraded' || analysis.metricConfidence === 'degraded'
+          ? 'degraded'
+          : 'reliable',
+      unreliableSegmentCount: optimizedMetricSummary.unreliableSegmentCount,
+      segments: optimizedMetricSummary.segments,
       confidenceScore: calculateConfidenceScore(stops, analysis, distanceSavings),
     };
   }
@@ -98,7 +113,7 @@ export function optimizeStopOrder(
 ): GroupedStop[] {
   if (stops.length <= 2) return [...stops];
 
-  const ordered = [...stops].sort((a, b) => {
+  const ordered = sanitizeRouteCoordinates(stops).sort((a, b) => {
     const clusterCompare = getClusterKey(a, strategy).localeCompare(getClusterKey(b, strategy));
     if (clusterCompare !== 0) return clusterCompare;
 
@@ -153,9 +168,11 @@ function getClusterKey(stop: GroupedStop, strategy: OptimizationStrategy): strin
 }
 
 function compareCoordinates(a: GroupedStop, b: GroupedStop, strategy: OptimizationStrategy): number {
-  if (a.latitude === null || a.longitude === null || b.latitude === null || b.longitude === null) return 0;
-  const latitudeCompare = a.latitude - b.latitude;
-  const longitudeCompare = a.longitude - b.longitude;
+  const coordinateA = getStopCoordinate(a);
+  const coordinateB = getStopCoordinate(b);
+  if (!coordinateA || !coordinateB) return 0;
+  const latitudeCompare = coordinateA.latitude - coordinateB.latitude;
+  const longitudeCompare = coordinateA.longitude - coordinateB.longitude;
   if (strategy === 'fastest') return longitudeCompare || latitudeCompare;
   return latitudeCompare || longitudeCompare;
 }
@@ -165,11 +182,17 @@ function calculateConfidenceScore(
   analysis: RouteAnalysis,
   distanceSavingsKm: number
 ): number {
-  const missingCoordinateRatio = stops.filter(stop => stop.latitude === null || stop.longitude === null).length / Math.max(stops.length, 1);
+  const missingCoordinateRatio = stops.filter(stop => {
+    const coordinateIntegrity = (stop as GroupedStop & {
+      coordinateIntegrity?: { confidence: string };
+    }).coordinateIntegrity;
+    return coordinateIntegrity?.confidence !== 'valid';
+  }).length / Math.max(stops.length, 1);
   const coordinatePenalty = Math.round(missingCoordinateRatio * 30);
+  const metricPenalty = analysis.metricConfidence === 'unreliable' ? 22 : analysis.metricConfidence === 'degraded' ? 10 : 0;
   const duplicateSignal = Math.min(12, analysis.duplicateNeighborhoods.length + analysis.duplicateStreets.length);
   const savingsSignal = Math.min(18, Math.round(distanceSavingsKm * 2));
-  return clampScore(76 - coordinatePenalty + duplicateSignal + savingsSignal);
+  return clampScore(76 - coordinatePenalty - metricPenalty + duplicateSignal + savingsSignal);
 }
 
 function strategyTolerance(strategy: OptimizationStrategy): number {

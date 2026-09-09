@@ -16,6 +16,7 @@ import { HeaderBrandIcon } from '@/components/HeaderBrandIcon';
 import { ZRIntelligenceCard } from '@/components/route-ai';
 import { useRoute } from '@/contexts/RouteContext';
 import { getLearningStatus, simulateRemainingRouteStrategies, type LearningStatus } from '@/lib/route-ai';
+import { applyOptimizedRouteOrder } from '@/lib/routeOrdering';
 import {
   buildDisplayedRoutePositionMap,
   formatRouteOrderBadge,
@@ -26,7 +27,7 @@ import {
 export default function ImportSummaryScreen() {
   const router = useRouter();
   const { from } = useLocalSearchParams<{ from?: string }>();
-  const { currentRoute, getSummary } = useRoute();
+  const { currentRoute, getSummary, setCurrentRoute } = useRoute();
   const [learningStatus, setLearningStatus] = React.useState<LearningStatus | null>(null);
   const routeStops = React.useMemo(
     () => currentRoute?.stops ?? [],
@@ -101,6 +102,30 @@ export default function ImportSummaryScreen() {
       pathname: '/(tabs)/routes/delivery-preparation',
       params: { from: 'import-summary' },
     });
+  };
+  const useOptimizedRoute = () => {
+    if (!currentRoute || !routeAIReport) {
+      openRouteReview();
+      return;
+    }
+
+    const result = applyOptimizedRouteOrder(
+      currentRoute.stops,
+      routeAIReport.optimization.optimizedStopIds,
+      {
+        recommendationAction: routeAIReport.recommendation.action,
+        metricConfidence: routeAIReport.comparison.metricConfidence,
+      }
+    );
+
+    if (result.applied) {
+      setCurrentRoute({
+        ...currentRoute,
+        stops: result.stops,
+      });
+    }
+
+    openRouteReview();
   };
 
   return (
@@ -203,7 +228,7 @@ export default function ImportSummaryScreen() {
           learningStatus={learningStatus ?? undefined}
           totalStops={currentRoute.stops.length}
           onPreview={openRouteReview}
-          onUseOptimized={openRouteReview}
+          onUseOptimized={useOptimizedRoute}
           onKeepOriginal={openRouteReview}
         />
       ) : null}

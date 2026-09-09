@@ -1,11 +1,21 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { moveRouteStop, moveRouteStopToIndex } from '../lib/routeOrdering.ts';
+import {
+  applyOptimizedRouteOrder,
+  moveRouteStop,
+  moveRouteStopToIndex,
+} from '../lib/routeOrdering.ts';
+import { deriveExecutionState } from '../lib/executionState.ts';
 
 function stop(id, orderIndex, packageStatus = 'pending') {
   return {
     id,
     orderIndex,
+    status: packageStatus === 'delivered'
+      ? 'completed'
+      : packageStatus === 'skipped'
+        ? 'skipped'
+        : 'pending',
     packages: [{ id: `pkg-${id}`, status: packageStatus }],
     addressGroups: [{ packageIds: [`pkg-${id}`] }],
   };
@@ -88,4 +98,97 @@ test('direct movement preserves package data and status', () => {
   assert.equal(reordered[0].packages[0].status, 'skipped');
   assert.equal(reordered[1].packages[0].status, 'delivered');
   assert.deepEqual(reordered.map(item => item.orderIndex), [0, 1, 2]);
+});
+
+test('trusted optimized recommendation applies optimized stop ids exactly once', () => {
+  const stops = [stop('a', 0), stop('b', 1), stop('c', 2)];
+  const result = applyOptimizedRouteOrder(stops, ['c', 'a', 'b'], {
+    recommendationAction: 'use-optimized-route',
+    metricConfidence: 'reliable',
+  });
+
+  assert.equal(result.applied, true);
+  assert.deepEqual(result.stops.map(item => item.id), ['c', 'a', 'b']);
+  assert.deepEqual(result.stops.map(item => item.orderIndex), [0, 1, 2]);
+});
+
+test('optimized route order preserves every original stop and package data', () => {
+  const stops = [stop('a', 0, 'delivered'), stop('b', 1), stop('c', 2, 'skipped')];
+  stops[1].packages.push({ id: 'pkg-b-extra', status: 'pending' });
+  const result = applyOptimizedRouteOrder(stops, ['b', 'c', 'a'], {
+    recommendationAction: 'use-optimized-route',
+    metricConfidence: 'reliable',
+  });
+
+  assert.equal(result.applied, true);
+  assert.deepEqual([...new Set(result.stops.map(item => item.id))], ['b', 'c', 'a']);
+  assert.deepEqual(result.stops.map(item => item.id).sort(), stops.map(item => item.id).sort());
+  assert.equal(result.stops[0].packages, stops[1].packages);
+  assert.equal(result.stops[0].addressGroups, stops[1].addressGroups);
+  assert.deepEqual(result.stops[0].packages.map(pkg => pkg.id), ['pkg-b', 'pkg-b-extra']);
+});
+
+test('invalid optimized stop ids cannot lose or duplicate stops', () => {
+  const stops = [stop('a', 0), stop('b', 1), stop('c', 2)];
+
+  assert.deepEqual(
+    applyOptimizedRouteOrder(stops, ['c', 'c', 'a'], {
+      recommendationAction: 'use-optimized-route',
+      metricConfidence: 'reliable',
+    }).stops.map(item => item.id),
+    ['a', 'b', 'c']
+  );
+  assert.deepEqual(
+    applyOptimizedRouteOrder(stops, ['c', 'a'], {
+      recommendationAction: 'use-optimized-route',
+      metricConfidence: 'reliable',
+    }).stops.map(item => item.id),
+    ['a', 'b', 'c']
+  );
+  assert.deepEqual(
+    applyOptimizedRouteOrder(stops, ['c', 'missing', 'a'], {
+      recommendationAction: 'use-optimized-route',
+      metricConfidence: 'reliable',
+    }).stops.map(item => item.id),
+    ['a', 'b', 'c']
+  );
+});
+
+test('unreliable recommendation does not apply optimized order', () => {
+  const stops = [stop('a', 0), stop('b', 1), stop('c', 2)];
+  const result = applyOptimizedRouteOrder(stops, ['c', 'a', 'b'], {
+    recommendationAction: 'use-optimized-route',
+    metricConfidence: 'unreliable',
+  });
+
+  assert.equal(result.applied, false);
+  assert.deepEqual(result.stops.map(item => item.id), ['a', 'b', 'c']);
+});
+
+test('keep-original recommendation does not mutate route order', () => {
+  const stops = [stop('a', 0), stop('b', 1), stop('c', 2)];
+  const result = applyOptimizedRouteOrder(stops, ['c', 'a', 'b'], {
+    recommendationAction: 'keep-original-route',
+    metricConfidence: 'reliable',
+  });
+
+  assert.equal(result.applied, false);
+  assert.deepEqual(result.stops.map(item => item.id), ['a', 'b', 'c']);
+  assert.deepEqual(stops.map(item => item.id), ['a', 'b', 'c']);
+});
+
+test('execution consumes the optimized route order after it is applied', () => {
+  const stops = [stop('a', 0), stop('b', 1), stop('c', 2)];
+  const result = applyOptimizedRouteOrder(stops, ['c', 'a', 'b'], {
+    recommendationAction: 'use-optimized-route',
+    metricConfidence: 'reliable',
+  });
+  const route = {
+    id: 'route-optimized',
+    stops: result.stops,
+    totalPackages: 3,
+  };
+
+  assert.equal(deriveExecutionState(route).currentStop?.id, 'c');
+  assert.equal(deriveExecutionState(route).nextStop?.id, 'a');
 });

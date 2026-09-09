@@ -1,4 +1,13 @@
-import type { GroupedStop } from '@/lib/packageUtils';
+import type { GroupedStop } from '../packageUtils.ts';
+import {
+  haversineDistanceKm,
+  sanitizeCoordinatePair,
+  sanitizeCoordinateRecord,
+  sanitizeRouteCoordinates,
+  summarizeCoordinateIntegrity,
+  type CoordinateConfidence,
+  type MetricProvenance,
+} from '../coordinateIntegrity.ts';
 import type {
   DuplicateGroup,
   OptimizationContext,
@@ -6,6 +15,7 @@ import type {
   RouteBottleneck,
   RouteCluster,
   RouteCoordinate,
+  RouteSegmentMetric,
 } from './OptimizationTypes.ts';
 
 export const DEFAULT_OPTIMIZATION_CONTEXT: OptimizationContext = {
@@ -15,38 +25,76 @@ export const DEFAULT_OPTIMIZATION_CONTEXT: OptimizationContext = {
 };
 
 const COORDINATE_GRID_SIZE = 0.015;
+const ESTIMATED_METRIC_PROVENANCE: MetricProvenance = 'estimated';
 
-export function hasCoordinate(stop: Pick<GroupedStop, 'latitude' | 'longitude'>): boolean {
-  return stop.latitude !== null && stop.longitude !== null;
+export function hasCoordinate(stop: Pick<GroupedStop, 'latitude' | 'longitude'> & {
+  coordinateConfidence?: CoordinateConfidence;
+  coordinateIntegrity?: ReturnType<typeof sanitizeCoordinatePair>;
+}): boolean {
+  const coordinate = sanitizeCoordinateRecord({ ...stop, id: 'stop' });
+  return coordinate.latitude !== null
+    && coordinate.longitude !== null
+    && coordinate.confidence !== 'invalid'
+    && coordinate.confidence !== 'unavailable'
+    && coordinate.confidence !== 'outlier';
 }
 
 export function getStopCoordinate(stop: GroupedStop): RouteCoordinate | null {
-  return hasCoordinate(stop)
-    ? { latitude: stop.latitude!, longitude: stop.longitude! }
+  const coordinate = sanitizeCoordinateRecord({ ...stop, id: stop.id });
+  return coordinate.latitude !== null
+    && coordinate.longitude !== null
+    && coordinate.confidence !== 'invalid'
+    && coordinate.confidence !== 'unavailable'
+    && coordinate.confidence !== 'outlier'
+    ? { latitude: coordinate.latitude!, longitude: coordinate.longitude! }
     : null;
 }
 
 export function calculateDistanceKm(a: GroupedStop, b: GroupedStop): number {
-  const coordA = getStopCoordinate(a);
-  const coordB = getStopCoordinate(b);
-
-  if (coordA && coordB) {
-    return haversineDistanceKm(coordA, coordB);
-  }
-
-  if (getStreetName(a.normalizedAddress) === getStreetName(b.normalizedAddress)) return 0.25;
-  if (getNeighborhood(a) && getNeighborhood(a) === getNeighborhood(b)) return 0.85;
-  if (a.zipCode && b.zipCode && a.zipCode.slice(0, 5) === b.zipCode.slice(0, 5)) return 1.4;
-  return 3.5;
+  return calculateSegmentMetric(a, b).distanceKm;
 }
 
 export function calculateRouteDistanceKm(stops: readonly GroupedStop[]): number {
-  if (stops.length < 2) return 0;
-  let distance = 0;
-  for (let index = 1; index < stops.length; index++) {
-    distance += calculateDistanceKm(stops[index - 1], stops[index]);
+  return calculateRouteMetricSummary(stops).distanceKm;
+}
+
+export function calculateRouteMetricSummary(stops: readonly GroupedStop[]): {
+  distanceKm: number;
+  segments: RouteSegmentMetric[];
+  metricConfidence: RouteAnalysis['metricConfidence'];
+  metricProvenance: MetricProvenance;
+  unreliableSegmentCount: number;
+} {
+  if (stops.length < 2) {
+    return {
+      distanceKm: 0,
+      segments: [],
+      metricConfidence: 'reliable',
+      metricProvenance: ESTIMATED_METRIC_PROVENANCE,
+      unreliableSegmentCount: 0,
+    };
   }
-  return roundDistance(distance);
+  const sanitizedStops = sanitizeRouteCoordinates(stops);
+  let distance = 0;
+  const segments: RouteSegmentMetric[] = [];
+  for (let index = 1; index < stops.length; index++) {
+    const segment = calculateSegmentMetric(sanitizedStops[index - 1], sanitizedStops[index]);
+    segments.push(segment);
+    distance += segment.distanceKm;
+  }
+  const unreliableSegmentCount = segments.filter(segment => segment.confidence === 'unreliable').length;
+  const degradedSegmentCount = segments.filter(segment => segment.confidence === 'degraded').length;
+  return {
+    distanceKm: roundDistance(distance),
+    segments,
+    metricConfidence: unreliableSegmentCount > 0
+      ? 'unreliable'
+      : degradedSegmentCount > 0
+        ? 'degraded'
+        : 'reliable',
+    metricProvenance: ESTIMATED_METRIC_PROVENANCE,
+    unreliableSegmentCount,
+  };
 }
 
 export function estimateDurationMinutes(
@@ -64,22 +112,78 @@ export function analyzeRoute(
   stops: readonly GroupedStop[],
   context: OptimizationContext = DEFAULT_OPTIMIZATION_CONTEXT
 ): RouteAnalysis {
-  const originalDistanceKm = calculateRouteDistanceKm(stops);
+  const sanitizedStops = sanitizeRouteCoordinates(stops);
+  const metricSummary = calculateRouteMetricSummary(stops);
+  const originalDistanceKm = metricSummary.distanceKm;
   const duplicateStreets = buildDuplicateGroups(stops, stop => getStreetName(stop.normalizedAddress), 'Rua nao identificada');
   const duplicateNeighborhoods = buildDuplicateGroups(stops, getNeighborhood, 'Bairro nao identificado');
-  const clusters = buildClusters(stops);
-  const potentialBottlenecks = buildBottlenecks(stops, duplicateNeighborhoods);
+  const clusters = buildClusters(sanitizedStops);
+  const potentialBottlenecks = buildBottlenecks(sanitizedStops, duplicateNeighborhoods);
 
   return {
     totalStops: stops.length,
     originalDistanceKm,
     estimatedOriginalDurationMinutes: estimateDurationMinutes(originalDistanceKm, stops.length, context),
     averageStopDistanceKm: stops.length > 1 ? roundDistance(originalDistanceKm / (stops.length - 1)) : 0,
+    metricProvenance: metricSummary.metricProvenance,
+    metricConfidence: metricSummary.metricConfidence,
+    unreliableSegmentCount: metricSummary.unreliableSegmentCount,
+    segments: metricSummary.segments,
+    coordinateSummary: summarizeCoordinateIntegrity(sanitizedStops.map(stop => stop.coordinateIntegrity)),
     clusters,
     potentialBottlenecks,
     duplicateStreets,
     duplicateNeighborhoods,
   };
+}
+
+function calculateSegmentMetric(a: GroupedStop, b: GroupedStop): RouteSegmentMetric {
+  const coordA = getMetricCoordinate(a);
+  const coordB = getMetricCoordinate(b);
+  const confidence = resolveSegmentConfidence(coordA.confidence, coordB.confidence);
+  const distanceKm = coordA.coordinate && coordB.coordinate && confidence !== 'unreliable'
+    ? haversineDistanceKm(coordA.coordinate, coordB.coordinate)
+    : 0;
+
+  return {
+    fromStopId: a.id,
+    toStopId: b.id,
+    distanceKm: roundDistance(distanceKm),
+    provenance: ESTIMATED_METRIC_PROVENANCE,
+    confidence,
+    coordinateConfidence: {
+      from: coordA.confidence,
+      to: coordB.confidence,
+    },
+  };
+}
+
+function getMetricCoordinate(stop: GroupedStop): {
+  coordinate: RouteCoordinate | null;
+  confidence: CoordinateConfidence;
+} {
+  const routeAwareIntegrity = 'coordinateIntegrity' in stop
+    ? (stop as GroupedStop & { coordinateIntegrity?: ReturnType<typeof sanitizeCoordinatePair> }).coordinateIntegrity
+    : undefined;
+  const coordinate = routeAwareIntegrity ?? sanitizeCoordinateRecord({ ...stop, id: stop.id });
+  return {
+    coordinate: coordinate.latitude !== null && coordinate.longitude !== null
+      ? { latitude: coordinate.latitude, longitude: coordinate.longitude }
+      : null,
+    confidence: coordinate.confidence,
+  };
+}
+
+function resolveSegmentConfidence(
+  from: CoordinateConfidence,
+  to: CoordinateConfidence
+): RouteSegmentMetric['confidence'] {
+  const values = [from, to];
+  if (values.some(value => value === 'invalid' || value === 'outlier' || value === 'unavailable')) {
+    return 'unreliable';
+  }
+  if (values.some(value => value === 'ambiguous')) return 'degraded';
+  return 'reliable';
 }
 
 export function getStreetName(address: string): string {
@@ -192,18 +296,6 @@ function getClusterCenter(stops: readonly GroupedStop[]): RouteCoordinate | null
   };
 }
 
-function haversineDistanceKm(a: RouteCoordinate, b: RouteCoordinate): number {
-  const earthRadiusKm = 6371;
-  const dLat = toRadians(b.latitude - a.latitude);
-  const dLon = toRadians(b.longitude - a.longitude);
-  const lat1 = toRadians(a.latitude);
-  const lat2 = toRadians(b.latitude);
-  const value =
-    Math.sin(dLat / 2) ** 2 +
-    Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLon / 2) ** 2;
-  return earthRadiusKm * 2 * Math.atan2(Math.sqrt(value), Math.sqrt(1 - value));
-}
-
 function parseNeighborhood(address: string): string | null {
   const parts = address.split('-').map(part => part.trim()).filter(Boolean);
   if (parts.length >= 2) return parts[parts.length - 1];
@@ -224,10 +316,6 @@ function toDisplayLabel(value: string): string {
     .split(' ')
     .map(word => word ? word[0].toUpperCase() + word.slice(1) : word)
     .join(' ');
-}
-
-function toRadians(value: number): number {
-  return value * Math.PI / 180;
 }
 
 export function roundDistance(value: number): number {

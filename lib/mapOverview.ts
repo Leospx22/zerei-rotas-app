@@ -3,6 +3,12 @@ import { getPrimaryExecutionAddress } from './executionPresentation.ts';
 import type { GroupedStop } from './packageUtils.ts';
 import { buildCanonicalNavigationAddress, buildStopGeocodingInput } from './geocoding.ts';
 import {
+  sanitizeRouteCoordinates as sanitizeCoordinateIntegrityRoute,
+  isStructurallyValidCoordinatePair,
+  parseCoordinateValue,
+  type CoordinateConfidence,
+} from './coordinateIntegrity.ts';
+import {
   buildDisplayedRoutePositionMap,
   getBaseAddressKey,
   isMissingSpreadsheetStop,
@@ -76,42 +82,15 @@ export function shouldAttemptNativeRouteMap(
   return platform !== 'android' || isNativeRouteMapFeatureEnabled(featureFlagValue);
 }
 
-const MIN_CLUSTER_SIZE = 3;
-const MIN_OUTLIER_DISTANCE_KM = 100;
-
-function median(values: number[]): number {
-  const sorted = [...values].sort((left, right) => left - right);
-  const middle = Math.floor(sorted.length / 2);
-  return sorted.length % 2 === 0
-    ? (sorted[middle - 1] + sorted[middle]) / 2
-    : sorted[middle];
-}
-
-function distanceKm(
-  latitudeA: number,
-  longitudeA: number,
-  latitudeB: number,
-  longitudeB: number
-): number {
-  const radians = (degrees: number) => degrees * Math.PI / 180;
-  const latitudeDelta = radians(latitudeB - latitudeA);
-  const longitudeDelta = radians(longitudeB - longitudeA);
-  const a = Math.sin(latitudeDelta / 2) ** 2
-    + Math.cos(radians(latitudeA))
-      * Math.cos(radians(latitudeB))
-      * Math.sin(longitudeDelta / 2) ** 2;
-  return 6371 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-}
-
-function validCoordinate(value: number | null, minimum: number, maximum: number): number | null {
-  return typeof value === 'number' && Number.isFinite(value) && value >= minimum && value <= maximum
-    ? value
+function validCoordinate(value: unknown, minimum: number, maximum: number): number | null {
+  const parsed = parseCoordinateValue(value);
+  return parsed !== null && parsed >= minimum && parsed <= maximum
+    ? parsed
     : null;
 }
 
 export function isValidCoordinatePair(latitude: unknown, longitude: unknown): latitude is number {
-  return validCoordinate(typeof latitude === 'number' ? latitude : null, -90, 90) !== null
-    && validCoordinate(typeof longitude === 'number' ? longitude : null, -180, 180) !== null;
+  return isStructurallyValidCoordinatePair(latitude, longitude);
 }
 
 export function isFiniteCoordinate(value: unknown): value is number {
@@ -171,59 +150,35 @@ export function buildSafeMapPayload(
   };
 }
 
+function toMapCoordinateStatus(confidence: CoordinateConfidence): MapCoordinateStatus {
+  if (confidence === 'valid') return 'valid';
+  if (confidence === 'corrected_swap') return 'corrected';
+  if (confidence === 'outlier' || confidence === 'invalid' || confidence === 'ambiguous') return 'invalid';
+  return 'missing';
+}
+
+function toCoordinateConfidence(status: MapCoordinateStatus): CoordinateConfidence | undefined {
+  if (status === 'corrected') return 'corrected_swap';
+  if (status === 'invalid') return 'invalid';
+  if (status === 'missing') return 'unavailable';
+  return undefined;
+}
+
 function sanitizeRouteCoordinates(stops: MapStop[]): MapStop[] {
-  const locatedStops = getLocatedMapStops(stops);
-  if (locatedStops.length < MIN_CLUSTER_SIZE) return stops;
+  const routeInput = stops.map(stop => ({
+    ...stop,
+    coordinateConfidence: toCoordinateConfidence(stop.coordinateStatus),
+  }));
 
-  const centerLatitude = median(locatedStops.map(stop => stop.latitude));
-  const centerLongitude = median(locatedStops.map(stop => stop.longitude));
-  const distances = locatedStops.map(stop =>
-    distanceKm(stop.latitude, stop.longitude, centerLatitude, centerLongitude)
-  );
-  const typicalDistance = median(distances);
-  const outlierThreshold = Math.max(
-    MIN_OUTLIER_DISTANCE_KM,
-    typicalDistance * 8
-  );
-
-  return stops.map(stop => {
-    if (stop.latitude === null || stop.longitude === null) return stop;
-    const originalDistance = distanceKm(
-      stop.latitude,
-      stop.longitude,
-      centerLatitude,
-      centerLongitude
-    );
-    if (originalDistance <= outlierThreshold) return stop;
-
-    const swappedLatitude = validCoordinate(stop.longitude, -90, 90);
-    const swappedLongitude = validCoordinate(stop.latitude, -180, 180);
-    if (swappedLatitude !== null && swappedLongitude !== null) {
-      const swappedDistance = distanceKm(
-        swappedLatitude,
-        swappedLongitude,
-        centerLatitude,
-        centerLongitude
-      );
-      const isClearlyCloser = swappedDistance <= outlierThreshold
-        && swappedDistance * 4 < originalDistance;
-      if (isClearlyCloser) {
-        return {
-          ...stop,
-          latitude: swappedLatitude,
-          longitude: swappedLongitude,
-          coordinateStatus: 'corrected' as const,
-        };
-      }
-    }
-
-    return {
-      ...stop,
-      latitude: null,
-      longitude: null,
-      coordinateStatus: 'invalid' as const,
-    };
-  });
+  return sanitizeCoordinateIntegrityRoute(routeInput).map(stop => ({
+    ...stop,
+    latitude: stop.coordinateIntegrity.latitude,
+    longitude: stop.coordinateIntegrity.longitude,
+    coordinateStatus: stop.coordinateStatus === 'recovered'
+      && stop.coordinateIntegrity.confidence === 'valid'
+      ? 'recovered'
+      : toMapCoordinateStatus(stop.coordinateIntegrity.confidence),
+  }));
 }
 
 function inheritDuplicateAddressCoordinates(stops: MapStop[]): MapStop[] {
@@ -272,11 +227,10 @@ export function buildMapStops(route: RouteData): MapStop[] {
     : -1;
   const displayedPositions = buildDisplayedRoutePositionMap(route.stops);
 
-  const mapStops = route.stops.map((stop, index) => {
-    const latitude = validCoordinate(stop.latitude, -90, 90);
-    const longitude = validCoordinate(stop.longitude, -180, 180);
-    const hasSourceCoordinate = stop.latitude !== null || stop.longitude !== null;
-    const hasValidPair = latitude !== null && longitude !== null;
+  const sanitizedStops = sanitizeCoordinateIntegrityRoute(route.stops);
+  const mapStops = sanitizedStops.map((stop, index) => {
+    const latitude = validCoordinate(stop.coordinateIntegrity.latitude, -90, 90);
+    const longitude = validCoordinate(stop.coordinateIntegrity.longitude, -180, 180);
     const geocodingInput = buildStopGeocodingInput(stop);
     const address = getPrimaryExecutionAddress(stop);
 
@@ -291,13 +245,9 @@ export function buildMapStops(route: RouteData): MapStop[] {
       state: geocodingInput.state,
       baseAddressKey: getBaseAddressKey(address),
       missingSpreadsheetStop: isMissingSpreadsheetStop(stop),
-      latitude: hasValidPair ? latitude : null,
-      longitude: hasValidPair ? longitude : null,
-      coordinateStatus: hasValidPair
-        ? 'valid' as const
-        : hasSourceCoordinate
-          ? 'invalid' as const
-          : 'missing' as const,
+      latitude,
+      longitude,
+      coordinateStatus: toMapCoordinateStatus(stop.coordinateIntegrity.confidence),
       packageCount: stop.packages.length,
       deliveredCount: stop.packages.filter(pkg => pkg.status === 'delivered').length,
       occurrenceCount: stop.packages.filter(pkg => Boolean(pkg.occurrenceReason)).length,
@@ -309,7 +259,7 @@ export function buildMapStops(route: RouteData): MapStop[] {
     };
   });
 
-  return inheritDuplicateAddressCoordinates(sanitizeRouteCoordinates(mapStops));
+  return inheritDuplicateAddressCoordinates(mapStops);
 }
 
 export function getMapCoordinateState(stops: readonly MapStop[]): MapCoordinateState {

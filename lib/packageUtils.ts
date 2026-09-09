@@ -13,6 +13,10 @@ import {
   smartAddressKeyForPackage,
   type SmartBlockGroup,
 } from './smartAddressGrouping.ts';
+import {
+  sanitizeCoordinatePair,
+  type CoordinateConfidence,
+} from './coordinateIntegrity.ts';
 
 export interface RawPackage {
   trackingNumber: string;
@@ -23,6 +27,10 @@ export interface RawPackage {
   state?: string;
   latitude: number | null;
   longitude: number | null;
+  coordinateConfidence?: CoordinateConfidence;
+  originalLatitude?: number | null;
+  originalLongitude?: number | null;
+  coordinateIssue?: string;
   stopNumber: number | null;
 }
 
@@ -36,6 +44,10 @@ export interface PackageItem {
   state?: string;
   latitude: number | null;
   longitude: number | null;
+  coordinateConfidence?: CoordinateConfidence;
+  originalLatitude?: number | null;
+  originalLongitude?: number | null;
+  coordinateIssue?: string;
   stopNumber: number | null;
   status: 'pending' | 'delivered' | 'skipped';
   occurrenceReason?: string;
@@ -72,6 +84,10 @@ export interface GroupedStop {
   zipCode: string;
   latitude: number | null;
   longitude: number | null;
+  coordinateConfidence?: CoordinateConfidence;
+  originalLatitude?: number | null;
+  originalLongitude?: number | null;
+  coordinateIssue?: string;
   // All packages in this stop (flat list for status tracking)
   packages: PackageItem[];
   packageCount: number;
@@ -93,6 +109,17 @@ export interface ImportSummary {
   largestStop: { stopNumber: number; address: string; count: number };
   smallestStop: { stopNumber: number; address: string; count: number };
 }
+
+type RawPackageColumnKey =
+  | 'trackingNumber'
+  | 'sequence'
+  | 'destinationAddress'
+  | 'zipCode'
+  | 'city'
+  | 'state'
+  | 'latitude'
+  | 'longitude'
+  | 'stopNumber';
 
 const ADDRESS_ABBREVIATIONS: Record<string, string[]> = {
   'Rua': ['Rua', 'R.', 'R', 'RUA', 'rua'],
@@ -160,8 +187,8 @@ export function getPackageSecondaryLabel(
   return pkg.sequence?.trim() ? `SPX TN: ${pkg.trackingNumber}` : null;
 }
 
-export function detectColumns(headers: string[]): Record<keyof RawPackage, number | null> {
-  const mapping: Record<keyof RawPackage, number | null> = {
+export function detectColumns(headers: string[]): Record<RawPackageColumnKey, number | null> {
+  const mapping: Record<RawPackageColumnKey, number | null> = {
     trackingNumber: null,
     sequence: null,
     destinationAddress: null,
@@ -175,7 +202,7 @@ export function detectColumns(headers: string[]): Record<keyof RawPackage, numbe
 
   // Strict exact-match candidates. "stop" variants have highest priority for stopNumber.
   // "sequence"/"seq" are intentionally excluded from stopNumber — they are order sequence only.
-  const exactMatches: Record<keyof RawPackage, string[]> = {
+  const exactMatches: Record<RawPackageColumnKey, string[]> = {
     trackingNumber: [
       'spx tn', 'spx_tn', 'tracking', 'tracking number', 'tracking_number',
       'rastreio', 'número rastreio', 'numero rastreio',
@@ -204,7 +231,7 @@ export function detectColumns(headers: string[]): Record<keyof RawPackage, numbe
 
   // Fuzzy fallback (only applied when exact match fails)
   // stopNumber fuzzy: only /\bstop\b/i or /\bparada\b/i — not seq/order
-  const fuzzyPatterns: Record<keyof RawPackage, RegExp[]> = {
+  const fuzzyPatterns: Record<RawPackageColumnKey, RegExp[]> = {
     sequence: [/sequ[eê]ncia/i, /^sequence$/i, /^seq$/i],
     trackingNumber: [/track/i, /rastreio/i, /cod[ií]go/i, /id[_\s]?pacote/i, /package[_\s]?id/i, /spx/i, /\btn\b/i],
     destinationAddress: [/endere[cç]o/i, /address/i, /destin/i, /logradouro/i],
@@ -220,9 +247,9 @@ export function detectColumns(headers: string[]): Record<keyof RawPackage, numbe
   headers.forEach((header, index) => {
     const clean = header.trim().toLowerCase();
     for (const [field, candidates] of Object.entries(exactMatches)) {
-      if (mapping[field as keyof RawPackage] !== null) continue;
+      if (mapping[field as RawPackageColumnKey] !== null) continue;
       if (candidates.includes(clean)) {
-        mapping[field as keyof RawPackage] = index;
+        mapping[field as RawPackageColumnKey] = index;
       }
     }
   });
@@ -231,9 +258,9 @@ export function detectColumns(headers: string[]): Record<keyof RawPackage, numbe
   headers.forEach((header, index) => {
     const clean = header.trim().toLowerCase();
     for (const [field, regexes] of Object.entries(fuzzyPatterns)) {
-      if (mapping[field as keyof RawPackage] !== null) continue;
+      if (mapping[field as RawPackageColumnKey] !== null) continue;
       if (regexes.some(r => r.test(clean))) {
-        mapping[field as keyof RawPackage] = index;
+        mapping[field as RawPackageColumnKey] = index;
       }
     }
   });
@@ -270,10 +297,9 @@ export function parseSpreadsheetData(rows: any[][], headers: string[]): RawPacka
       ? parseValidStopNumber(row[mapping.stopNumber])
       : null;
 
-    const parseCoordinate = (value: unknown, minimum: number, maximum: number) => {
-      const parsed = Number.parseFloat(String(value ?? '').replace(',', '.'));
-      return Number.isFinite(parsed) && parsed >= minimum && parsed <= maximum ? parsed : null;
-    };
+    const latitudeSource = mapping.latitude !== null ? row[mapping.latitude] : null;
+    const longitudeSource = mapping.longitude !== null ? row[mapping.longitude] : null;
+    const coordinate = sanitizeCoordinatePair(latitudeSource, longitudeSource);
 
     packages.push({
       trackingNumber: finalTracking,
@@ -282,12 +308,12 @@ export function parseSpreadsheetData(rows: any[][], headers: string[]): RawPacka
       zipCode: mapping.zipCode !== null ? String(row[mapping.zipCode] ?? '').trim() : '',
       city: mapping.city !== null ? String(row[mapping.city] ?? '').trim() || undefined : undefined,
       state: mapping.state !== null ? String(row[mapping.state] ?? '').trim() || undefined : undefined,
-      latitude: mapping.latitude !== null
-        ? parseCoordinate(row[mapping.latitude], -90, 90)
-        : null,
-      longitude: mapping.longitude !== null
-        ? parseCoordinate(row[mapping.longitude], -180, 180)
-        : null,
+      latitude: coordinate.latitude,
+      longitude: coordinate.longitude,
+      coordinateConfidence: coordinate.confidence,
+      originalLatitude: coordinate.originalLatitude,
+      originalLongitude: coordinate.originalLongitude,
+      coordinateIssue: coordinate.reason,
       stopNumber: stopNum,
     });
   }
@@ -367,6 +393,10 @@ export function groupPackagesByStop(rawPackages: RawPackage[]): GroupedStop[] {
       state: p.state,
       latitude: p.latitude,
       longitude: p.longitude,
+      coordinateConfidence: p.coordinateConfidence,
+      originalLatitude: p.originalLatitude,
+      originalLongitude: p.originalLongitude,
+      coordinateIssue: p.coordinateIssue,
       stopNumber: p.stopNumber,
       status: 'pending',
     }));
@@ -383,6 +413,10 @@ export function groupPackagesByStop(rawPackages: RawPackage[]): GroupedStop[] {
       zipCode: first.zipCode,
       latitude: coordinateSource.latitude,
       longitude: coordinateSource.longitude,
+      coordinateConfidence: coordinateSource.coordinateConfidence,
+      originalLatitude: coordinateSource.originalLatitude,
+      originalLongitude: coordinateSource.originalLongitude,
+      coordinateIssue: coordinateSource.coordinateIssue,
       packages,
       packageCount: packages.length,
       addressGroups,

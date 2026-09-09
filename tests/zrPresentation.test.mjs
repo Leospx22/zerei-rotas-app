@@ -4,6 +4,9 @@ import {
   buildZRExplanations,
   formatDistance,
   formatFuelCurrency,
+  formatMetricConfidence,
+  formatMetricImprovement,
+  formatMetricSavings,
   formatMinutes,
   getZRScoreBand,
 } from '../components/route-ai/zrPresentation.ts';
@@ -40,5 +43,14 @@ test('ZR presentation formatters keep route AI metrics display-ready', () => {
   assert.equal(formatDistance(8.44), '8.4 km');
   assert.equal(formatMinutes(31.2), '31 min');
   assert.equal(formatFuelCurrency(2.984, 6.1), 'R$ 18,20');
+});
+
+test('ZR presentation shows unavailable copy for untrusted savings, confidence, and improvement', () => {
+  assert.equal(formatMetricSavings('12.0 km', 'unreliable'), 'Indisponível');
+  assert.equal(formatMetricImprovement(0, 'unreliable', 'de melhoria'), 'Estimativa indisponível');
+  assert.equal(formatMetricImprovement(0, 'degraded', 'melhor'), 'Estimativa indisponível');
+  assert.equal(formatMetricConfidence(100, 'unreliable'), 'Indisponível');
+  assert.equal(formatMetricConfidence(52, 'degraded'), 'Confiança parcial');
+  assert.equal(formatMetricConfidence(88, 'reliable'), '88%');
 });
 

@@ -1,14 +1,18 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { generateMapRouteSuggestions } from '../lib/route-ai/MapRouteSuggestions.ts';
-import { buildMapRoutePreview } from '../lib/mapOverview.ts';
+import {
+  applyRecoveredMapCoordinates,
+  buildMapRoutePreview,
+  getAiEligibleMapStops,
+} from '../lib/mapOverview.ts';
 import { applyEligibleRouteOrder } from '../lib/routeOrdering.ts';
 
 function coordinateStop(id, latitude, longitude, extra = {}) {
   return { id, latitude, longitude, ...extra };
 }
 
-function mappedStop(id, latitude, longitude, order) {
+function mappedStop(id, latitude, longitude, order, extra = {}) {
   return {
     id,
     order,
@@ -25,6 +29,7 @@ function mappedStop(id, latitude, longitude, order) {
     deliveredCount: 0,
     occurrenceCount: 0,
     status: 'pending',
+    ...extra,
   };
 }
 
@@ -184,4 +189,68 @@ test('invalid preview candidate restores the unchanged original order', () => {
   assert.deepEqual(buildMapRoutePreview(original, ['a', 'a', 'b']), original);
   assert.deepEqual(buildMapRoutePreview(original, ['a', 'b']), original);
   assert.deepEqual(buildMapRoutePreview(original, ['a', 'b', 'missing']), original);
+});
+
+test('AI generation, preview, and acceptance share eligibility for ambiguous coordinates', () => {
+  const validMapStops = geographicStops.map((stop, index) =>
+    mappedStop(stop.id, stop.latitude, stop.longitude, index + 1, {
+      coordinateConfidence: 'valid',
+    })
+  );
+  const ambiguousStop = mappedStop('ambiguous', -23.558, -46.650, 7, {
+    coordinateStatus: 'invalid',
+    coordinateConfidence: 'ambiguous',
+  });
+  const mapStops = [...validMapStops, ambiguousStop];
+  const suggestions = generateMapRouteSuggestions(mapStops);
+  const eligibleIds = getAiEligibleMapStops(mapStops).map(stop => stop.id);
+  const candidate = suggestions.suggestions[0];
+
+  assert.equal(eligibleIds.includes(ambiguousStop.id), false);
+  assert.equal(suggestions.eligibleStopCount, eligibleIds.length);
+  assert.deepEqual([...candidate.stopIds].sort(), [...eligibleIds].sort());
+
+  const preview = buildMapRoutePreview(mapStops, candidate.stopIds);
+  assert.deepEqual(preview.slice(0, eligibleIds.length).map(stop => stop.id), candidate.stopIds);
+  assert.equal(preview.at(-1).id, ambiguousStop.id);
+  assert.notDeepEqual(preview.map(stop => stop.id), mapStops.map(stop => stop.id));
+
+  const routeStops = mapStops.map((stop, index) => routeStop(stop.id, index));
+  const accepted = applyEligibleRouteOrder(routeStops, eligibleIds, candidate.stopIds);
+  const acceptedIds = accepted.stops.map(stop => stop.id);
+
+  assert.equal(accepted.applied, true);
+  assert.equal(acceptedIds.at(-1), ambiguousStop.id);
+  assert.equal(acceptedIds.length, mapStops.length);
+  assert.equal(new Set(acceptedIds).size, mapStops.length);
+  assert.deepEqual([...acceptedIds].sort(), mapStops.map(stop => stop.id).sort());
+});
+
+test('sanitized recovered coordinates are explicitly trusted across the AI flow', () => {
+  const baseStops = [
+    ...geographicStops.slice(0, 5).map((stop, index) =>
+      mappedStop(stop.id, stop.latitude, stop.longitude, index + 1, {
+        coordinateConfidence: 'valid',
+      })
+    ),
+    mappedStop('recovered', null, null, 6),
+  ];
+  const recoveredStops = applyRecoveredMapCoordinates(baseStops, {
+    recovered: { latitude: -23.562, longitude: -46.658 },
+  });
+  const recovered = recoveredStops.find(stop => stop.id === 'recovered');
+  const suggestions = generateMapRouteSuggestions(recoveredStops);
+  const eligibleIds = getAiEligibleMapStops(recoveredStops).map(stop => stop.id);
+
+  assert.equal(recovered.coordinateStatus, 'recovered');
+  assert.equal(recovered.coordinateConfidence, 'valid');
+  assert.equal(eligibleIds.includes('recovered'), true);
+  assert.equal(suggestions.eligibleStopCount, eligibleIds.length);
+  assert.equal(suggestions.suggestions[0].stopIds.includes('recovered'), true);
+  assert.deepEqual(
+    buildMapRoutePreview(recoveredStops, suggestions.suggestions[0].stopIds)
+      .slice(0, eligibleIds.length)
+      .map(stop => stop.id),
+    suggestions.suggestions[0].stopIds
+  );
 });

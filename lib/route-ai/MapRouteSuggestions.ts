@@ -1,5 +1,6 @@
 import {
   haversineDistanceKm,
+  isAiRouteEligibleCoordinate,
   sanitizeRouteCoordinates,
   type CoordinateConfidence,
   type CoordinatePair,
@@ -50,16 +51,16 @@ export function generateMapRouteSuggestions(
     coordinateConfidence: resolveInputConfidence(stop),
   })));
   const eligible: LocatedSuggestionStop[] = sanitized.flatMap(stop => {
-    const latitude = stop.coordinateIntegrity.latitude;
-    const longitude = stop.coordinateIntegrity.longitude;
     if (
-      latitude === null
-      || longitude === null
-      || !isReliableConfidence(stop.coordinateIntegrity.confidence)
+      !isAiRouteEligibleCoordinate(stop.coordinateIntegrity)
     ) {
       return [];
     }
-    return [{ ...stop, latitude, longitude }];
+    return [{
+      ...stop,
+      latitude: stop.coordinateIntegrity.latitude,
+      longitude: stop.coordinateIntegrity.longitude,
+    }];
   });
   const reliableRatio = eligible.length / Math.max(stops.length, 1);
 
@@ -120,14 +121,14 @@ export function generateMapRouteSuggestions(
 
 function resolveInputConfidence(stop: MapRouteSuggestionStop): CoordinateConfidence | undefined {
   if (stop.coordinateConfidence) return stop.coordinateConfidence;
+  // Recovered map coordinates only retain this status after mapOverview
+  // sanitizes them to the canonical valid confidence.
+  if (stop.coordinateStatus === 'recovered') return 'valid';
+  if (stop.coordinateStatus === 'valid') return 'valid';
   if (stop.coordinateStatus === 'corrected') return 'corrected_swap';
   if (stop.coordinateStatus === 'invalid') return 'invalid';
   if (stop.coordinateStatus === 'missing') return 'unavailable';
   return undefined;
-}
-
-function isReliableConfidence(confidence: CoordinateConfidence): boolean {
-  return confidence === 'valid' || confidence === 'corrected_swap';
 }
 
 function findLogicalEndpoints(

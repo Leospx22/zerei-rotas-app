@@ -63,6 +63,14 @@ export interface CoordinateIntegritySummary {
   unavailable: number;
 }
 
+export type AiRouteEligibleConfidence = 'valid' | 'corrected_swap';
+
+export interface AiRouteEligibleCoordinate {
+  latitude: number;
+  longitude: number;
+  confidence: AiRouteEligibleConfidence;
+}
+
 export const BRAZIL_COORDINATE_CONTEXT: CoordinateValidationContext = {
   id: 'BR',
   label: 'Brasil',
@@ -103,6 +111,17 @@ export function isStructurallyValidCoordinatePair(
     && lat <= 90
     && lng >= -180
     && lng <= 180;
+}
+
+/** Canonical coordinate rule for AI map organization. */
+export function isAiRouteEligibleCoordinate(
+  coordinate: Pick<CoordinateValidationResult, 'latitude' | 'longitude' | 'confidence'>
+): coordinate is AiRouteEligibleCoordinate {
+  return coordinate.latitude !== null
+    && coordinate.longitude !== null
+    && Number.isFinite(coordinate.latitude)
+    && Number.isFinite(coordinate.longitude)
+    && (coordinate.confidence === 'valid' || coordinate.confidence === 'corrected_swap');
 }
 
 export function sanitizeCoordinatePair(

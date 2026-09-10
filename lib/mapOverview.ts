@@ -4,6 +4,7 @@ import type { GroupedStop } from './packageUtils.ts';
 import { buildCanonicalNavigationAddress, buildStopGeocodingInput } from './geocoding.ts';
 import {
   sanitizeRouteCoordinates as sanitizeCoordinateIntegrityRoute,
+  isAiRouteEligibleCoordinate,
   isStructurallyValidCoordinatePair,
   parseCoordinateValue,
   type CoordinateConfidence,
@@ -32,6 +33,7 @@ export interface MapStop {
   latitude: number | null;
   longitude: number | null;
   coordinateStatus: MapCoordinateStatus;
+  coordinateConfidence?: CoordinateConfidence;
   packageCount: number;
   deliveredCount: number;
   occurrenceCount: number;
@@ -157,11 +159,11 @@ function toMapCoordinateStatus(confidence: CoordinateConfidence): MapCoordinateS
   return 'missing';
 }
 
-function toCoordinateConfidence(status: MapCoordinateStatus): CoordinateConfidence | undefined {
+function toCoordinateConfidence(status: MapCoordinateStatus): CoordinateConfidence {
+  if (status === 'valid' || status === 'recovered') return 'valid';
   if (status === 'corrected') return 'corrected_swap';
   if (status === 'invalid') return 'invalid';
-  if (status === 'missing') return 'unavailable';
-  return undefined;
+  return 'unavailable';
 }
 
 function sanitizeRouteCoordinates(stops: MapStop[]): MapStop[] {
@@ -174,6 +176,7 @@ function sanitizeRouteCoordinates(stops: MapStop[]): MapStop[] {
     ...stop,
     latitude: stop.coordinateIntegrity.latitude,
     longitude: stop.coordinateIntegrity.longitude,
+    coordinateConfidence: stop.coordinateIntegrity.confidence,
     coordinateStatus: stop.coordinateStatus === 'recovered'
       && stop.coordinateIntegrity.confidence === 'valid'
       ? 'recovered'
@@ -248,6 +251,7 @@ export function buildMapStops(route: RouteData): MapStop[] {
       latitude,
       longitude,
       coordinateStatus: toMapCoordinateStatus(stop.coordinateIntegrity.confidence),
+      coordinateConfidence: stop.coordinateIntegrity.confidence,
       packageCount: stop.packages.length,
       deliveredCount: stop.packages.filter(pkg => pkg.status === 'delivered').length,
       occurrenceCount: stop.packages.filter(pkg => Boolean(pkg.occurrenceReason)).length,
@@ -277,13 +281,24 @@ export function getLocatedMapStops(stops: readonly MapStop[]): LocatedMapStop[] 
   );
 }
 
+export function getAiEligibleMapStops(stops: readonly MapStop[]): LocatedMapStop[] {
+  return stops.filter((stop): stop is LocatedMapStop =>
+    isValidCoordinatePair(stop.latitude, stop.longitude)
+    && isAiRouteEligibleCoordinate({
+      latitude: stop.latitude,
+      longitude: stop.longitude,
+      confidence: stop.coordinateConfidence ?? toCoordinateConfidence(stop.coordinateStatus),
+    })
+  );
+}
+
 export function buildMapRoutePreview(
   stops: readonly MapStop[],
   candidateStopIds: readonly string[] | null
 ): MapStop[] {
   if (!candidateStopIds) return [...stops];
   const stopsById = new Map(stops.map(stop => [stop.id, stop]));
-  const eligibleIds = getLocatedMapStops(stops).map(stop => stop.id);
+  const eligibleIds = getAiEligibleMapStops(stops).map(stop => stop.id);
   const expectedIds = new Set(eligibleIds);
   const candidateIds = new Set(candidateStopIds);
   if (

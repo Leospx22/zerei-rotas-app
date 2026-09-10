@@ -33,7 +33,7 @@ import {
   buildSafeMapPayload,
   buildMapRoutePreview,
   applyRecoveredMapCoordinates,
-  getLocatedMapStops,
+  getAiEligibleMapStops,
   getMapCoordinateSummary,
   getMapCoordinateState,
   shouldAttemptNativeRouteMap,
@@ -153,7 +153,7 @@ export default function MapOverviewScreen() {
 
   const acceptSuggestion = () => {
     if (!currentRoute || !activeSuggestion) return;
-    const eligibleStopIds = getLocatedMapStops(mapStops).map(stop => stop.id);
+    const eligibleStopIds = getAiEligibleMapStops(mapStops).map(stop => stop.id);
     const result = applyEligibleRouteOrder(
       currentRoute.stops,
       eligibleStopIds,

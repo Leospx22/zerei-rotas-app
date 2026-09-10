@@ -277,6 +277,33 @@ export function getLocatedMapStops(stops: readonly MapStop[]): LocatedMapStop[] 
   );
 }
 
+export function buildMapRoutePreview(
+  stops: readonly MapStop[],
+  candidateStopIds: readonly string[] | null
+): MapStop[] {
+  if (!candidateStopIds) return [...stops];
+  const stopsById = new Map(stops.map(stop => [stop.id, stop]));
+  const eligibleIds = getLocatedMapStops(stops).map(stop => stop.id);
+  const expectedIds = new Set(eligibleIds);
+  const candidateIds = new Set(candidateStopIds);
+  if (
+    expectedIds.size !== eligibleIds.length
+    || candidateIds.size !== candidateStopIds.length
+    || candidateStopIds.length !== eligibleIds.length
+    || candidateStopIds.some(stopId => !expectedIds.has(stopId))
+  ) {
+    return [...stops];
+  }
+
+  const orderedEligibleStops = candidateStopIds.map(stopId => stopsById.get(stopId)!);
+  const ineligibleStops = stops.filter(stop => !expectedIds.has(stop.id));
+  return [...orderedEligibleStops, ...ineligibleStops].map((stop, index) => ({
+    ...stop,
+    order: index + 1,
+    badge: index < orderedEligibleStops.length ? `#${index + 1}` : stop.badge,
+  }));
+}
+
 export function getMapCoordinateSummary(stops: readonly MapStop[]): MapCoordinateSummary {
   return {
     totalCount: stops.length,

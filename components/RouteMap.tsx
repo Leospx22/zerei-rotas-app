@@ -8,6 +8,7 @@ interface RouteMapProps {
   selectedStopId: string | null;
   focusStopId: string | null;
   onSelectStop: (stopId: string) => void;
+  isPreview?: boolean;
 }
 
 export default function RouteMap({ stops }: RouteMapProps) {

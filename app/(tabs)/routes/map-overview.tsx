@@ -21,6 +21,7 @@ import {
   Navigation,
   Package,
   Play,
+  Sparkles,
 } from 'lucide-react-native';
 import RouteMap from '@/components/RouteMap';
 import RouteSequenceList from '@/components/RouteSequenceList';
@@ -30,12 +31,16 @@ import { buildGoogleMapsSearchUrl } from '@/lib/mapNavigation';
 import { useMapStops } from '@/hooks/useMapStops';
 import {
   buildSafeMapPayload,
+  buildMapRoutePreview,
   applyRecoveredMapCoordinates,
+  getLocatedMapStops,
   getMapCoordinateSummary,
   getMapCoordinateState,
   shouldAttemptNativeRouteMap,
   mapStopStatusLabel,
 } from '@/lib/mapOverview';
+import { generateMapRouteSuggestions } from '@/lib/route-ai/MapRouteSuggestions';
+import { applyEligibleRouteOrder } from '@/lib/routeOrdering';
 import { buildStopGeocodingInput, resolveGeocoding } from '@/lib/geocoding';
 import {
   getBestManualAddress,
@@ -85,24 +90,36 @@ function MapFallbackCard({ reason, onRetry }: { reason: string; onRetry: () => v
 
 export default function MapOverviewScreen() {
   const router = useRouter();
-  const { currentRoute } = useRoute();
+  const { currentRoute, setCurrentRoute } = useRoute();
   const baseMapStops = useMapStops(currentRoute);
   const [recoveredCoordinates, setRecoveredCoordinates] = useState<Record<string, { latitude: number; longitude: number }>>({});
   const mapStops = useMemo(
     () => applyRecoveredMapCoordinates(baseMapStops, recoveredCoordinates),
     [baseMapStops, recoveredCoordinates]
   );
-  const initialStop = mapStops.find(stop => stop.status === 'current') ?? mapStops[0] ?? null;
+  const routeSuggestions = useMemo(
+    () => generateMapRouteSuggestions(mapStops),
+    [mapStops]
+  );
+  const [activeSuggestionIndex, setActiveSuggestionIndex] = useState<number | null>(null);
+  const activeSuggestion = activeSuggestionIndex === null
+    ? null
+    : routeSuggestions.suggestions[activeSuggestionIndex] ?? null;
+  const displayedMapStops = useMemo(
+    () => buildMapRoutePreview(mapStops, activeSuggestion?.stopIds ?? null),
+    [activeSuggestion?.stopIds, mapStops]
+  );
+  const initialStop = displayedMapStops.find(stop => stop.status === 'current') ?? displayedMapStops[0] ?? null;
   const [selectedStopId, setSelectedStopId] = useState<string | null>(initialStop?.id ?? null);
   const [focusStopId, setFocusStopId] = useState<string | null>(null);
   const [retryingStopId, setRetryingStopId] = useState<string | null>(null);
   const [mapRetryKey, setMapRetryKey] = useState(0);
-  const selectedStop = mapStops.find(stop => stop.id === selectedStopId) ?? initialStop;
+  const selectedStop = displayedMapStops.find(stop => stop.id === selectedStopId) ?? initialStop;
   const coordinateState = getMapCoordinateState(mapStops);
   const coordinateSummary = getMapCoordinateSummary(mapStops);
   const safeMapPayload = useMemo(
-    () => buildSafeMapPayload(mapStops, selectedStop?.id ?? null),
-    [mapStops, selectedStop?.id]
+    () => buildSafeMapPayload(displayedMapStops, selectedStop?.id ?? null),
+    [displayedMapStops, selectedStop?.id]
   );
   const canAttemptNativeMap = shouldAttemptNativeRouteMap(
     safeMapPayload.canRenderNativeMap,
@@ -118,6 +135,37 @@ export default function MapOverviewScreen() {
       return;
     }
     setMapRetryKey(previous => previous + 1);
+  };
+
+  const activateAIOrganization = () => {
+    if (routeSuggestions.suggestions.length === 0) return;
+    setActiveSuggestionIndex(0);
+  };
+
+  const switchSuggestion = () => {
+    if (routeSuggestions.suggestions.length < 2) return;
+    setActiveSuggestionIndex(previous => previous === 1 ? 0 : 1);
+  };
+
+  const keepOriginalRoute = () => {
+    setActiveSuggestionIndex(null);
+  };
+
+  const acceptSuggestion = () => {
+    if (!currentRoute || !activeSuggestion) return;
+    const eligibleStopIds = getLocatedMapStops(mapStops).map(stop => stop.id);
+    const result = applyEligibleRouteOrder(
+      currentRoute.stops,
+      eligibleStopIds,
+      activeSuggestion.stopIds
+    );
+    if (!result.applied) {
+      Alert.alert('Não foi possível aplicar esta sequência com segurança.');
+      return;
+    }
+    setActiveSuggestionIndex(null);
+    setCurrentRoute({ ...currentRoute, stops: result.stops });
+    Alert.alert('Sequência atualizada.');
   };
 
   const selectStopFromList = (stopId: string) => {
@@ -251,6 +299,84 @@ export default function MapOverviewScreen() {
         </View>
       ) : null}
 
+      <View style={[styles.aiControl, activeSuggestion && styles.aiControlPreview]}>
+        {activeSuggestion ? (
+          <>
+            <View style={styles.aiControlHeader}>
+              <Sparkles size={18} color={Colors.gold[400]} />
+              <Text style={styles.aiControlTitle}>
+                Sugestão {(activeSuggestionIndex ?? 0) + 1} de {routeSuggestions.suggestions.length}
+              </Text>
+            </View>
+            <Text style={styles.aiControlHint}>
+              {routeSuggestions.eligibleStopCount} de {routeSuggestions.totalStopCount} paradas incluídas nesta sugestão.
+            </Text>
+            {routeSuggestions.alternativeUnavailable ? (
+              <Text style={styles.aiAlternativeHint}>Não foi encontrada outra alternativa útil para esta rota.</Text>
+            ) : null}
+            <View style={styles.aiActions}>
+              <TouchableOpacity
+                style={styles.aiPrimaryButton}
+                onPress={acceptSuggestion}
+                activeOpacity={0.78}
+                accessibilityRole="button"
+                accessibilityLabel="Usar esta sequência"
+              >
+                <Text style={styles.aiPrimaryButtonText}>Usar esta sequência</Text>
+              </TouchableOpacity>
+              {routeSuggestions.suggestions.length > 1 ? (
+                <TouchableOpacity
+                  style={styles.aiSecondaryButton}
+                  onPress={switchSuggestion}
+                  activeOpacity={0.78}
+                  accessibilityRole="button"
+                  accessibilityLabel={activeSuggestionIndex === 1 ? 'Voltar à sugestão 1' : 'Ver outra sugestão'}
+                >
+                  <Text style={styles.aiSecondaryButtonText}>
+                    {activeSuggestionIndex === 1 ? 'Voltar à sugestão 1' : 'Ver outra sugestão'}
+                  </Text>
+                </TouchableOpacity>
+              ) : null}
+              <TouchableOpacity
+                style={styles.aiSecondaryButton}
+                onPress={keepOriginalRoute}
+                activeOpacity={0.78}
+                accessibilityRole="button"
+                accessibilityLabel="Manter original"
+              >
+                <Text style={styles.aiSecondaryButtonText}>Manter original</Text>
+              </TouchableOpacity>
+            </View>
+          </>
+        ) : (
+          <>
+            <TouchableOpacity
+              style={[
+                styles.aiLaunchButton,
+                routeSuggestions.suggestions.length === 0 && styles.aiLaunchButtonDisabled,
+              ]}
+              onPress={activateAIOrganization}
+              disabled={routeSuggestions.suggestions.length === 0}
+              activeOpacity={0.78}
+              accessibilityRole="button"
+              accessibilityLabel="Organizar com IA"
+            >
+              <Text style={[
+                styles.aiLaunchButtonText,
+                routeSuggestions.suggestions.length === 0 && styles.aiLaunchButtonTextDisabled,
+              ]}>
+                ✨ Organizar com IA
+              </Text>
+            </TouchableOpacity>
+            {routeSuggestions.suppressedReason ? (
+              <Text style={styles.aiUnavailableText}>
+                Não há coordenadas confiáveis suficientes para organizar esta rota.
+              </Text>
+            ) : null}
+          </>
+        )}
+      </View>
+
       {canAttemptNativeMap ? (
         <MapVisualizationBoundary
           key={mapRetryKey}
@@ -262,10 +388,11 @@ export default function MapOverviewScreen() {
           )}
         >
           <RouteMap
-            stops={mapStops}
+            stops={displayedMapStops}
             selectedStopId={selectedStop?.id ?? null}
             focusStopId={focusStopId}
             onSelectStop={setSelectedStopId}
+            isPreview={activeSuggestion !== null}
           />
         </MapVisualizationBoundary>
       ) : (
@@ -373,7 +500,7 @@ export default function MapOverviewScreen() {
         <Text style={styles.routeListTitle}>Ordem da rota</Text>
         <Text style={styles.routeListHint}>Toque em uma parada para selecioná-la no mapa.</Text>
         <RouteSequenceList
-          stops={mapStops}
+          stops={displayedMapStops}
           selectedStopId={selectedStop?.id ?? null}
           onSelectStop={selectStopFromList}
           onNavigateStop={stop => navigateToAddress(stop.navigationAddress || stop.address)}
@@ -434,6 +561,55 @@ const styles = StyleSheet.create({
   warningTitle: { color: Colors.warning, fontSize: FontSizes.md, fontWeight: '800' },
   warningText: { flex: 1, color: Colors.gray, fontSize: FontSizes.sm, lineHeight: 18 },
   warningCount: { color: Colors.warning, fontSize: FontSizes.sm, fontWeight: '700' },
+  aiControl: {
+    gap: Spacing.sm,
+    padding: Spacing.sm,
+    borderRadius: BorderRadius.md,
+    borderWidth: 1,
+    borderColor: Colors.cardBorder,
+    backgroundColor: Colors.cardBg,
+  },
+  aiControlPreview: { borderColor: Colors.gold[700] },
+  aiControlHeader: { flexDirection: 'row', alignItems: 'center', gap: Spacing.xs },
+  aiControlTitle: { color: Colors.white, fontSize: FontSizes.md, fontWeight: '900' },
+  aiControlHint: { color: Colors.gray, fontSize: FontSizes.sm },
+  aiAlternativeHint: { color: Colors.warning, fontSize: FontSizes.sm },
+  aiActions: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.xs },
+  aiLaunchButton: {
+    minHeight: 44,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: Spacing.xs,
+    borderRadius: BorderRadius.sm,
+    backgroundColor: Colors.overlay,
+  },
+  aiLaunchButtonDisabled: { opacity: 0.65 },
+  aiLaunchButtonText: { color: Colors.gold[400], fontSize: FontSizes.md, fontWeight: '900' },
+  aiLaunchButtonTextDisabled: { color: Colors.gray },
+  aiUnavailableText: { color: Colors.gray, fontSize: FontSizes.sm, lineHeight: 18, textAlign: 'center' },
+  aiPrimaryButton: {
+    minHeight: 40,
+    flexGrow: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: Spacing.sm,
+    borderRadius: BorderRadius.sm,
+    backgroundColor: Colors.gold[500],
+  },
+  aiPrimaryButtonText: { color: Colors.primary[900], fontSize: FontSizes.sm, fontWeight: '900' },
+  aiSecondaryButton: {
+    minHeight: 40,
+    flexGrow: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: Spacing.sm,
+    borderRadius: BorderRadius.sm,
+    borderWidth: 1,
+    borderColor: Colors.gold[700],
+    backgroundColor: Colors.overlay,
+  },
+  aiSecondaryButtonText: { color: Colors.gold[400], fontSize: FontSizes.sm, fontWeight: '800' },
   mapFallbackCard: {
     minHeight: 180,
     alignItems: 'center',

@@ -10,6 +10,37 @@ export interface OptimizedRouteOrderResult<T> {
   applied: boolean;
 }
 
+export function applyEligibleRouteOrder<T extends { id: string; orderIndex: number }>(
+  stops: readonly T[],
+  eligibleStopIds: readonly string[],
+  candidateStopIds: readonly string[]
+): OptimizedRouteOrderResult<T> {
+  const expectedEligibleIds = new Set(eligibleStopIds);
+  const candidateIds = new Set(candidateStopIds);
+  if (
+    expectedEligibleIds.size !== eligibleStopIds.length
+    || candidateIds.size !== candidateStopIds.length
+    || candidateStopIds.length !== eligibleStopIds.length
+    || candidateStopIds.some(stopId => !expectedEligibleIds.has(stopId))
+    || eligibleStopIds.some(stopId => !stops.some(stop => stop.id === stopId))
+  ) {
+    return { stops: [...stops], applied: false };
+  }
+
+  const ineligibleStopIds = stops
+    .filter(stop => !expectedEligibleIds.has(stop.id))
+    .map(stop => stop.id);
+
+  return applyOptimizedRouteOrder(
+    stops,
+    [...candidateStopIds, ...ineligibleStopIds],
+    {
+      recommendationAction: 'use-optimized-route',
+      metricConfidence: 'reliable',
+    }
+  );
+}
+
 export function moveRouteStop<T extends { orderIndex: number }>(
   stops: readonly T[],
   fromIndex: number,

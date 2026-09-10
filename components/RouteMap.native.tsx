@@ -9,6 +9,7 @@ interface RouteMapProps {
   selectedStopId: string | null;
   focusStopId: string | null;
   onSelectStop: (stopId: string) => void;
+  isPreview?: boolean;
 }
 
 const ENABLE_MAP_DIAGNOSTICS =
@@ -34,7 +35,7 @@ function markerLabel(stop: MapStop): string {
   return stop.badge.replace('#', '');
 }
 
-export default function RouteMap({ stops, selectedStopId, focusStopId, onSelectStop }: RouteMapProps) {
+export default function RouteMap({ stops, selectedStopId, focusStopId, onSelectStop, isPreview = false }: RouteMapProps) {
   const mapRef = useRef<MapView>(null);
   const fitAttemptedRef = useRef(false);
   const [isMounted, setIsMounted] = useState(false);
@@ -198,7 +199,7 @@ export default function RouteMap({ stops, selectedStopId, focusStopId, onSelectS
           {safePayload.polylineCoordinates.length >= 2 ? (
             <Polyline
               coordinates={safePayload.polylineCoordinates}
-              strokeColor={Colors.gold[500]}
+              strokeColor={isPreview ? Colors.primary[400] : Colors.gold[500]}
               strokeWidth={3}
             />
           ) : null}

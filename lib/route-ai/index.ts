@@ -16,6 +16,7 @@ export * from './RouteAssistantAnalyzer.ts';
 export * from './RouteAnalyzer.ts';
 export * from './RouteComparison.ts';
 export * from './RouteOptimizer.ts';
+export * from './MapRouteSuggestions.ts';
 export * from './RouteScorer.ts';
 export * from './ExecutionProductivityAssistant.ts';
 export * from './runtime/index.ts';

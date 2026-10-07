@@ -4,6 +4,7 @@ import type { GroupedStop } from './packageUtils.ts';
 import { buildCanonicalNavigationAddress, buildStopGeocodingInput } from './geocoding.ts';
 import {
   sanitizeRouteCoordinates as sanitizeCoordinateIntegrityRoute,
+  coordinateStatusToConfidence,
   isAiRouteEligibleCoordinate,
   isStructurallyValidCoordinatePair,
   parseCoordinateValue,
@@ -159,17 +160,10 @@ function toMapCoordinateStatus(confidence: CoordinateConfidence): MapCoordinateS
   return 'missing';
 }
 
-function toCoordinateConfidence(status: MapCoordinateStatus): CoordinateConfidence {
-  if (status === 'valid' || status === 'recovered') return 'valid';
-  if (status === 'corrected') return 'corrected_swap';
-  if (status === 'invalid') return 'invalid';
-  return 'unavailable';
-}
-
 function sanitizeRouteCoordinates(stops: MapStop[]): MapStop[] {
   const routeInput = stops.map(stop => ({
     ...stop,
-    coordinateConfidence: toCoordinateConfidence(stop.coordinateStatus),
+    coordinateConfidence: coordinateStatusToConfidence(stop.coordinateStatus),
   }));
 
   return sanitizeCoordinateIntegrityRoute(routeInput).map(stop => ({
@@ -287,7 +281,7 @@ export function getAiEligibleMapStops(stops: readonly MapStop[]): LocatedMapStop
     && isAiRouteEligibleCoordinate({
       latitude: stop.latitude,
       longitude: stop.longitude,
-      confidence: stop.coordinateConfidence ?? toCoordinateConfidence(stop.coordinateStatus),
+      confidence: stop.coordinateConfidence ?? coordinateStatusToConfidence(stop.coordinateStatus),
     })
   );
 }

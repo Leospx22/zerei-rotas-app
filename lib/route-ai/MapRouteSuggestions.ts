@@ -1,4 +1,5 @@
 import {
+  coordinateStatusToConfidence,
   haversineDistanceKm,
   isAiRouteEligibleCoordinate,
   sanitizeRouteCoordinates,
@@ -121,14 +122,10 @@ export function generateMapRouteSuggestions(
 
 function resolveInputConfidence(stop: MapRouteSuggestionStop): CoordinateConfidence | undefined {
   if (stop.coordinateConfidence) return stop.coordinateConfidence;
-  // Recovered map coordinates only retain this status after mapOverview
-  // sanitizes them to the canonical valid confidence.
-  if (stop.coordinateStatus === 'recovered') return 'valid';
-  if (stop.coordinateStatus === 'valid') return 'valid';
-  if (stop.coordinateStatus === 'corrected') return 'corrected_swap';
-  if (stop.coordinateStatus === 'invalid') return 'invalid';
-  if (stop.coordinateStatus === 'missing') return 'unavailable';
-  return undefined;
+  if (!stop.coordinateStatus) return undefined;
+  // Delegates to the canonical coordinateIntegrity mapping so 'recovered'
+  // (and every other status) resolves identically everywhere it's used.
+  return coordinateStatusToConfidence(stop.coordinateStatus);
 }
 
 function findLogicalEndpoints(

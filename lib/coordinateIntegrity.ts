@@ -113,6 +113,26 @@ export function isStructurallyValidCoordinatePair(
     && lng <= 180;
 }
 
+/**
+ * Route-level coordinate status used by map/AI consumers. 'recovered' is a
+ * derived state (a stop that had no coordinates but inherited trusted ones,
+ * e.g. from a duplicate address) and is always treated as 'valid' confidence.
+ */
+export type CanonicalCoordinateStatus = 'valid' | 'corrected' | 'recovered' | 'invalid' | 'missing';
+
+/**
+ * Canonical, single-source-of-truth mapping from a route coordinate status
+ * to its AI-eligibility confidence. Any module deriving confidence from a
+ * status string (instead of already holding a CoordinateConfidence) must go
+ * through this function so 'recovered' semantics never diverge across files.
+ */
+export function coordinateStatusToConfidence(status: CanonicalCoordinateStatus): CoordinateConfidence {
+  if (status === 'valid' || status === 'recovered') return 'valid';
+  if (status === 'corrected') return 'corrected_swap';
+  if (status === 'invalid') return 'invalid';
+  return 'unavailable';
+}
+
 /** Canonical coordinate rule for AI map organization. */
 export function isAiRouteEligibleCoordinate(
   coordinate: Pick<CoordinateValidationResult, 'latitude' | 'longitude' | 'confidence'>

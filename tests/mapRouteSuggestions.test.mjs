@@ -211,6 +211,7 @@ test('AI generation, preview, and acceptance share eligibility for ambiguous coo
   assert.deepEqual([...candidate.stopIds].sort(), [...eligibleIds].sort());
 
   const preview = buildMapRoutePreview(mapStops, candidate.stopIds);
+  assert.equal(preview.length, mapStops.length);
   assert.deepEqual(preview.slice(0, eligibleIds.length).map(stop => stop.id), candidate.stopIds);
   assert.equal(preview.at(-1).id, ambiguousStop.id);
   assert.notDeepEqual(preview.map(stop => stop.id), mapStops.map(stop => stop.id));
